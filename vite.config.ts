@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
 
   return {
-    // base: '/nexofinance/', // Removido para funcionar na raiz do domínio atual (Cloud Shell/Preview)
+    base: '/nexofinance/',
     plugins: [react()],
     server: {
       port: 3000,
