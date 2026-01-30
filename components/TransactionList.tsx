@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter } from 'lucide-react';
@@ -10,6 +11,7 @@ interface TransactionListProps {
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
   privacyMode: boolean;
+  hasApiKey: boolean;
 }
 
 const CATEGORY_STYLES: Record<string, string> = {
@@ -50,7 +52,7 @@ const INCOME_CATEGORIES = ['Salário', 'Renda Extra', 'Investimentos', 'Presente
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode, hasApiKey }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
@@ -290,10 +292,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             </button>
           </div>
 
-          <label className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 px-4 py-2.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors cursor-pointer text-sm font-medium">
+          <label 
+             title={!hasApiKey ? "Configure a Chave API para usar Leitura de Recibo" : "Ler Recibo com IA"}
+             className={`flex items-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 px-4 py-2.5 rounded-lg transition-colors cursor-pointer text-sm font-medium
+                ${!hasApiKey ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+          >
              {analyzingReceipt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
              <span className="hidden lg:inline">{analyzingReceipt ? 'Lendo...' : 'Ler Recibo'}</span>
-             <input type="file" accept="image/*,.csv" className="hidden" onChange={handleFileUpload} />
+             <input disabled={!hasApiKey} type="file" accept="image/*,.csv" className="hidden" onChange={handleFileUpload} />
           </label>
           <button
             onClick={() => {
@@ -363,9 +369,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             <button
               type="button"
               onClick={handleAutoCategorize}
-              disabled={loadingAutoCat || !newTransaction.description}
-              className="absolute right-2 top-2 text-indigo-500 hover:text-indigo-700 disabled:opacity-30"
-              title="Auto-categorizar com IA"
+              disabled={loadingAutoCat || !newTransaction.description || !hasApiKey}
+              className={`absolute right-2 top-2 ${!hasApiKey ? 'text-slate-400 opacity-50 cursor-not-allowed' : 'text-indigo-500 hover:text-indigo-700'} disabled:opacity-30`}
+              title={!hasApiKey ? "Requer Chave IA" : "Auto-categorizar com IA"}
             >
               {loadingAutoCat ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
             </button>

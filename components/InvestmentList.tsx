@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Investment } from '../types';
 import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
@@ -9,9 +10,10 @@ interface InvestmentListProps {
   onUpdate: (id: string, newAmount: number) => void;
   onDelete: (id: string) => void;
   privacyMode: boolean;
+  hasApiKey: boolean;
 }
 
-export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onAdd, onUpdate, onDelete, privacyMode }) => {
+export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onAdd, onUpdate, onDelete, privacyMode, hasApiKey }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   
   // AI Consultant State
@@ -61,6 +63,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
   };
 
   const handleConsultAi = async () => {
+    if (!hasApiKey) return;
     setShowAiPanel(true);
     setLoadingAdvice(true);
     setAiAdvice(null);
@@ -101,10 +104,16 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
         <div className="flex gap-2">
             <button
                 onClick={handleConsultAi}
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm"
+                disabled={!hasApiKey}
+                title={!hasApiKey ? "Configure a Chave API para usar" : "Consultor IA"}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-sm
+                   ${!hasApiKey 
+                     ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-60'
+                     : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700'
+                   }`}
             >
                 <Sparkles className="w-4 h-4" />
-                Consultor IA
+                Consultor IA {!hasApiKey && <span className="text-[10px] ml-1">(Req. Chave)</span>}
             </button>
             <button
             onClick={() => setIsFormOpen(!isFormOpen)}
