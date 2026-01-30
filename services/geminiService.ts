@@ -7,12 +7,12 @@ const API_KEY_STORAGE = 'nexo_user_api_key';
 
 // Helper functions for API Key Management
 export const getApiKey = (): string | null => {
-  // First try the user's custom key stored in browser
+  // Only use the user's custom key stored in browser
   const storedKey = localStorage.getItem(API_KEY_STORAGE);
   if (storedKey) return storedKey;
   
-  // Fallback to environment variable (dev mode or configured build)
-  return process.env.API_KEY || null;
+  // No fallback to process.env.API_KEY anymore
+  return null;
 };
 
 export const setApiKey = (key: string) => {

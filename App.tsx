@@ -39,9 +39,10 @@ const App: React.FC = () => {
   const [hasKey, setHasKey] = useState(false);
 
   useEffect(() => {
-    // Check if key exists on mount
-    setHasKey(hasCustomApiKey() || !!process.env.API_KEY);
-    // If we have a custom key stored, populate the input (masked usually, but here we just show placeholder logic)
+    // Check if key exists on mount (User custom key only)
+    setHasKey(hasCustomApiKey());
+    
+    // If we have a custom key stored, populate the input
     if (hasCustomApiKey()) {
        setUserKeyInput(getApiKey() || '');
     }
@@ -59,7 +60,7 @@ const App: React.FC = () => {
   const handleRemoveKey = () => {
      removeApiKey();
      setUserKeyInput('');
-     setHasKey(!!process.env.API_KEY);
+     setHasKey(false);
      setIsKeyModalOpen(false);
   };
 
@@ -326,7 +327,7 @@ const App: React.FC = () => {
             <div className="overflow-hidden">
                 <p className="text-xs font-bold text-white truncate">Minha Conta</p>
                 <div className="flex items-center gap-1">
-                   <div className={`w-1.5 h-1.5 rounded-full ${hasKey ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                   <div className={`w-1.5 h-1.5 rounded-full ${hasKey ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
                    <p className="text-[10px] text-slate-400">
                       {hasKey ? 'IA Conectada' : 'IA Offline'}
                    </p>
