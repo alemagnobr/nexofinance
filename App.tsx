@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Receipt, LineChart, PieChart, Eye, EyeOff, Moon, Sun, Target, Calendar, Repeat, MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, Loader2, Maximize, Minimize, Key, Check, Trash2, X, Download, Upload, HardDriveDownload, HardDriveUpload, Github, Linkedin, Heart, ShieldCheck, Copy, Gift, PlusCircle, TrendingUp, Banknote, Lock, Unlock } from 'lucide-react';
+import { LayoutDashboard, Receipt, LineChart, PieChart, Eye, EyeOff, Moon, Sun, Target, Calendar, Repeat, MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, Loader2, Maximize, Minimize, Key, Check, Trash2, X, Download, Upload, HardDriveDownload, HardDriveUpload, Github, Linkedin, Heart, ShieldCheck, Copy, Gift, PlusCircle, TrendingUp, Banknote, Lock, Unlock, Cloud } from 'lucide-react';
 import { AppData, View, Transaction, Investment, Budget, Debt, TransactionStatus } from './types';
 import { loadData, saveData } from './services/storageService';
 import { setApiKey, getApiKey, removeApiKey, hasCustomApiKey } from './services/geminiService';
@@ -1003,11 +1003,11 @@ const App: React.FC = () => {
                           <div className="space-y-6 mt-8 md:mt-0">
                               <div className="flex gap-4">
                                   <div className="bg-white/10 p-2 rounded-lg h-fit">
-                                     <ShieldCheck className="w-6 h-6 text-emerald-300" />
+                                     <Cloud className="w-6 h-6 text-emerald-300" />
                                   </div>
                                   <div>
-                                      <h4 className="font-bold text-lg mb-1">Privacidade Total</h4>
-                                      <p className="text-indigo-100 text-xs leading-relaxed">Este é um Software Livre. Seus dados ficam salvos <strong>apenas no seu navegador</strong>. Nada é enviado para servidores externos.</p>
+                                      <h4 className="font-bold text-lg mb-1">Acesso Seguro</h4>
+                                      <p className="text-indigo-100 text-xs leading-relaxed">Sua conta é protegida pelo sistema de login seguro. Seus registros são vinculados exclusivamente ao seu usuário.</p>
                                   </div>
                               </div>
                               <div className="flex gap-4">
@@ -1015,8 +1015,8 @@ const App: React.FC = () => {
                                      <HardDriveDownload className="w-6 h-6 text-blue-300" />
                                   </div>
                                   <div>
-                                      <h4 className="font-bold text-lg mb-1">Faça Backups!</h4>
-                                      <p className="text-indigo-100 text-xs leading-relaxed">Como os dados são locais, lembre-se de ir em <strong>Dados & Backup</strong> e baixar seu arquivo JSON regularmente.</p>
+                                      <h4 className="font-bold text-lg mb-1">Propriedade dos Dados</h4>
+                                      <p className="text-indigo-100 text-xs leading-relaxed">Você está no comando. Acesse a área de <strong>Dados & Backup</strong> para baixar uma cópia local do seu histórico sempre que desejar.</p>
                                   </div>
                               </div>
                           </div>
