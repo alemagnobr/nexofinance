@@ -6,7 +6,8 @@ import App from './App';
 // Register Service Worker for PWA capabilities
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    // Usando caminho relativo para ser compatível com diferentes base paths
+    navigator.serviceWorker.register('./sw.js')
       .then((registration) => {
         console.log('SW registered: ', registration);
       })

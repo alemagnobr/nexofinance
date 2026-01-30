@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { AppData, ChatMessage } from '../types';
 import { Send, Mic, Sparkles, Bot, User, StopCircle } from 'lucide-react';
-import { chatWithAdvisor } from '../services/geminiService';
+import { chatWithAdvisorStream } from '../services/geminiService';
 
 interface AiAssistantProps {
   data: AppData;
@@ -73,6 +74,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ data, privacyMode }) =
     const textToSend = textOverride || input;
     if (!textToSend.trim()) return;
 
+    // 1. Add User Message
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -84,17 +86,34 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ data, privacyMode }) =
     setInput('');
     setIsLoading(true);
 
-    const responseText = await chatWithAdvisor(textToSend, messages, data);
-
+    // 2. Prepare AI Message Placeholder
+    const aiMsgId = crypto.randomUUID();
     const aiMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: aiMsgId,
       role: 'assistant',
-      content: responseText,
+      content: '', // Start empty
       timestamp: new Date()
     };
-
     setMessages(prev => [...prev, aiMsg]);
-    setIsLoading(false);
+
+    try {
+        // 3. Stream Response
+        const stream = chatWithAdvisorStream(textToSend, messages, data);
+        
+        let fullContent = '';
+        for await (const chunk of stream) {
+            fullContent += chunk;
+            setMessages(prev => prev.map(m => 
+                m.id === aiMsgId ? { ...m, content: fullContent } : m
+            ));
+        }
+    } catch (e) {
+        setMessages(prev => prev.map(m => 
+            m.id === aiMsgId ? { ...m, content: "Desculpe, tive um erro ao processar sua resposta." } : m
+        ));
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -143,26 +162,17 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ data, privacyMode }) =
                       }`}
                   >
                       {msg.content}
+                      {isLoading && msg.content === '' && (
+                         <span className="inline-flex gap-1">
+                            <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce"></span>
+                            <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{animationDelay: '100ms'}}></span>
+                            <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" style={{animationDelay: '200ms'}}></span>
+                         </span>
+                      )}
                   </div>
                </div>
              </div>
            ))}
-           
-           {/* Chat Loading State */}
-           {isLoading && (
-              <div className="flex justify-start w-full">
-                  <div className="flex gap-3 max-w-[80%]">
-                      <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
-                          <Bot className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                  </div>
-              </div>
-           )}
            <div ref={messagesEndRef} />
         </div>
 

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import { Debt, Transaction } from '../types';
 import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon } from 'lucide-react';
 
@@ -9,9 +10,10 @@ interface DebtManagerProps {
   onDelete: (id: string) => void;
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
   privacyMode: boolean;
+  quickActionSignal?: number; // Prop to trigger form open
 }
 
-export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode }) => {
+export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'prescribed'>('all');
 
@@ -35,6 +37,14 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     status: 'open' as Debt['status'],
     notes: ''
   });
+
+  // Effect to listen for Quick Action triggers
+  useEffect(() => {
+    if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
+        setIsFormOpen(true);
+        setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', notes: '' });
+    }
+  }, [quickActionSignal]);
 
   // Helper: Check if debt is prescribed (5 years rule in Brazil)
   const isPrescribed = (dueDateStr: string) => {

@@ -33,62 +33,6 @@ export interface InvestmentAdviceResult {
   sources: { title: string; uri: string }[];
 }
 
-export const generateFinancialAdvice = async (data: AppData): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return "API Key não encontrada. Configure sua chave nas preferências do menu.";
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const totalIncome = data.transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  const totalExpense = data.transactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const pendingBills = data.transactions
-    .filter(t => t.type === 'expense' && t.status === 'pending')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalInvested = data.investments.reduce((sum, i) => sum + i.amount, 0);
-  
-  // Forecasting context
-  const recurringExpenses = data.transactions.filter(t => t.isRecurring && t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const prompt = `
-    Atue como um consultor financeiro.
-    Resumo:
-    - Renda: R$ ${totalIncome.toFixed(2)}
-    - Despesas: R$ ${totalExpense.toFixed(2)}
-    - Contas Pendentes: R$ ${pendingBills.toFixed(2)}
-    - Investido: R$ ${totalInvested.toFixed(2)}
-    - Despesas Recorrentes (Assinaturas/Fixas): R$ ${recurringExpenses.toFixed(2)}
-    
-    Transações recentes: ${JSON.stringify(data.transactions.slice(-5))}
-
-    Forneça 3 conselhos curtos (bullet points). Foque em:
-    1. Fluxo de caixa e contas a pagar.
-    2. Impacto dos gastos recorrentes/assinaturas.
-    3. Oportunidade de investimento.
-    Use Markdown.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text || "Sem análise disponível.";
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Erro na IA. Verifique sua chave de API.";
-  }
-};
-
 export const suggestCategory = async (description: string): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) return 'Outros';
@@ -229,10 +173,13 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
   }
 };
 
-// Function for Chatbot that implicitly generates a "report" for itself before answering
-export const chatWithAdvisor = async (message: string, history: ChatMessage[], data: AppData): Promise<string> => {
+// STREAMING Implementation
+export async function* chatWithAdvisorStream(message: string, history: ChatMessage[], data: AppData) {
   const apiKey = getApiKey();
-  if (!apiKey) return "Por favor, configure sua API Key nas preferências do menu.";
+  if (!apiKey) {
+    yield "Por favor, configure sua API Key nas preferências do menu.";
+    return;
+  }
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -257,24 +204,32 @@ export const chatWithAdvisor = async (message: string, history: ChatMessage[], d
     .map(d => `- ${d.creditor}: R$ ${d.currentAmount} (Status: ${d.status}, Vence: ${d.dueDate})`)
     .join('\n');
 
+  // Determine User Persona for System Instruction
+  let userPersona = "Neutro";
+  if (debts > invested * 2) userPersona = "Endividado (Foco em quitação)";
+  else if (invested > expense * 6) userPersona = "Investidor (Foco em otimização)";
+  else if (income < expense) userPersona = "Déficit (Foco em corte de gastos)";
+
   // This is the "Report" the AI reads for itself to understand the user's situation
   const financialContext = `
     RELATÓRIO FINANCEIRO DO USUÁRIO (Contexto Interno):
     
-    1. RESUMO:
+    1. PERFIL IDENTIFICADO: ${userPersona}
+
+    2. RESUMO:
        - Renda Total: R$ ${income.toFixed(2)}
        - Despesas Totais: R$ ${expense.toFixed(2)}
        - Saldo: R$ ${(income - expense).toFixed(2)}
        - Total Investido: R$ ${invested.toFixed(2)}
        - Dívidas Ativas: R$ ${debts.toFixed(2)}
 
-    2. ÚLTIMAS TRANSAÇÕES:
+    3. ÚLTIMAS TRANSAÇÕES:
     ${recentTransactions}
 
-    3. INVESTIMENTOS:
+    4. INVESTIMENTOS:
     ${investmentPortfolio}
 
-    4. DÍVIDAS:
+    5. DÍVIDAS:
     ${debtList}
   `;
 
@@ -282,11 +237,9 @@ export const chatWithAdvisor = async (message: string, history: ChatMessage[], d
     Você é o NEXO AI, um assistente financeiro pessoal de elite.
     
     OBJETIVO:
-    Ajudar o usuário a gerenciar suas finanças, tirar dúvidas e dar conselhos estratégicos.
+    Ajudar o usuário a gerenciar suas finanças com base no perfil identificado: ${userPersona}.
 
     CONTEXTO:
-    Você acabou de ler o seguinte relatório financeiro completo do usuário. 
-    Use essas informações para responder com precisão, sem que o usuário precise repetir os dados.
     ${financialContext}
 
     DIRETRIZES:
@@ -294,31 +247,38 @@ export const chatWithAdvisor = async (message: string, history: ChatMessage[], d
     - Se o usuário perguntar sobre o saldo, gastos específicos ou investimentos, consulte o relatório acima.
     - Seja proativo: se vir uma dívida vencendo ou gasto alto, pode alertar sutilmente.
     - Use Markdown para formatar valores e listas.
-    - NÃO inicie a conversa listando o relatório, apenas use-o como conhecimento prévio.
   `;
 
-  // Build History for Gemini (last 10 turns)
-  const conversationHistory = history.slice(-6).map(h => `${h.role === 'user' ? 'Usuário' : 'Modelo'}: ${h.content}`).join('\n');
+  // Initialize Chat
+  const chat = ai.chats.create({
+    model: 'gemini-3-flash-preview',
+    config: { systemInstruction }
+  });
 
-  const prompt = `
-    Histórico da conversa:
+  // Load history into chat (GoogleGenAI format)
+  // Note: The history in `chats.create` is usually handled by the `history` param in older SDKs or manual management.
+  // In @google/genai, we usually send the message history as part of the context or maintain the chat object.
+  // For simplicity and statelessness between reloads, we'll just send the current message + a prompt block if needed,
+  // OR rely on the chat object instance if we kept it alive. 
+  // Here, we re-inject recent history context into the user message to simulate memory since we recreate the chat instance.
+  
+  const conversationHistory = history.slice(-6).map(h => `${h.role === 'user' ? 'Usuário' : 'Modelo'}: ${h.content}`).join('\n');
+  const fullMessage = `
+    [Histórico Recente]:
     ${conversationHistory}
     
-    Nova mensagem do Usuário: ${message}
-    Modelo:
+    [Nova Mensagem]: ${message}
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction
-      }
-    });
-    return response.text || "Desculpe, não entendi.";
+    const result = await chat.sendMessageStream({ message: fullMessage });
+    for await (const chunk of result) {
+       if (chunk.text) {
+          yield chunk.text;
+       }
+    }
   } catch (error) {
     console.error(error);
-    return "Erro de conexão com o cérebro digital. Verifique sua Chave de API.";
+    yield "Erro de conexão com o cérebro digital. Verifique sua Chave de API.";
   }
-};
+}

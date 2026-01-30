@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppData, Badge } from '../types';
+import { AppData, Badge, Budget } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -11,26 +11,32 @@ interface DashboardProps {
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
 
-// Gamification Definitions
+// Gamification Definitions with Progress Logic
 const AVAILABLE_BADGES: Badge[] = [
   {
     id: 'first_invest',
     name: 'Investidor Iniciante',
     description: 'Realizou o primeiro investimento.',
     icon: '🌱',
-    unlocked: false,
-    condition: (d) => d.investments.length > 0
+    condition: (d) => d.investments.length > 0,
+    getProgress: (d) => d.investments.length > 0 ? 100 : 0
   },
   {
     id: 'controlled',
     name: 'No Controle',
     description: 'Tem mais receitas que despesas no mês.',
     icon: '⚖️',
-    unlocked: false,
     condition: (d) => {
       const inc = d.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
       const exp = d.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
       return inc > exp && inc > 0;
+    },
+    getProgress: (d) => {
+       const inc = d.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+       const exp = d.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+       if (inc === 0) return 0;
+       if (inc > exp) return 100;
+       return Math.min(99, (inc / exp) * 100); // Inverse logic purely for progress visual roughly
     }
   },
   {
@@ -38,18 +44,21 @@ const AVAILABLE_BADGES: Badge[] = [
     name: 'Poupador',
     description: 'Acumulou mais de R$ 5.000 em investimentos.',
     icon: '💰',
-    unlocked: false,
-    condition: (d) => d.investments.reduce((acc, i) => acc + i.amount, 0) >= 5000
+    condition: (d) => d.investments.reduce((acc, i) => acc + i.amount, 0) >= 5000,
+    getProgress: (d) => Math.min(100, (d.investments.reduce((acc, i) => acc + i.amount, 0) / 5000) * 100)
   },
   {
     id: 'diversified',
     name: 'Mente Diversificada',
     description: 'Investiu em 3 ou mais categorias diferentes.',
     icon: '🎨',
-    unlocked: false,
     condition: (d) => {
       const uniqueTypes = new Set(d.investments.map(i => i.type));
       return uniqueTypes.size >= 3;
+    },
+    getProgress: (d) => {
+        const uniqueTypes = new Set(d.investments.map(i => i.type));
+        return Math.min(100, (uniqueTypes.size / 3) * 100);
     }
   },
   {
@@ -57,11 +66,16 @@ const AVAILABLE_BADGES: Badge[] = [
     name: 'Zero Pendências',
     description: 'Não possui nenhuma conta pendente.',
     icon: '✅',
-    unlocked: false,
     condition: (d) => {
       const hasExpenses = d.transactions.some(t => t.type === 'expense');
       const pending = d.transactions.filter(t => t.type === 'expense' && t.status === 'pending');
       return hasExpenses && pending.length === 0;
+    },
+    getProgress: (d) => {
+        const expenses = d.transactions.filter(t => t.type === 'expense');
+        if (expenses.length === 0) return 0;
+        const paid = expenses.filter(t => t.status === 'paid').length;
+        return Math.min(100, (paid / expenses.length) * 100);
     }
   },
   {
@@ -69,23 +83,41 @@ const AVAILABLE_BADGES: Badge[] = [
     name: 'Na Mosca',
     description: 'Atingiu 100% da meta de um investimento.',
     icon: '🎯',
-    unlocked: false,
-    condition: (d) => d.investments.some(i => i.targetAmount > 0 && i.amount >= i.targetAmount)
+    condition: (d) => d.investments.some(i => i.targetAmount > 0 && i.amount >= i.targetAmount),
+    getProgress: (d) => {
+        const progresses = d.investments.map(i => i.targetAmount > 0 ? (i.amount / i.targetAmount) * 100 : 0);
+        return Math.min(100, Math.max(0, ...progresses));
+    }
   },
   {
     id: 'club_10k',
     name: 'Clube dos 10k',
     description: 'Patrimônio total superou R$ 10.000.',
     icon: '💎',
-    unlocked: false,
     condition: (d) => {
       const totalInvest = d.investments.reduce((acc, i) => acc + i.amount, 0);
       const totalBalance = d.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0) -
                            d.transactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((s, t) => s + t.amount, 0);
       return (totalInvest + totalBalance) >= 10000;
+    },
+    getProgress: (d) => {
+      const totalInvest = d.investments.reduce((acc, i) => acc + i.amount, 0);
+      const totalBalance = d.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0) -
+                           d.transactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((s, t) => s + t.amount, 0);
+      return Math.min(100, ((totalInvest + totalBalance) / 10000) * 100);
     }
   }
 ];
+
+// Helper to get effective budget for current month
+const getEffectiveBudget = (budgets: Budget[], category: string, date: Date) => {
+  const monthStr = date.toISOString().slice(0, 7); // YYYY-MM
+  // 1. Specific monthly budget
+  const specific = budgets.find(b => b.category === category && b.month === monthStr);
+  if (specific) return specific;
+  // 2. Recurring budget
+  return budgets.find(b => b.category === category && b.isRecurring);
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge }) => {
   
@@ -105,6 +137,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       }
     });
   }, [data, onUnlockBadge]);
+
+  // --- NUDGES LOGIC ---
+  const nudges = useMemo(() => {
+    const alerts: { title: string; message: string; type: 'warning' | 'info' }[] = [];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    // Unique categories present in budgets
+    const budgetCategories = Array.from(new Set<string>(data.budgets.map((b: Budget) => b.category)));
+
+    // Only check if before the 25th to be a useful "mid-month" warning
+    if (today.getDate() <= 25) {
+        budgetCategories.forEach(cat => {
+            const budget = getEffectiveBudget(data.budgets, cat, today);
+            if (!budget) return;
+
+            const spent = data.transactions
+                .filter(t => 
+                    t.type === 'expense' && 
+                    t.category === cat && 
+                    new Date(t.date).getMonth() === currentMonth &&
+                    new Date(t.date).getFullYear() === currentYear
+                )
+                .reduce((sum, t) => sum + t.amount, 0);
+            
+            if (spent >= budget.limit * 0.8 && spent < budget.limit) {
+                alerts.push({
+                    title: `Atenção: ${cat}`,
+                    message: `Você já usou ${(spent/budget.limit*100).toFixed(0)}% do orçamento e ainda é dia ${today.getDate()}. Cuidado!`,
+                    type: 'warning'
+                });
+            } else if (spent >= budget.limit) {
+                 alerts.push({
+                    title: `Limite Excedido: ${cat}`,
+                    message: `Você estourou o teto definido para esta categoria.`,
+                    type: 'warning'
+                });
+            }
+        });
+    }
+
+    return alerts;
+  }, [data.budgets, data.transactions]);
 
   // Helper to mask values
   const formatValue = (val: number) => {
@@ -274,6 +350,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* NUDGES / ALERTS AREA */}
+      {nudges.length > 0 && (
+         <div className="space-y-2">
+            {nudges.map((nudge, idx) => (
+               <div key={idx} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3 animate-fade-in-down">
+                  <div className="bg-amber-100 dark:bg-amber-800 p-2 rounded-full flex-shrink-0">
+                     <Bell className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+                  </div>
+                  <div>
+                     <h4 className="font-bold text-amber-800 dark:text-amber-300 text-sm">{nudge.title}</h4>
+                     <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">{nudge.message}</p>
+                  </div>
+               </div>
+            ))}
+         </div>
+      )}
+
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:flex-1 min-w-0">
@@ -283,25 +376,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
              <div className="flex-1 flex items-center gap-2 px-4 py-2 sm:border-l sm:border-slate-300 dark:sm:border-slate-600 overflow-x-auto no-scrollbar mask-gradient w-full">
                 {AVAILABLE_BADGES.map(badge => {
                    const isUnlocked = data.unlockedBadges.includes(badge.id);
+                   const progress = badge.getProgress(data);
                    return (
                       <div 
                         key={badge.id} 
                         className="group relative flex-shrink-0 cursor-help"
-                        title={`${badge.name} - ${badge.description} (${isUnlocked ? 'Desbloqueado' : 'Bloqueado'})`}
                       >
-                         <span 
-                            className={`text-xl md:text-2xl transition-all duration-300 block ${isUnlocked ? 'filter-none opacity-100 scale-100' : 'grayscale opacity-20 scale-90'}`}
-                         >
-                            {badge.icon}
-                         </span>
+                         {/* Badge Icon */}
+                         <div className="relative">
+                            <span 
+                                className={`text-xl md:text-2xl transition-all duration-300 block ${isUnlocked ? 'filter-none opacity-100 scale-100' : 'grayscale opacity-30 scale-90'}`}
+                            >
+                                {badge.icon}
+                            </span>
+                            
+                            {/* Mini Progress Bar for Locked Badges */}
+                            {!isUnlocked && progress > 0 && (
+                                <div className="absolute -bottom-1 left-0 w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-indigo-500 rounded-full" 
+                                        style={{ width: `${progress}%` }}
+                                    ></div>
+                                </div>
+                            )}
+                         </div>
                          
-                         {/* Visual Tooltip (Extra fallback) */}
-                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[150px] hidden group-hover:block z-50 pointer-events-none">
-                            <div className="bg-slate-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg text-center border border-slate-700">
+                         {/* Visual Tooltip */}
+                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-max max-w-[180px] hidden group-hover:block z-50 pointer-events-none animate-fade-in">
+                            <div className="bg-slate-800 text-white text-xs px-3 py-2 rounded-lg shadow-xl text-center border border-slate-700">
                                <p className="font-bold mb-0.5">{badge.name}</p>
-                               <p className={`text-[10px] uppercase font-semibold ${isUnlocked ? 'text-emerald-400' : 'text-slate-400'}`}>
-                                  {isUnlocked ? 'Desbloqueado' : 'Bloqueado'}
-                               </p>
+                               <p className="opacity-80 mb-2">{badge.description}</p>
+                               
+                               <div className="flex items-center justify-between text-[10px] uppercase font-semibold">
+                                  <span className={isUnlocked ? 'text-emerald-400' : 'text-slate-400'}>
+                                     {isUnlocked ? 'Desbloqueado' : `${progress.toFixed(0)}% Concluído`}
+                                  </span>
+                               </div>
+                               {!isUnlocked && (
+                                   <div className="w-full h-1.5 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                                       <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                                   </div>
+                               )}
                             </div>
                             {/* Arrow */}
                             <div className="w-2 h-2 bg-slate-800 rotate-45 absolute -top-1 left-1/2 -translate-x-1/2 border-t border-l border-slate-700"></div>
@@ -316,7 +431,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           onClick={exportData}
           className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors self-end md:self-auto flex-shrink-0"
         >
-          <Download className="w-4 h-4" /> Exportar Relatório
+          <Download className="w-4 h-4" /> Exportar CSV
         </button>
       </div>
 

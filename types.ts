@@ -29,6 +29,8 @@ export interface Budget {
   id: string;
   category: string;
   limit: number;
+  month?: string; // Formato "YYYY-MM" (opcional se for recorrente)
+  isRecurring: boolean; // Se true, aplica-se a qualquer mês que não tenha um budget específico
 }
 
 export interface Debt {
@@ -48,8 +50,8 @@ export interface Badge {
   name: string;
   description: string;
   icon: string;
-  unlocked: boolean;
   condition: (data: AppData) => boolean;
+  getProgress: (data: AppData) => number;
 }
 
 export interface ChatMessage {

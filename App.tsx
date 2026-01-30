@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Receipt, LineChart, PieChart, Eye, EyeOff, Moon, Sun, Target, Calendar, Repeat, MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, Loader2, Maximize, Minimize, Key, Check, Trash2, X, Download, Upload, HardDriveDownload, HardDriveUpload, Github, Linkedin, Heart, ShieldCheck, Copy, Gift } from 'lucide-react';
+import { LayoutDashboard, Receipt, LineChart, PieChart, Eye, EyeOff, Moon, Sun, Target, Calendar, Repeat, MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, Loader2, Maximize, Minimize, Key, Check, Trash2, X, Download, Upload, HardDriveDownload, HardDriveUpload, Github, Linkedin, Heart, ShieldCheck, Copy, Gift, PlusCircle, TrendingUp, Banknote, Lock, Unlock } from 'lucide-react';
 import { AppData, View, Transaction, Investment, Budget, Debt, TransactionStatus } from './types';
 import { loadData, saveData } from './services/storageService';
 import { setApiKey, getApiKey, removeApiKey, hasCustomApiKey } from './services/geminiService';
+import { auth } from './services/firebase'; // Import Auth
+import { onAuthStateChanged, User, signOut } from 'firebase/auth'; // Import Firebase Types
 
+import { Login } from './components/Login'; // Import Login Component
 import { Dashboard } from './components/Dashboard';
 import { TransactionList } from './components/TransactionList';
 import { InvestmentList } from './components/InvestmentList';
@@ -25,16 +28,98 @@ const DEFAULT_DATA: AppData = {
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
 
+// --- Encryption Helpers ---
+async function encryptData(data: string, password: string): Promise<{ iv: number[], ciphertext: number[] }> {
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+    );
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const key = await window.crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt,
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt"]
+    );
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        enc.encode(data)
+    );
+    
+    // Return format: IV (12 bytes) + Salt (16 bytes) + Ciphertext
+    // We will combine them for simple JSON serialization
+    const combined = new Uint8Array(iv.length + salt.length + encrypted.byteLength);
+    combined.set(iv, 0);
+    combined.set(salt, iv.length);
+    combined.set(new Uint8Array(encrypted), iv.length + salt.length);
+    
+    return { iv: Array.from(combined), ciphertext: [] }; // Using Array.from for compatibility if needed, but here we will just return base64
+}
+
+async function decryptData(combinedData: Uint8Array, password: string): Promise<string> {
+    const iv = combinedData.slice(0, 12);
+    const salt = combinedData.slice(12, 28);
+    const ciphertext = combinedData.slice(28);
+    
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+    );
+    
+    const key = await window.crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt,
+            iterations: 100000,
+            hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+    );
+    
+    const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        key,
+        ciphertext
+    );
+    
+    return new TextDecoder().decode(decrypted);
+}
+
 const App: React.FC = () => {
-  // Inicializa com dados do LocalStorage
-  const [data, setData] = useState<AppData>(() => {
-    return loadData() || DEFAULT_DATA;
-  });
+  // Auth State
+  const [user, setUser] = useState<User | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // App Data State (Initialized based on user later)
+  const [data, setData] = useState<AppData>(DEFAULT_DATA);
   
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [privacyMode, setPrivacyMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Quick Action Trigger (Timestamp to force effect in children)
+  const [quickActionSignal, setQuickActionSignal] = useState<number>(0);
 
   // API Key Management State
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -50,6 +135,50 @@ const App: React.FC = () => {
   // File Input Ref for Import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- AUTH EFFECT ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setIsGuest(false);
+        // Load data specific to this user
+        const userData = loadData(currentUser.uid);
+        setData(userData);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- SAVE DATA EFFECT ---
+  // Salva no LocalStorage sempre que houver mudanças, isolado por usuário ou convidado
+  useEffect(() => {
+    if (!authLoading) {
+        if (user) {
+            saveData(data, user.uid);
+        } else if (isGuest) {
+            saveData(data, 'guest_user');
+        }
+    }
+  }, [data, user, isGuest, authLoading]);
+
+  const handleGuestLogin = () => {
+      setIsGuest(true);
+      const guestData = loadData('guest_user');
+      setData(guestData);
+  };
+
+  const handleLogout = async () => {
+    if (isGuest) {
+        setIsGuest(false);
+        setData(DEFAULT_DATA);
+    } else {
+        await signOut(auth);
+    }
+    // Data will clear via auth effect setting user to null
+  };
+
+  // General Effects (Fullscreen, Key Check, Recurring)
   useEffect(() => {
     // Check if key exists on mount (User custom key only)
     setHasKey(hasCustomApiKey());
@@ -60,11 +189,73 @@ const App: React.FC = () => {
     }
 
     // Check if it's the first visit
+    // Make this user-specific key in future, or global per browser
     const hasSeenWelcome = localStorage.getItem('nexo_welcome_seen');
-    if (!hasSeenWelcome) {
+    if (!hasSeenWelcome && (user || isGuest)) {
         setShowWelcome(true);
     }
-  }, []);
+
+    // --- AUTOMATION: Check for Recurring Transactions ---
+    if (user || isGuest) {
+        processRecurringTransactions();
+    }
+  }, [user, isGuest]); // Re-run when user logs in
+
+  const processRecurringTransactions = () => {
+      setData(prevData => {
+          const today = new Date();
+          const currentMonth = today.getMonth();
+          const currentYear = today.getFullYear();
+          
+          const recurringTemplates = new Map<string, Transaction>();
+          
+          prevData.transactions.forEach(t => {
+              if (t.isRecurring) {
+                  const existing = recurringTemplates.get(t.description);
+                  if (!existing || new Date(t.date) > new Date(existing.date)) {
+                      recurringTemplates.set(t.description, t);
+                  }
+              }
+          });
+
+          const newTransactions: Transaction[] = [];
+
+          recurringTemplates.forEach((template, description) => {
+               const existsInCurrentMonth = prevData.transactions.some(t => {
+                   const tDate = new Date(t.date);
+                   return t.description === description &&
+                          t.amount === template.amount &&
+                          tDate.getMonth() === currentMonth &&
+                          tDate.getFullYear() === currentYear;
+               });
+
+               if (!existsInCurrentMonth) {
+                   const tDate = new Date(template.date);
+                   const targetDay = tDate.getDate();
+                   const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                   const finalDay = Math.min(targetDay, daysInCurrentMonth);
+                   const newDateObj = new Date(currentYear, currentMonth, finalDay);
+                   
+                   newTransactions.push({
+                       ...template,
+                       id: crypto.randomUUID(),
+                       date: newDateObj.toISOString().split('T')[0],
+                       status: 'pending',
+                       isRecurring: true
+                   });
+               }
+          });
+
+          if (newTransactions.length > 0) {
+              return {
+                  ...prevData,
+                  transactions: [...prevData.transactions, ...newTransactions]
+              };
+          }
+
+          return prevData;
+      });
+  };
 
   const handleSaveKey = () => {
      if (userKeyInput.trim()) {
@@ -96,11 +287,6 @@ const App: React.FC = () => {
       alert("Chave Pix copiada!");
   };
 
-  // Salva no LocalStorage sempre que houver mudanças
-  useEffect(() => {
-    saveData(data);
-  }, [data]);
-
   // Dark Mode Toggle
   useEffect(() => {
     if (darkMode) {
@@ -131,14 +317,60 @@ const App: React.FC = () => {
     }
   };
 
-  // --- BACKUP FUNCTIONS ---
-  const handleExportBackup = () => {
+  // --- Quick Action Handler ---
+  const triggerQuickAction = (view: View) => {
+    setCurrentView(view);
+    setTimeout(() => setQuickActionSignal(Date.now()), 50);
+  };
+
+  // --- BACKUP FUNCTIONS (Now with Encryption) ---
+  const handleExportBackup = async () => {
     const jsonString = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
+    let blob;
+    let filename = `nexo_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+    if (window.confirm("Deseja criptografar este backup com uma senha? (Recomendado para Cloud Backup)")) {
+        const password = window.prompt("Digite uma senha forte para criptografar:");
+        if (password) {
+            try {
+                // Perform encryption manually here to get the byte array
+                const enc = new TextEncoder();
+                const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]);
+                const salt = window.crypto.getRandomValues(new Uint8Array(16));
+                const key = await window.crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" }, keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(jsonString));
+                
+                const combined = new Uint8Array(iv.length + salt.length + encrypted.byteLength);
+                combined.set(iv, 0);
+                combined.set(salt, iv.length);
+                combined.set(new Uint8Array(encrypted), iv.length + salt.length);
+
+                // Convert to Base64 for easier JSON storage
+                const base64Content = btoa(String.fromCharCode(...combined));
+                const encryptedPayload = JSON.stringify({
+                    isEncrypted: true,
+                    data: base64Content
+                });
+                
+                blob = new Blob([encryptedPayload], { type: "application/json" });
+                filename = `nexo_secure_backup_${new Date().toISOString().split('T')[0]}.json`;
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao criptografar. Exportando sem senha.");
+                blob = new Blob([jsonString], { type: "application/json" });
+            }
+        } else {
+            blob = new Blob([jsonString], { type: "application/json" });
+        }
+    } else {
+        blob = new Blob([jsonString], { type: "application/json" });
+    }
+
     const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = href;
-    link.download = `nexo_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -154,11 +386,33 @@ const App: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const jsonContent = e.target?.result as string;
-        const parsedData = JSON.parse(jsonContent);
+        let parsedData = JSON.parse(jsonContent);
         
+        // Check for encryption
+        if (parsedData.isEncrypted && parsedData.data) {
+            const password = window.prompt("Este backup é criptografado. Digite a senha para restaurar:");
+            if (!password) return;
+
+            try {
+                // Convert Base64 back to Uint8Array
+                const binaryString = atob(parsedData.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const decryptedString = await decryptData(bytes, password);
+                parsedData = JSON.parse(decryptedString);
+            } catch (err) {
+                console.error(err);
+                alert("Senha incorreta ou arquivo corrompido.");
+                return;
+            }
+        }
+
         // Basic Validation
         if (Array.isArray(parsedData.transactions) && Array.isArray(parsedData.investments)) {
            if(window.confirm("Isso substituirá todos os seus dados atuais pelos do backup. Deseja continuar?")) {
@@ -320,6 +574,7 @@ const App: React.FC = () => {
             onToggleStatus={toggleTransactionStatus}
             privacyMode={privacyMode}
             hasApiKey={hasKey}
+            quickActionSignal={quickActionSignal}
           />
         );
       case View.INVESTMENTS:
@@ -331,6 +586,7 @@ const App: React.FC = () => {
             onDelete={deleteInvestment}
             privacyMode={privacyMode}
             hasApiKey={hasKey}
+            quickActionSignal={quickActionSignal}
           />
         );
       case View.BUDGETS:
@@ -341,6 +597,7 @@ const App: React.FC = () => {
             onAdd={addBudget} 
             onDelete={deleteBudget} 
             privacyMode={privacyMode} 
+            quickActionSignal={quickActionSignal}
           />
         );
       case View.SUBSCRIPTIONS:
@@ -368,6 +625,7 @@ const App: React.FC = () => {
             onDelete={deleteDebt}
             onAddTransaction={addTransaction}
             privacyMode={privacyMode}
+            quickActionSignal={quickActionSignal}
           />
         );
       case View.AI_ASSISTANT:
@@ -381,6 +639,20 @@ const App: React.FC = () => {
         return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={unlockBadge} />;
     }
   };
+
+  // --- RENDER LOADING OR LOGIN ---
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+      </div>
+    );
+  }
+
+  // Show login if NOT user AND NOT guest
+  if (!user && !isGuest) {
+    return <Login onGuestLogin={handleGuestLogin} />;
+  }
 
   // Main App
   return (
@@ -403,18 +675,19 @@ const App: React.FC = () => {
 
         {/* User Profile - Fixed */}
         <div className="hidden md:flex items-center gap-3 mb-4 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50 shrink-0">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600">
-                <span className="text-xs font-bold text-white">EU</span>
+            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 overflow-hidden text-xs text-white">
+                {user?.photoURL ? <img src={user.photoURL} alt="User" /> : (user?.email?.substring(0,2).toUpperCase() || 'CV')}
             </div>
-            <div className="overflow-hidden">
-                <p className="text-xs font-bold text-white truncate">Minha Conta</p>
+            <div className="overflow-hidden flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate" title={user?.email || 'Convidado'}>{user?.email?.split('@')[0] || 'Convidado'}</p>
                 <div className="flex items-center gap-1">
-                   <div className={`w-1.5 h-1.5 rounded-full ${hasKey ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-                   <p className="text-[10px] text-slate-400">
-                      {hasKey ? 'IA Conectada' : 'IA Offline'}
-                   </p>
+                   <div className={`w-1.5 h-1.5 rounded-full ${user ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                   <p className="text-[10px] text-slate-400">{user ? 'Online' : 'Offline'}</p>
                 </div>
             </div>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500" title="Sair">
+               <LogOut className="w-4 h-4" />
+            </button>
         </div>
 
         {/* Menu Items - Scrollable */}
@@ -643,14 +916,8 @@ const App: React.FC = () => {
                    </span>
                 )}
               </button>
-              <button onClick={toggleFullscreen} className="text-slate-400 hover:text-white">
-                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-              </button>
-              <button onClick={() => setDarkMode(!darkMode)} className="text-slate-400 hover:text-white">
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <button onClick={() => setPrivacyMode(!privacyMode)} className="text-slate-400 hover:text-white">
-                  {privacyMode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500">
+                <LogOut className="w-5 h-5" />
               </button>
            </div>
         </div>
@@ -659,6 +926,61 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 pt-20 md:pt-8 pb-24 md:pb-8 overflow-y-auto h-screen scroll-smooth">
         <div className="max-w-6xl mx-auto">
+          {/* --- QUICK ACTION BAR --- */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+             <button 
+                onClick={() => triggerQuickAction(View.TRANSACTIONS)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-blue-100 dark:border-blue-900/30 hover:border-blue-300 transition-all group"
+             >
+                <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600 dark:text-blue-400">
+                    <PlusCircle className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nova</p>
+                    <p className="font-bold text-slate-700 dark:text-white">Transação</p>
+                </div>
+             </button>
+
+             <button 
+                onClick={() => triggerQuickAction(View.INVESTMENTS)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-indigo-100 dark:border-indigo-900/30 hover:border-indigo-300 transition-all group"
+             >
+                <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2.5 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors text-indigo-600 dark:text-indigo-400">
+                    <TrendingUp className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Novo</p>
+                    <p className="font-bold text-slate-700 dark:text-white">Investimento</p>
+                </div>
+             </button>
+
+             <button 
+                onClick={() => triggerQuickAction(View.DEBTS)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
+             >
+                <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
+                    <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Registrar</p>
+                    <p className="font-bold text-slate-700 dark:text-white">Dívida</p>
+                </div>
+             </button>
+
+             <button 
+                onClick={() => triggerQuickAction(View.BUDGETS)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-pink-100 dark:border-pink-900/30 hover:border-pink-300 transition-all group"
+             >
+                <div className="bg-pink-100 dark:bg-pink-900/40 p-2.5 rounded-lg group-hover:bg-pink-600 group-hover:text-white transition-colors text-pink-600 dark:text-pink-400">
+                    <Target className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Definir</p>
+                    <p className="font-bold text-slate-700 dark:text-white">Meta/Limite</p>
+                </div>
+             </button>
+          </div>
+
           {renderContent()}
         </div>
       </main>
@@ -901,10 +1223,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-// Helper for icons
-const ArrowRight = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-)
 
 export default App;

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
@@ -12,6 +12,7 @@ interface TransactionListProps {
   onToggleStatus: (id: string) => void;
   privacyMode: boolean;
   hasApiKey: boolean;
+  quickActionSignal?: number; // Prop to trigger form open
 }
 
 const CATEGORY_STYLES: Record<string, string> = {
@@ -52,7 +53,7 @@ const INCOME_CATEGORIES = ['Salário', 'Renda Extra', 'Investimentos', 'Presente
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode, hasApiKey }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
@@ -74,6 +75,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     paymentMethod: 'credit_card' as PaymentMethod,
     isRecurring: false
   });
+
+  // Effect to listen for Quick Action triggers
+  useEffect(() => {
+    if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
+        setIsFormOpen(true);
+        resetForm();
+    }
+  }, [quickActionSignal]);
 
   // Derived state for category options based on type
   const currentCategoryOptions = useMemo(() => {
@@ -232,7 +241,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         isRecurring: false 
     });
     setEditingId(null);
-    setIsFormOpen(false);
+    // Note: Do not setIsFormOpen(false) here, as this is used by the quick action to reset state before showing
   }
 
   const handleEdit = (t: Transaction) => {
@@ -270,6 +279,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     }
     
     resetForm();
+    setIsFormOpen(false);
   };
 
   return (
@@ -446,7 +456,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </div>
 
           <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-2">
-            <button type="button" onClick={resetForm} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+            <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
               Cancelar
             </button>
             <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">

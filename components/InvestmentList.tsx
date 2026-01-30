@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Investment } from '../types';
 import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { getInvestmentAdvice, InvestmentAdviceResult } from '../services/geminiService';
@@ -11,9 +11,10 @@ interface InvestmentListProps {
   onDelete: (id: string) => void;
   privacyMode: boolean;
   hasApiKey: boolean;
+  quickActionSignal?: number; // Prop to trigger form open
 }
 
-export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onAdd, onUpdate, onDelete, privacyMode, hasApiKey }) => {
+export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onAdd, onUpdate, onDelete, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   
   // AI Consultant State
@@ -33,6 +34,14 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     type: 'Renda Fixa',
     date: new Date().toISOString().split('T')[0]
   });
+
+  // Effect to listen for Quick Action triggers
+  useEffect(() => {
+    if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
+        setIsFormOpen(true);
+        setNewInvest({ name: '', amount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0] });
+    }
+  }, [quickActionSignal]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
