@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../services/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { Hexagon, Loader2, LogIn, UserPlus, AlertCircle, Check, Copy, UserX } from 'lucide-react';
+import { Hexagon, Loader2, LogIn, UserPlus, AlertCircle, Check, Copy, UserX, Settings, Database, Key } from 'lucide-react';
 
 interface LoginProps {
   onGuestLogin: () => void;
@@ -13,8 +13,18 @@ export const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [authErrorDomain, setAuthErrorDomain] = useState(''); // Estado para guardar domínio bloqueado
+  const [authErrorDomain, setAuthErrorDomain] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsConfig, setNeedsConfig] = useState(false);
+
+  // Verifica se o Firebase está configurado com as chaves reais
+  useEffect(() => {
+    // @ts-ignore - Acessa a configuração interna para verificar se é o placeholder
+    const apiKey = auth.app.options.apiKey;
+    if (!apiKey || apiKey === "SUA_API_KEY_AQUI" || apiKey.includes("SUA_API_KEY")) {
+        setNeedsConfig(true);
+    }
+  }, []);
 
   const handleAuthError = (err: any) => {
     console.error(err);
@@ -25,8 +35,11 @@ export const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
     if (err.code === 'auth/weak-password') msg = "A senha deve ter pelo menos 6 caracteres.";
     if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') msg = "E-mail ou senha incorretos.";
     if (err.code === 'auth/invalid-credential') msg = "Credenciais inválidas.";
+    if (err.code === 'auth/invalid-api-key') {
+        msg = "Chave de API inválida.";
+        setNeedsConfig(true); // Força a tela de configuração se a chave for rejeitada
+    }
     
-    // Tratamento específico para domínio não autorizado
     if (err.code === 'auth/unauthorized-domain') {
         msg = "Domínio não autorizado pelo Firebase.";
         setAuthErrorDomain(window.location.hostname);
@@ -74,6 +87,60 @@ export const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
       navigator.clipboard.writeText(authErrorDomain);
       alert('Domínio copiado!');
   };
+
+  // TELA DE AJUDA PARA CONFIGURAÇÃO (Se detectar chaves inválidas)
+  if (needsConfig) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-700 animate-scale-in flex flex-col md:flex-row">
+                <div className="bg-indigo-600 p-8 text-white md:w-1/3 flex flex-col items-center justify-center text-center">
+                    <Settings className="w-16 h-16 mb-4 opacity-80" />
+                    <h2 className="text-xl font-bold">Configuração Necessária</h2>
+                    <p className="text-indigo-100 text-sm mt-2">Para usar o modo online, você precisa conectar seu Firebase.</p>
+                </div>
+                <div className="p-8 md:w-2/3">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Siga estes passos:</h3>
+                    <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+                        <div className="flex gap-3">
+                            <div className="bg-slate-100 dark:bg-slate-700 p-2 rounded h-fit font-bold">1</div>
+                            <div>
+                                <p className="font-bold text-slate-800 dark:text-white">Crie o Banco de Dados</p>
+                                <p>No Console do Firebase, vá em <strong>Firestore Database</strong>, clique em "Criar banco de dados", escolha a região (nam5) e clique em "Iniciar no modo de produção".</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <div className="bg-slate-100 dark:bg-slate-700 p-2 rounded h-fit font-bold">2</div>
+                            <div>
+                                <p className="font-bold text-slate-800 dark:text-white">Ative o Login</p>
+                                <p>Vá em <strong>Authentication</strong> &gt; Sign-in method e ative "E-mail/senha".</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <div className="bg-slate-100 dark:bg-slate-700 p-2 rounded h-fit font-bold">3</div>
+                            <div>
+                                <p className="font-bold text-slate-800 dark:text-white">Copie as Chaves</p>
+                                <p>Vá nas Configurações do Projeto (⚙️), role até "Seus aplicativos" e copie o objeto <code>firebaseConfig</code>.</p>
+                            </div>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-lg text-xs">
+                            <p className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                <Key className="w-3 h-3" /> Ação Necessária no Código
+                            </p>
+                            <p className="mt-1">Abra o arquivo <code>services/firebase.ts</code> e substitua <code>"SUA_API_KEY_AQUI"</code> pelos dados reais que você copiou.</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={onGuestLogin}
+                        className="w-full mt-6 py-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <UserX className="w-4 h-4" />
+                        Pular e Usar Modo Offline (Convidado)
+                    </button>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">

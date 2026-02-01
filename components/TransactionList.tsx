@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget } from '../types';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
   transactions: Transaction[];
+  budgets: Budget[]; // Added budget prop
   onAdd: (t: Omit<Transaction, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
@@ -53,7 +54,7 @@ const INCOME_CATEGORIES = ['Salário', 'Renda Extra', 'Investimentos', 'Presente
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode, hasApiKey, quickActionSignal }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, onAdd, onUpdate, onDelete, onToggleStatus, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
@@ -73,7 +74,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     date: new Date().toISOString().split('T')[0],
     status: 'paid' as TransactionStatus,
     paymentMethod: 'credit_card' as PaymentMethod,
-    isRecurring: false
+    isRecurring: false,
+    installments: '' // New field for parcelas
   });
 
   // Effect to listen for Quick Action triggers
@@ -93,6 +95,55 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const currentPaymentMethods = useMemo(() => {
     return newTransaction.type === 'income' ? INCOME_PAYMENT_METHODS : EXPENSE_PAYMENT_METHODS;
   }, [newTransaction.type]);
+
+  // --- ACTIVE FEEDBACK LOGIC ---
+  const budgetAlert = useMemo(() => {
+      // Only check for expenses
+      if (newTransaction.type !== 'expense' || !newTransaction.amount) return null;
+      
+      const val = parseFloat(newTransaction.amount);
+      if (isNaN(val) || val <= 0) return null;
+
+      const dateObj = new Date(newTransaction.date);
+      const year = dateObj.getFullYear();
+      const month = dateObj.getMonth();
+      const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+      // 1. Find Budget (Specific > Recurring)
+      const specificBudget = budgets.find(b => b.category === newTransaction.category && b.month === monthStr);
+      const recurringBudget = budgets.find(b => b.category === newTransaction.category && b.isRecurring);
+      const activeBudget = specificBudget || recurringBudget;
+
+      if (!activeBudget) return null; // No budget to compare
+
+      // 2. Calculate current spending for that category/month (excluding the one being edited if applicable)
+      const currentSpent = transactions
+        .filter(t => {
+            if (editingId && t.id === editingId) return false; // Exclude self if editing
+            const tDate = new Date(t.date);
+            return (
+                t.type === 'expense' &&
+                t.category === newTransaction.category &&
+                tDate.getFullYear() === year &&
+                tDate.getMonth() === month
+            );
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const projectedTotal = currentSpent + val;
+      const isExceeded = projectedTotal > activeBudget.limit;
+      const isNearLimit = projectedTotal > activeBudget.limit * 0.8;
+
+      if (!isNearLimit && !isExceeded) return null;
+
+      return {
+          limit: activeBudget.limit,
+          current: currentSpent,
+          projected: projectedTotal,
+          isExceeded
+      };
+
+  }, [newTransaction.amount, newTransaction.category, newTransaction.date, newTransaction.type, budgets, transactions, editingId]);
 
   // Month Navigation Logic
   const handlePrevMonth = () => {
@@ -238,7 +289,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         date: new Date().toISOString().split('T')[0], 
         status: 'paid', 
         paymentMethod: 'credit_card', 
-        isRecurring: false 
+        isRecurring: false,
+        installments: ''
     });
     setEditingId(null);
     // Note: Do not setIsFormOpen(false) here, as this is used by the quick action to reset state before showing
@@ -253,7 +305,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         date: t.date,
         status: t.status,
         paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'),
-        isRecurring: t.isRecurring || false
+        isRecurring: t.isRecurring || false,
+        installments: '' // Reset installments on edit to avoid accidental multiplication
     });
     setEditingId(t.id);
     setIsFormOpen(true);
@@ -272,10 +325,41 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       isRecurring: newTransaction.isRecurring
     };
 
-    if (editingId) {
-        onUpdate(editingId, transactionData);
+    // --- LOGIC FOR INSTALLMENTS vs RECURRING ---
+    const numInstallments = parseInt(newTransaction.installments);
+
+    if (newTransaction.isRecurring && !isNaN(numInstallments) && numInstallments > 1) {
+        // PARCELAMENTO (Finite Installments)
+        // Creating multiple transactions into the future
+        const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); // Force noon to avoid timezone shift
+
+        for(let i=0; i < numInstallments; i++) {
+             // Create a new date for this installment
+             const nextDate = new Date(baseDateObj);
+             nextDate.setMonth(baseDateObj.getMonth() + i);
+             
+             // Handle edge cases like Jan 31 -> Feb 28 automatically by setMonth, but sometimes it skips.
+             // Standard JS setMonth behavior: Jan 31 + 1 month = March 3 (non-leap) or March 2.
+             // If we want to stick to "end of month", additional logic is needed, but standard behavior is usually acceptable for simple apps.
+             
+             const isoDate = nextDate.toISOString().split('T')[0];
+             const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
+
+             onAdd({
+                 ...transactionData,
+                 description: desc,
+                 date: isoDate,
+                 // IMPORTANT: Installments are individual items, not recurring generators themselves
+                 isRecurring: false 
+             });
+        }
     } else {
-        onAdd(transactionData);
+        // STANDARD (Single or Infinite Recurring Subscription)
+        if (editingId) {
+            onUpdate(editingId, transactionData);
+        } else {
+            onAdd(transactionData);
+        }
     }
     
     resetForm();
@@ -442,18 +526,69 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             ))}
           </select>
 
-          <div className="flex items-center gap-2 p-2">
-             <input 
-                type="checkbox" 
-                id="recurring"
-                checked={newTransaction.isRecurring}
-                onChange={(e) => setNewTransaction({...newTransaction, isRecurring: e.target.checked})}
-                className="w-4 h-4 text-blue-600 rounded"
-             />
-             <label htmlFor="recurring" className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                <Repeat className="w-3 h-3" /> Assinatura/Recorrente
-             </label>
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-2 p-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+               <input 
+                  type="checkbox" 
+                  id="recurring"
+                  checked={newTransaction.isRecurring}
+                  onChange={(e) => setNewTransaction({...newTransaction, isRecurring: e.target.checked})}
+                  className="w-4 h-4 text-blue-600 rounded"
+               />
+               <label htmlFor="recurring" className="text-sm text-slate-700 dark:text-slate-200 font-medium flex items-center gap-1 cursor-pointer">
+                  <Repeat className="w-4 h-4 text-blue-500" /> Assinatura / Recorrente / Parcelado
+               </label>
+            </div>
+
+            {newTransaction.isRecurring && (
+                <div className="mt-2 pl-2 md:pl-6 animate-fade-in">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                            Repetir por quantas vezes? (Opcional)
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-slate-400" />
+                            <input
+                                type="number"
+                                placeholder="Ex: 12 (Deixe vazio para assinatura infinita)"
+                                value={newTransaction.installments}
+                                onChange={e => setNewTransaction({...newTransaction, installments: e.target.value})}
+                                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm w-full outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                            {newTransaction.installments && parseInt(newTransaction.installments) > 1 
+                                ? `Serão criadas ${newTransaction.installments} transações futuras automaticamente (Ex: Compra 1/10, 2/10...).`
+                                : 'Se deixar em branco, será uma assinatura fixa que se repete todo mês até você excluir.'}
+                        </p>
+                    </div>
+                </div>
+            )}
           </div>
+
+          {/* BUDGET ALERT (ACTIVE FEEDBACK) */}
+          {budgetAlert && (
+             <div className={`col-span-1 md:col-span-2 p-3 rounded-lg border flex items-start gap-3 animate-fade-in ${
+                budgetAlert.isExceeded 
+                   ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800'
+                   : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
+             }`}>
+                {budgetAlert.isExceeded ? (
+                    <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 mt-0.5 flex-shrink-0" />
+                ) : (
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                )}
+                <div className="flex-1">
+                    <p className={`text-sm font-bold ${budgetAlert.isExceeded ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                        {budgetAlert.isExceeded ? 'Cuidado! Limite Excedido.' : 'Atenção ao Orçamento.'}
+                    </p>
+                    <p className={`text-xs mt-1 ${budgetAlert.isExceeded ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                        Sua meta para <strong>{newTransaction.category}</strong> é R$ {budgetAlert.limit}. 
+                        Com essa transação, o total irá para <strong>R$ {budgetAlert.projected}</strong>.
+                    </p>
+                </div>
+             </div>
+          )}
 
           <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-2">
             <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">

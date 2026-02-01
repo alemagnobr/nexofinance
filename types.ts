@@ -45,6 +45,14 @@ export interface Debt {
   notes?: string;
 }
 
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  quantity: number;
+  actualPrice: number; // O valor que o usuário digita no mercado (calculadora)
+  isChecked: boolean; // Se já pegou o item
+}
+
 export interface Badge {
   id: string;
   name: string;
@@ -61,12 +69,24 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+// --- WEALTH PLANNER TYPES ---
+export type RiskProfile = 'conservative' | 'moderate' | 'aggressive';
+
+export interface WealthProfile {
+  age: number;
+  retirementAge: number;
+  riskProfile: RiskProfile;
+  monthlyContributionOverride?: number; // Se o usuário quiser simular aportar diferente do real
+}
+
 export interface AppData {
   transactions: Transaction[];
   investments: Investment[];
   budgets: Budget[];
   debts: Debt[];
+  shoppingList: ShoppingItem[];
   unlockedBadges: string[];
+  wealthProfile?: WealthProfile; // Novo campo opcional
 }
 
 export enum View {
@@ -77,5 +97,7 @@ export enum View {
   SUBSCRIPTIONS = 'SUBSCRIPTIONS',
   CALENDAR = 'CALENDAR',
   AI_ASSISTANT = 'AI_ASSISTANT',
-  DEBTS = 'DEBTS'
+  DEBTS = 'DEBTS',
+  SHOPPING_LIST = 'SHOPPING_LIST',
+  WEALTH_PLANNER = 'WEALTH_PLANNER' // Nova View
 }

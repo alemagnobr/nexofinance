@@ -1,8 +1,9 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-// Configuração do Firebase para o projeto NEXO
+// --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAp9vMuLIhE-W8sEVpuzSWr7vvRHOu1pSc",
   authDomain: "nexo-bbbe5.firebaseapp.com",
@@ -15,5 +16,8 @@ const firebaseConfig = {
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 
-// Exporta o serviço de autenticação para ser usado no resto do app
+// Exporta o serviço de autenticação
 export const auth = getAuth(app);
+
+// Exporta o banco de dados (Firestore)
+export const db = getFirestore(app);

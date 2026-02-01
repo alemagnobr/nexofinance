@@ -1,10 +1,10 @@
 
-const CACHE_NAME = 'nexo-fin-v1';
+const CACHE_NAME = 'nexo-fin-v2';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/index.tsx',
-  '/manifest.json'
+  './',
+  './index.html',
+  './manifest.json',
+  './index.css'
 ];
 
 // Install Event
@@ -47,7 +47,10 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => {
           // Only cache same-origin requests to avoid caching API calls incorrectly
           if (event.request.url.startsWith(self.location.origin)) {
-            cache.put(event.request, responseToCache);
+            // Avoid caching POST requests or non-GET methods
+            if (event.request.method === 'GET') {
+               cache.put(event.request, responseToCache);
+            }
           }
         });
 

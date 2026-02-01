@@ -1,6 +1,6 @@
 
-import { GoogleGenAI } from "@google/genai";
-import { AppData, Investment, ChatMessage } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
+import { AppData, Investment, ChatMessage, RiskProfile } from '../types';
 
 const CATEGORIES = ['Casa', 'Mobilidade', 'Alimentos', 'Lazer', 'Pets', 'Outros'];
 const API_KEY_STORAGE = 'nexo_user_api_key';
@@ -32,6 +32,15 @@ export interface InvestmentAdviceResult {
   text: string;
   sources: { title: string; uri: string }[];
 }
+
+// New Interface for Structured Wealth Analysis
+export interface WealthAnalysisResult {
+    analysisText: string;
+    currentAllocation: { name: string; value: number }[];
+    suggestedAllocation: { name: string; value: number }[];
+    actionItems: { title: string; type: 'buy' | 'sell' | 'hold'; description: string }[];
+}
+
 
 export const suggestCategory = async (description: string): Promise<string> => {
   const apiKey = getApiKey();
@@ -135,7 +144,6 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
   `;
 
   try {
-    // Usando gemini-3-flash-preview para uso da ferramenta Google Search
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: prompt,
@@ -144,7 +152,6 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
       },
     });
 
-    // Extract sources
     const sources: { title: string; uri: string }[] = [];
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     
@@ -159,7 +166,6 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
       });
     }
 
-    // Filter duplicate sources by URI
     const uniqueSources = sources.filter((v, i, a) => a.findIndex(t => t.uri === v.uri) === i);
 
     return {
@@ -173,6 +179,63 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
   }
 };
 
+// NEW FUNCTION: Structured Analysis for Wealth Planner
+export const analyzeWealthPortfolio = async (investments: Investment[], riskProfile: RiskProfile, age: number): Promise<WealthAnalysisResult | null> => {
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Aggregate current allocation
+    const allocationMap = new Map<string, number>();
+    investments.forEach(inv => {
+        allocationMap.set(inv.type, (allocationMap.get(inv.type) || 0) + inv.amount);
+    });
+    
+    // Create clear summary for AI
+    const portfolioSummary = Array.from(allocationMap.entries())
+        .map(([type, amount]) => `${type}: R$ ${amount.toFixed(2)}`)
+        .join(', ');
+
+    const prompt = `
+      Atue como um Gestor de Private Banking. O cliente tem ${age} anos e perfil de risco: ${riskProfile.toUpperCase()}.
+      
+      Carteira Atual Agregada: ${portfolioSummary || "R$ 0,00 (Vazia)"}
+
+      Sua tarefa é analisar a alocação de ativos e sugerir o rebalanceamento ideal baseado nas melhores práticas de Wealth Management (como Bridgewater/Arta) adaptado ao Brasil.
+      
+      RETORNE APENAS JSON VÁLIDO. NÃO USE MARKDOWN. Siga este esquema:
+      {
+        "analysisText": "Parágrafo curto (max 300 chars) com sua visão macro sobre a carteira do cliente.",
+        "currentAllocation": [ {"name": "Categoria", "value": %_atual (0-100)} ],
+        "suggestedAllocation": [ {"name": "Categoria", "value": %_ideal (0-100)} ],
+        "actionItems": [
+           {"title": "Ação Tática", "type": "buy" | "sell" | "hold", "description": "Explicação curta"}
+        ]
+      }
+      
+      Regras:
+      1. 'suggestedAllocation' deve somar 100.
+      2. Categorias sugeridas podem ser: 'Renda Fixa Pós', 'Renda Fixa Pré/IPCA', 'Ações Brasil', 'Ações Global', 'FIIs', 'Cripto/Alternativos', 'Reserva'.
+      3. Se a carteira estiver vazia, sugira a alocação ideal do zero.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' } // Enforcing JSON mode
+        });
+
+        const jsonStr = response.text?.trim() || "{}";
+        return JSON.parse(jsonStr) as WealthAnalysisResult;
+
+    } catch (error) {
+        console.error("Wealth Analysis Error:", error);
+        return null;
+    }
+};
+
 // STREAMING Implementation
 export async function* chatWithAdvisorStream(message: string, history: ChatMessage[], data: AppData) {
   const apiKey = getApiKey();
@@ -183,16 +246,14 @@ export async function* chatWithAdvisorStream(message: string, history: ChatMessa
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // 1. Generate the "Report" internally (The Context)
   const income = data.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const expense = data.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const invested = data.investments.reduce((s, i) => s + i.amount, 0);
   const debts = data.debts.reduce((s, d) => s + d.currentAmount, 0);
   
-  // Detailed strings
   const recentTransactions = data.transactions
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 30) // More context
+    .slice(0, 30)
     .map(t => `- ${t.date}: ${t.description} (${t.type}) R$ ${t.amount} [${t.category}] Status: ${t.status}`)
     .join('\n');
 
@@ -204,44 +265,33 @@ export async function* chatWithAdvisorStream(message: string, history: ChatMessa
     .map(d => `- ${d.creditor}: R$ ${d.currentAmount} (Status: ${d.status}, Vence: ${d.dueDate})`)
     .join('\n');
 
-  // Determine User Persona for System Instruction
   let userPersona = "Neutro";
   if (debts > invested * 2) userPersona = "Endividado (Foco em quitação)";
   else if (invested > expense * 6) userPersona = "Investidor (Foco em otimização)";
   else if (income < expense) userPersona = "Déficit (Foco em corte de gastos)";
 
-  // This is the "Report" the AI reads for itself to understand the user's situation
   const financialContext = `
     RELATÓRIO FINANCEIRO DO USUÁRIO (Contexto Interno):
     
     1. PERFIL IDENTIFICADO: ${userPersona}
-
     2. RESUMO:
        - Renda Total: R$ ${income.toFixed(2)}
        - Despesas Totais: R$ ${expense.toFixed(2)}
        - Saldo: R$ ${(income - expense).toFixed(2)}
        - Total Investido: R$ ${invested.toFixed(2)}
        - Dívidas Ativas: R$ ${debts.toFixed(2)}
-
     3. ÚLTIMAS TRANSAÇÕES:
     ${recentTransactions}
-
     4. INVESTIMENTOS:
     ${investmentPortfolio}
-
     5. DÍVIDAS:
     ${debtList}
   `;
 
   const systemInstruction = `
     Você é o NEXO AI, um assistente financeiro pessoal de elite.
-    
-    OBJETIVO:
-    Ajudar o usuário a gerenciar suas finanças com base no perfil identificado: ${userPersona}.
-
-    CONTEXTO:
-    ${financialContext}
-
+    OBJETIVO: Ajudar o usuário a gerenciar suas finanças com base no perfil identificado: ${userPersona}.
+    CONTEXTO: ${financialContext}
     DIRETRIZES:
     - Responda de forma concisa e amigável.
     - Se o usuário perguntar sobre o saldo, gastos específicos ou investimentos, consulte o relatório acima.
@@ -249,18 +299,10 @@ export async function* chatWithAdvisorStream(message: string, history: ChatMessa
     - Use Markdown para formatar valores e listas.
   `;
 
-  // Initialize Chat
   const chat = ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: { systemInstruction }
   });
-
-  // Load history into chat (GoogleGenAI format)
-  // Note: The history in `chats.create` is usually handled by the `history` param in older SDKs or manual management.
-  // In @google/genai, we usually send the message history as part of the context or maintain the chat object.
-  // For simplicity and statelessness between reloads, we'll just send the current message + a prompt block if needed,
-  // OR rely on the chat object instance if we kept it alive. 
-  // Here, we re-inject recent history context into the user message to simulate memory since we recreate the chat instance.
   
   const conversationHistory = history.slice(-6).map(h => `${h.role === 'user' ? 'Usuário' : 'Modelo'}: ${h.content}`).join('\n');
   const fullMessage = `
