@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const firebaseConfig = {
@@ -20,4 +20,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Exporta o banco de dados (Firestore)
-export const db = getFirestore(app);
+// Usamos initializeFirestore com ignoreUndefinedProperties: true para evitar erros quando campos opcionais (como 'month') são undefined
+export const db = initializeFirestore(app, {
+    ignoreUndefinedProperties: true
+});

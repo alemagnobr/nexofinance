@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Upload, Repeat, ChevronLeft, ChevronRight, Calendar, Edit2, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -96,14 +96,56 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     return newTransaction.type === 'income' ? INCOME_PAYMENT_METHODS : EXPENSE_PAYMENT_METHODS;
   }, [newTransaction.type]);
 
-  // --- ACTIVE FEEDBACK LOGIC ---
+  // --- GLOBAL MONTHLY ALERTS (BANNER) ---
+  const monthlyAlerts = useMemo(() => {
+    const alerts: { title: string; message: string; type: 'warning' | 'info' }[] = [];
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    const today = new Date();
+    
+    // Unique categories present in budgets
+    const budgetCategories = Array.from(new Set<string>(budgets.map((b: Budget) => b.category)));
+
+    budgetCategories.forEach(cat => {
+        // Find budget for the VIEWED month
+        const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        const budget = budgets.find(b => b.category === cat && b.month === monthStr) || budgets.find(b => b.category === cat && b.isRecurring);
+        
+        if (!budget) return;
+
+        const spent = transactions
+            .filter(t => 
+                t.type === 'expense' && 
+                t.category === cat && 
+                new Date(t.date).getMonth() === currentMonth &&
+                new Date(t.date).getFullYear() === currentYear
+            )
+            .reduce((sum, t) => sum + t.amount, 0);
+        
+        if (spent >= budget.limit) {
+                alerts.push({
+                title: `Limite Excedido: ${cat}`,
+                message: `Você já gastou R$ ${spent.toLocaleString('pt-BR')} (Meta: R$ ${budget.limit.toLocaleString('pt-BR')}).`,
+                type: 'warning'
+            });
+        } else if (spent >= budget.limit * 0.8) {
+            alerts.push({
+                title: `Atenção: ${cat}`,
+                message: `Você já usou ${(spent/budget.limit*100).toFixed(0)}% do orçamento. Restam R$ ${(budget.limit - spent).toLocaleString('pt-BR')}.`,
+                type: 'info' 
+            });
+        }
+    });
+
+    return alerts;
+  }, [budgets, transactions, currentDate]);
+
+
+  // --- ACTIVE FEEDBACK LOGIC (IN-FORM) ---
   const budgetAlert = useMemo(() => {
       // Only check for expenses
-      if (newTransaction.type !== 'expense' || !newTransaction.amount) return null;
+      if (newTransaction.type !== 'expense') return null;
       
-      const val = parseFloat(newTransaction.amount);
-      if (isNaN(val) || val <= 0) return null;
-
       const dateObj = new Date(newTransaction.date);
       const year = dateObj.getFullYear();
       const month = dateObj.getMonth();
@@ -130,17 +172,25 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         })
         .reduce((sum, t) => sum + t.amount, 0);
 
+      const val = parseFloat(newTransaction.amount) || 0;
       const projectedTotal = currentSpent + val;
-      const isExceeded = projectedTotal > activeBudget.limit;
-      const isNearLimit = projectedTotal > activeBudget.limit * 0.8;
-
-      if (!isNearLimit && !isExceeded) return null;
+      const limit = activeBudget.limit;
+      const remaining = limit - currentSpent;
+      const percentage = (currentSpent / limit) * 100;
+      
+      const isCurrentlyCritical = percentage >= 80;
+      const willBeCritical = (projectedTotal / limit) >= 0.8;
+      
+      if (!isCurrentlyCritical && !willBeCritical) return null;
 
       return {
-          limit: activeBudget.limit,
+          limit,
           current: currentSpent,
           projected: projectedTotal,
-          isExceeded
+          remaining: Math.max(0, remaining),
+          isExceeded: projectedTotal > limit,
+          isCurrentlyExceeded: currentSpent > limit,
+          hasAmount: val > 0
       };
 
   }, [newTransaction.amount, newTransaction.category, newTransaction.date, newTransaction.type, budgets, transactions, editingId]);
@@ -293,7 +343,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         installments: ''
     });
     setEditingId(null);
-    // Note: Do not setIsFormOpen(false) here, as this is used by the quick action to reset state before showing
   }
 
   const handleEdit = (t: Transaction) => {
@@ -325,23 +374,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       isRecurring: newTransaction.isRecurring
     };
 
-    // --- LOGIC FOR INSTALLMENTS vs RECURRING ---
     const numInstallments = parseInt(newTransaction.installments);
 
     if (newTransaction.isRecurring && !isNaN(numInstallments) && numInstallments > 1) {
-        // PARCELAMENTO (Finite Installments)
-        // Creating multiple transactions into the future
-        const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); // Force noon to avoid timezone shift
-
+        const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); 
         for(let i=0; i < numInstallments; i++) {
-             // Create a new date for this installment
              const nextDate = new Date(baseDateObj);
              nextDate.setMonth(baseDateObj.getMonth() + i);
-             
-             // Handle edge cases like Jan 31 -> Feb 28 automatically by setMonth, but sometimes it skips.
-             // Standard JS setMonth behavior: Jan 31 + 1 month = March 3 (non-leap) or March 2.
-             // If we want to stick to "end of month", additional logic is needed, but standard behavior is usually acceptable for simple apps.
-             
              const isoDate = nextDate.toISOString().split('T')[0];
              const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
 
@@ -349,12 +388,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                  ...transactionData,
                  description: desc,
                  date: isoDate,
-                 // IMPORTANT: Installments are individual items, not recurring generators themselves
                  isRecurring: false 
              });
         }
     } else {
-        // STANDARD (Single or Infinite Recurring Subscription)
         if (editingId) {
             onUpdate(editingId, transactionData);
         } else {
@@ -368,11 +405,40 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   return (
     <div className="space-y-6">
+      
+      {/* GLOBAL MONTHLY ALERTS */}
+      {monthlyAlerts.length > 0 && (
+         <div className="space-y-2">
+            {monthlyAlerts.map((alert, idx) => (
+               <div key={idx} className={`border p-4 rounded-xl flex items-start gap-3 animate-fade-in-down ${
+                  alert.type === 'warning' 
+                  ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800' 
+                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+               }`}>
+                  <div className={`p-2 rounded-full flex-shrink-0 ${
+                      alert.type === 'warning' ? 'bg-rose-100 dark:bg-rose-800' : 'bg-amber-100 dark:bg-amber-800'
+                  }`}>
+                     <Bell className={`w-5 h-5 ${
+                         alert.type === 'warning' ? 'text-rose-600 dark:text-rose-300' : 'text-amber-600 dark:text-amber-300'
+                     }`} />
+                  </div>
+                  <div>
+                     <h4 className={`font-bold text-sm ${
+                         alert.type === 'warning' ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'
+                     }`}>{alert.title}</h4>
+                     <p className={`text-xs mt-0.5 ${
+                         alert.type === 'warning' ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'
+                     }`}>{alert.message}</p>
+                  </div>
+               </div>
+            ))}
+         </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Transações</h2>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* Month Selector */}
           <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-1">
             <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
               <ChevronLeft className="w-5 h-5" />
@@ -408,7 +474,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         </div>
       </div>
 
-      {/* Summary Cards (Monthly) */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
           <div>
@@ -569,23 +635,36 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           {/* BUDGET ALERT (ACTIVE FEEDBACK) */}
           {budgetAlert && (
              <div className={`col-span-1 md:col-span-2 p-3 rounded-lg border flex items-start gap-3 animate-fade-in ${
-                budgetAlert.isExceeded 
+                budgetAlert.isExceeded || budgetAlert.isCurrentlyExceeded
                    ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800'
                    : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
              }`}>
-                {budgetAlert.isExceeded ? (
+                {budgetAlert.isExceeded || budgetAlert.isCurrentlyExceeded ? (
                     <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 mt-0.5 flex-shrink-0" />
                 ) : (
                     <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                 )}
                 <div className="flex-1">
-                    <p className={`text-sm font-bold ${budgetAlert.isExceeded ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}>
-                        {budgetAlert.isExceeded ? 'Cuidado! Limite Excedido.' : 'Atenção ao Orçamento.'}
+                    <p className={`text-sm font-bold ${
+                        budgetAlert.isExceeded || budgetAlert.isCurrentlyExceeded ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'
+                    }`}>
+                        {budgetAlert.isCurrentlyExceeded 
+                          ? 'Atenção! Você já estourou este orçamento.' 
+                          : budgetAlert.isExceeded 
+                              ? 'Cuidado! Essa transação vai estourar o limite.' 
+                              : 'Atenção ao Orçamento (Já usou >80%).'
+                        }
                     </p>
-                    <p className={`text-xs mt-1 ${budgetAlert.isExceeded ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                        Sua meta para <strong>{newTransaction.category}</strong> é R$ {budgetAlert.limit}. 
-                        Com essa transação, o total irá para <strong>R$ {budgetAlert.projected}</strong>.
-                    </p>
+                    <div className={`text-xs mt-1 ${
+                        budgetAlert.isExceeded || budgetAlert.isCurrentlyExceeded ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'
+                    }`}>
+                        <p>Meta: R$ {budgetAlert.limit} | Gasto Atual: R$ {budgetAlert.current}</p>
+                        {budgetAlert.hasAmount && (
+                             <p className="mt-0.5 font-bold">
+                                Após transação: R$ {budgetAlert.projected}
+                             </p>
+                        )}
+                    </div>
                 </div>
              </div>
           )}

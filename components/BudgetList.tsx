@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Budget, Transaction } from '../types';
-import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Wallet, Edit2, X, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Edit2, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
 interface BudgetListProps {
@@ -88,12 +89,18 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
         }
     }
 
-    onAdd({
+    // Construct payload ensuring no undefined fields if strictness is an issue
+    const payload: Omit<Budget, 'id'> = {
       category: newBudget.category,
       limit: parseFloat(newBudget.limit),
       isRecurring: newBudget.isRecurring,
-      month: newBudget.isRecurring ? undefined : newBudget.month
-    });
+    };
+
+    if (!newBudget.isRecurring) {
+        payload.month = newBudget.month;
+    }
+
+    onAdd(payload);
     
     setNewBudget({ category: 'Outros', limit: '', isRecurring: true, month: getCurrentMonthKey() });
     setIsFormOpen(false);

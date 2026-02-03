@@ -122,7 +122,7 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
     Carteira Atual: R$ ${totalValue} (${portfolioSummary || "Vazia"}).
 
     TAREFA:
-    Use o Google Search para encontrar oportunidades REAIS e ATUAIS (taxas de hoje, cotações recentes).
+    Encontre oportunidades REAIS e ATUAIS para diversificação.
     
     FORMATO OBRIGATÓRIO (Siga estritamente):
     
@@ -144,6 +144,7 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
   `;
 
   try {
+    // Tentativa 1: Com Google Search (Grounding)
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview', 
       contents: prompt,
@@ -173,9 +174,27 @@ export const getInvestmentAdvice = async (investments: Investment[]): Promise<In
       sources: uniqueSources
     };
 
-  } catch (error) {
-    console.error("Investment Advice Error:", error);
-    return { text: "Erro ao consultar consultor IA. Verifique sua chave.", sources: [] };
+  } catch (error: any) {
+    console.warn("Google Search Grounding failed, retrying without search...", error);
+    
+    // Tentativa 2: Fallback sem Google Search (para evitar erro total)
+    try {
+        const fallbackResponse = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt + "\n\n(Nota: A pesquisa em tempo real falhou. Use seu conhecimento geral.)",
+        });
+        
+        return {
+            text: (fallbackResponse.text || "Sem resposta.") + "\n\n⚠️ *Nota: O acesso à pesquisa em tempo real falhou. As taxas mencionadas podem ser estimativas baseadas no conhecimento geral do modelo.*",
+            sources: []
+        };
+    } catch (fallbackError: any) {
+        console.error("Investment Advice Error (Fallback):", fallbackError);
+        return { 
+            text: `Erro ao consultar IA: ${fallbackError.message || "Erro desconhecido"}. Verifique sua chave API ou tente novamente mais tarde.`, 
+            sources: [] 
+        };
+    }
   }
 };
 
