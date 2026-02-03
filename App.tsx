@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Target, Calendar, ShieldAlert, Hexagon, Loader2, Key, Menu, PlusCircle, ShoppingCart } from 'lucide-react';
+import { Target, Calendar, ShieldAlert, Hexagon, Loader2, Key, Menu, PlusCircle, ShoppingCart, AppWindow } from 'lucide-react';
 import { View, Transaction, TransactionStatus, ShoppingItem, PaymentMethod, AppData } from './types';
 import { loadData, saveData, migrateLocalToCloud } from './services/storageService';
 import { setApiKey, getApiKey, removeApiKey, hasCustomApiKey } from './services/geminiService';
@@ -41,6 +41,9 @@ const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  
   // Modals & Keys
   const [quickActionSignal, setQuickActionSignal] = useState<number>(0);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -49,6 +52,28 @@ const App: React.FC = () => {
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // PWA Install Logic
+  useEffect(() => {
+    const handler = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -228,6 +253,7 @@ const App: React.FC = () => {
             onUpdate={actions.updateTransaction}
             onDelete={actions.deleteTransaction}
             onToggleStatus={actions.toggleTransactionStatus}
+            onNavigate={(view) => setCurrentView(view)}
             privacyMode={privacyMode}
             hasApiKey={hasKey}
             quickActionSignal={quickActionSignal}
@@ -240,6 +266,7 @@ const App: React.FC = () => {
             onAdd={actions.addInvestment}
             onUpdate={actions.updateInvestment}
             onDelete={actions.deleteInvestment}
+            onNavigate={(view) => setCurrentView(view)}
             privacyMode={privacyMode}
             hasApiKey={hasKey}
             quickActionSignal={quickActionSignal}
@@ -254,6 +281,9 @@ const App: React.FC = () => {
              onDelete={actions.deleteShoppingItem}
              onClearList={actions.clearShoppingList}
              onFinishShopping={finishShopping}
+             shoppingBudget={data.shoppingBudget}
+             onUpdateBudget={actions.setShoppingBudget}
+             hasApiKey={hasKey}
              privacyMode={privacyMode}
              quickActionSignal={quickActionSignal}
           />
@@ -263,8 +293,11 @@ const App: React.FC = () => {
           <BudgetList 
             budgets={data.budgets || []} 
             transactions={data.transactions}
+            investments={data.investments || []}
             onAdd={actions.addBudget} 
-            onDelete={actions.deleteBudget} 
+            onUpdate={actions.updateBudget}
+            onDelete={actions.deleteBudget}
+            onNavigate={(view) => setCurrentView(view)} 
             privacyMode={privacyMode} 
             quickActionSignal={quickActionSignal}
           />
@@ -279,7 +312,13 @@ const App: React.FC = () => {
           />
         );
       case View.CALENDAR:
-        return <FinancialCalendar transactions={data.transactions} privacyMode={privacyMode} />;
+        return (
+          <FinancialCalendar 
+            transactions={data.transactions} 
+            onAddTransaction={actions.addTransaction}
+            privacyMode={privacyMode} 
+          />
+        );
       case View.DEBTS:
         return (
           <DebtManager 
@@ -343,6 +382,8 @@ const App: React.FC = () => {
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
         onFactoryReset={handleFactoryReset}
+        canInstall={!!deferredPrompt}
+        onInstall={handleInstallClick}
       />
 
       <main className="flex-1 p-4 md:p-8 pt-20 md:pt-8 pb-8 overflow-y-auto h-screen scroll-smooth">
@@ -355,7 +396,17 @@ const App: React.FC = () => {
              </div>
            </div>
            
-           <div className="flex gap-4">
+           <div className="flex gap-4 items-center">
+              {deferredPrompt && (
+                <button 
+                  onClick={handleInstallClick}
+                  className="text-emerald-400 hover:text-white animate-pulse"
+                  title="Instalar Aplicativo"
+                >
+                  <AppWindow className="w-5 h-5" />
+                </button>
+              )}
+
               <button onClick={() => setIsKeyModalOpen(true)} className={`${hasKey ? 'text-emerald-400' : 'text-rose-500'} hover:text-white relative`}>
                 <Key className="w-5 h-5" />
                 {!hasKey && (

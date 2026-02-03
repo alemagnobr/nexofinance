@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -129,6 +130,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
     return `${d.getFullYear()}-${m}`;
   });
 
+  // Mobile Tabs State
+  const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
+
   // Check Badges Effect
   useEffect(() => {
     AVAILABLE_BADGES.forEach(badge => {
@@ -192,7 +196,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   const totalIncome = data.transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
   const totalExpense = data.transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const totalPending = data.transactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-  const currentBalance = totalIncome - data.transactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
+  
+  // Use walletBalance from DB if available (Optimized), otherwise fallback to calculation (Legacy/Guest)
+  const currentBalance = data.walletBalance !== undefined 
+      ? data.walletBalance 
+      : (totalIncome - data.transactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0));
+  
   const totalInvested = data.investments.reduce((acc, curr) => acc + curr.amount, 0);
 
   // --- NEW: Detailed Metrics for Cards ---
@@ -210,9 +219,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   }, [data.investments]);
 
   // 3. Runway (Months of Survival)
-  // Logic: Current Balance / Average Monthly Expense (simplified as total expense of current view / 1, or just total expense if > 0)
   const financialRunway = useMemo(() => {
-     const monthlyBurn = totalExpense > 0 ? totalExpense : (totalIncome * 0.5) || 1000; // Fallback estimate
+     const monthlyBurn = totalExpense > 0 ? totalExpense : (totalIncome * 0.5) || 1000; 
      return currentBalance / monthlyBurn;
   }, [currentBalance, totalExpense, totalIncome]);
 
@@ -270,7 +278,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
     else { sLabel = 'Crítico'; sColor = 'text-rose-600'; }
 
     return { healthScore: score, scoreLabel: sLabel, scoreColor: sColor, factors: factorsList };
-  }, [data, totalIncome, totalExpense, totalPending, currentBalance, totalInvested]);
+  }, [data.debts, totalIncome, totalExpense, totalPending, currentBalance, totalInvested]);
 
 
   // Expense History
@@ -347,6 +355,120 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
     link.click();
     document.body.removeChild(link);
   };
+
+  // --- CHART COMPONENTS (Reused for Mobile/Desktop) ---
+
+  const renderFlowChart = (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+         <div className="flex items-center gap-2 mb-6">
+            <BarChart3 className="w-5 h-5 text-indigo-500" />
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Fluxo de Caixa (6 Meses)</h3>
+         </div>
+         <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+               <BarChart data={comparativeData} margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} width={60} />
+                  <RechartsTooltip 
+                     cursor={{ fill: 'transparent' }}
+                     contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                     formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`, '']}
+                  />
+                  <Legend iconType="circle" />
+                  <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+               </BarChart>
+            </ResponsiveContainer>
+         </div>
+    </div>
+  );
+
+  const renderAllocationChart = (
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <PieChartIcon className="w-5 h-5 text-indigo-500" />
+            Distribuição de Patrimônio
+        </h3>
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={5} dataKey="value">
+                {pieChartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <RechartsTooltip formatter={(value: number) => privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`} />
+              <Legend verticalAlign="bottom" height={36} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+  );
+
+  const renderHistoryChart = (
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                  <TrendingDown className="w-5 h-5 text-rose-500" />
+                  Tendência de Despesas
+              </h3>
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Início:</span>
+                  <input 
+                      type="month" 
+                      value={historyStartMonth}
+                      onChange={(e) => setHistoryStartMonth(e.target.value)}
+                      className="bg-transparent text-sm text-slate-700 dark:text-slate-200 focus:outline-none font-medium"
+                  />
+              </div>
+          </div>
+          {/* Adjusted height to 200px to make it even smaller as requested */}
+          <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={expenseHistoryData} margin={{ top: 10, right: 10, bottom: 25, left: 10 }}>
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                       <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 12}} 
+                          dy={10} 
+                          padding={{ left: 10, right: 10 }}
+                       />
+                       <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 12}} 
+                          tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`}
+                          width={60}
+                       />
+                       <RechartsTooltip 
+                            cursor={{ stroke: '#f43f5e', strokeWidth: 1, strokeDasharray: '5 5' }}
+                            contentStyle={{ 
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
+                            }}
+                            formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'Despesas']}
+                            labelStyle={{ color: '#64748b', marginBottom: '0.25rem' }}
+                       />
+                       <Line 
+                          type="monotone" 
+                          dataKey="amount" 
+                          stroke="#f43f5e" 
+                          strokeWidth={3} 
+                          dot={{r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff'}} 
+                          activeDot={{r: 6, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff'}} 
+                          isAnimationActive={false}
+                       />
+                  </LineChart>
+              </ResponsiveContainer>
+          </div>
+      </div>
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -568,111 +690,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
       </div>
       
-      {/* GRID CONTAINER FOR SIDE-BY-SIDE CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Comparativo Mensal Chart */}
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-             <div className="flex items-center gap-2 mb-6">
-                <BarChart3 className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Fluxo de Caixa (Últimos 6 Meses)</h3>
-             </div>
-             <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                   <BarChart data={comparativeData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} width={60} />
-                      <RechartsTooltip 
-                         cursor={{ fill: 'transparent' }}
-                         contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                         formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`, '']}
-                      />
-                      <Legend iconType="circle" />
-                      <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                   </BarChart>
-                </ResponsiveContainer>
-             </div>
-          </div>
-
-          {/* Distribution Pie Chart */}
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Distribuição de Patrimônio</h3>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={5} dataKey="value">
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip formatter={(value: number) => privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`} />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      {/* --- DESKTOP VIEW (GRID) --- */}
+      <div className="hidden lg:block space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+           {renderFlowChart}
+           {renderAllocationChart}
+        </div>
+        {renderHistoryChart}
       </div>
 
-      {/* Expense History Chart (Full Width) */}
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-                  <TrendingDown className="w-5 h-5 text-rose-500" />
-                  Tendência de Despesas
-              </h3>
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Início:</span>
-                  <input 
-                      type="month" 
-                      value={historyStartMonth}
-                      onChange={(e) => setHistoryStartMonth(e.target.value)}
-                      className="bg-transparent text-sm text-slate-700 dark:text-slate-200 focus:outline-none font-medium"
-                  />
-              </div>
+      {/* --- MOBILE VIEW (TABS) --- */}
+      <div className="lg:hidden space-y-4">
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 border border-slate-200 dark:border-slate-700">
+              <button 
+                  onClick={() => setActiveMobileTab('flow')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
+                    ${activeMobileTab === 'flow' 
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  Fluxo
+              </button>
+              <button 
+                  onClick={() => setActiveMobileTab('allocation')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
+                    ${activeMobileTab === 'allocation' 
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              >
+                  <PieChartIcon className="w-3.5 h-3.5" />
+                  Carteira
+              </button>
+              <button 
+                  onClick={() => setActiveMobileTab('history')}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
+                    ${activeMobileTab === 'history' 
+                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              >
+                  <TrendingDown className="w-3.5 h-3.5" />
+                  Histórico
+              </button>
           </div>
-          <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={expenseHistoryData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                       <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#94a3b8', fontSize: 12}} 
-                          dy={10} 
-                          padding={{ left: 10, right: 10 }}
-                       />
-                       <YAxis 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#94a3b8', fontSize: 12}} 
-                          tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`}
-                          width={60}
-                       />
-                       <RechartsTooltip 
-                            cursor={{ stroke: '#f43f5e', strokeWidth: 1, strokeDasharray: '5 5' }}
-                            contentStyle={{ 
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                                borderRadius: '12px', 
-                                border: 'none', 
-                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
-                            }}
-                            formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'Despesas']}
-                            labelStyle={{ color: '#64748b', marginBottom: '0.25rem' }}
-                       />
-                       <Line 
-                          type="monotone" 
-                          dataKey="amount" 
-                          stroke="#f43f5e" 
-                          strokeWidth={3} 
-                          dot={{r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff'}} 
-                          activeDot={{r: 6, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff'}} 
-                          isAnimationActive={false}
-                       />
-                  </LineChart>
-              </ResponsiveContainer>
+
+          <div className="min-h-[350px]">
+             {activeMobileTab === 'flow' && renderFlowChart}
+             {activeMobileTab === 'allocation' && renderAllocationChart}
+             {activeMobileTab === 'history' && renderHistoryChart}
           </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Debt, Transaction } from '../types';
-import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon } from 'lucide-react';
+import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon, TrendingUp, Calculator, Layers, Globe, Link } from 'lucide-react';
 
 interface DebtManagerProps {
   debts: Debt[];
@@ -12,6 +12,18 @@ interface DebtManagerProps {
   privacyMode: boolean;
   quickActionSignal?: number; // Prop to trigger form open
 }
+
+const NEGOTIATION_PLATFORMS = [
+    'Serasa Limpa Nome',
+    'Acordo Certo',
+    'Desenrola Brasil',
+    'SPC Brasil',
+    'Boa Vista (Consumidor Positivo)',
+    'Direto com Banco/Credor',
+    'QueroQuitar',
+    'Pessoal/Família',
+    'Outros'
+];
 
 export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -25,8 +37,17 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
 
   const [agreementDetails, setAgreementDetails] = useState({
     date: new Date().toISOString().split('T')[0],
-    amount: ''
+    amount: '',
+    installments: 1
   });
+
+  // Modal State for Interest
+  const [interestModal, setInterestModal] = useState<{
+      isOpen: boolean;
+      debtId: string;
+      currentValue: number;
+  }>({ isOpen: false, debtId: '', currentValue: 0 });
+  const [interestRate, setInterestRate] = useState<string>('1');
 
   const [newDebt, setNewDebt] = useState({
     creditor: '',
@@ -35,6 +56,8 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     targetAmount: '',
     dueDate: '',
     status: 'open' as Debt['status'],
+    platform: 'Serasa Limpa Nome',
+    customPlatform: '', // Campo auxiliar para "Outros"
     notes: ''
   });
 
@@ -42,7 +65,7 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
   useEffect(() => {
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
-        setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', notes: '' });
+        setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', platform: 'Serasa Limpa Nome', customPlatform: '', notes: '' });
     }
   }, [quickActionSignal]);
 
@@ -96,6 +119,9 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     // Logic: If targetAmount is empty, save as 0 (Sem Meta)
     const target = newDebt.targetAmount ? parseFloat(newDebt.targetAmount) : 0;
     
+    // Define a plataforma final
+    const finalPlatform = newDebt.platform === 'Outros' ? newDebt.customPlatform : newDebt.platform;
+
     onAdd({
       creditor: newDebt.creditor,
       originalAmount: parseFloat(newDebt.originalAmount),
@@ -103,9 +129,10 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
       targetAmount: target, 
       dueDate: newDebt.dueDate,
       status: newDebt.status,
+      platform: finalPlatform,
       notes: newDebt.notes
     });
-    setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', notes: '' });
+    setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', platform: 'Serasa Limpa Nome', customPlatform: '', notes: '' });
     setIsFormOpen(false);
   };
 
@@ -120,7 +147,8 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
       const suggestedAmount = debt.targetAmount > 0 ? debt.targetAmount : debt.currentAmount;
       setAgreementDetails({
         date: new Date().toISOString().split('T')[0],
-        amount: suggestedAmount.toString()
+        amount: suggestedAmount.toString(),
+        installments: 1
       });
     } else {
       onUpdate(debt.id, { status: newStatus as Debt['status'] });
@@ -132,28 +160,60 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     const debt = debts.find(d => d.id === agreementModal.debtId);
     if (!debt) return;
 
-    const amount = parseFloat(agreementDetails.amount);
+    const totalAmount = parseFloat(agreementDetails.amount);
+    const installments = Math.max(1, Math.floor(agreementDetails.installments));
+    const installmentValue = totalAmount / installments;
 
     // 1. Update Debt Status AND save the Agreed Amount
     onUpdate(debt.id, { 
       status: 'agreement',
-      agreedAmount: amount 
+      agreedAmount: totalAmount 
     });
 
-    // 2. Add Transaction to Calendar/Expenses LINKED to the debt
-    onAddTransaction({
-      description: `Acordo: ${debt.creditor}`,
-      amount: amount,
-      type: 'expense',
-      category: 'Outros', 
-      date: agreementDetails.date,
-      status: 'pending', 
-      paymentMethod: 'pix',
-      debtId: debt.id // <--- IMPORTANT: Link the transaction to the debt
-    });
+    // 2. Add Transactions to Calendar/Expenses LINKED to the debt
+    const startDate = new Date(agreementDetails.date);
+    
+    for (let i = 0; i < installments; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setMonth(startDate.getMonth() + i);
+        
+        const description = installments > 1 
+            ? `Acordo: ${debt.creditor} (${i + 1}/${installments})` 
+            : `Acordo: ${debt.creditor}`;
 
-    alert('Acordo registrado! O pagamento foi agendado. Ao marcar como PAGO nas transações, a dívida será quitada automaticamente.');
+        onAddTransaction({
+            description: description,
+            amount: parseFloat(installmentValue.toFixed(2)), // Ensure 2 decimal places
+            type: 'expense',
+            category: 'Outros', 
+            date: currentDate.toISOString().split('T')[0],
+            status: 'pending', 
+            paymentMethod: 'pix',
+            debtId: debt.id
+        });
+    }
+
+    alert(`Acordo registrado! ${installments > 1 ? `${installments} parcelas agendadas` : 'Pagamento agendado'}. A dívida será quitada automaticamente quando todas as parcelas forem pagas.`);
     setAgreementModal({ isOpen: false, debtId: ''});
+  };
+
+  const openInterestModal = (debt: Debt) => {
+      setInterestModal({
+          isOpen: true,
+          debtId: debt.id,
+          currentValue: debt.currentAmount
+      });
+      setInterestRate('1');
+  };
+
+  const applyInterest = () => {
+      const debt = debts.find(d => d.id === interestModal.debtId);
+      if (debt) {
+          const rate = parseFloat(interestRate);
+          const newValue = debt.currentAmount * (1 + rate / 100);
+          onUpdate(debt.id, { currentAmount: newValue });
+      }
+      setInterestModal({ isOpen: false, debtId: '', currentValue: 0 });
   };
 
   const formatValue = (val: number) => {
@@ -164,13 +224,54 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
   const totalDebt = debts.filter(d => d.status !== 'paid').reduce((acc, d) => acc + d.currentAmount, 0);
   const totalTarget = debts.filter(d => d.status !== 'paid').reduce((acc, d) => acc + d.targetAmount, 0);
   
-  // Potential savings calculation only considers debts with targets
   const potentialSavings = debts
     .filter(d => d.status !== 'paid' && d.targetAmount > 0)
     .reduce((acc, d) => acc + (d.currentAmount - d.targetAmount), 0);
 
   return (
     <div className="space-y-6 animate-fade-in relative">
+      
+      {/* Interest Modal */}
+      {interestModal.isOpen && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-6 animate-scale-in">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-rose-500" /> Atualizar Juros
+                      </h3>
+                  </div>
+                  <p className="text-sm text-slate-500 mb-4">
+                      O efeito bola de neve é real. Atualize o valor para manter o controle.
+                  </p>
+                  
+                  <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg mb-4 flex justify-between items-center">
+                      <span className="text-xs font-bold uppercase text-slate-500">Valor Atual</span>
+                      <span className="font-mono font-bold text-slate-700 dark:text-white">{formatValue(interestModal.currentValue)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-6">
+                      <button onClick={() => setInterestRate('1')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${interestRate === '1' ? 'bg-rose-100 text-rose-600 border border-rose-200' : 'bg-slate-50 dark:bg-slate-700 text-slate-500'}`}>+1%</button>
+                      <button onClick={() => setInterestRate('2')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${interestRate === '2' ? 'bg-rose-100 text-rose-600 border border-rose-200' : 'bg-slate-50 dark:bg-slate-700 text-slate-500'}`}>+2%</button>
+                      <button onClick={() => setInterestRate('5')} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${interestRate === '5' ? 'bg-rose-100 text-rose-600 border border-rose-200' : 'bg-slate-50 dark:bg-slate-700 text-slate-500'}`}>+5%</button>
+                      <div className="relative w-20">
+                          <input 
+                              type="number" 
+                              value={interestRate}
+                              onChange={(e) => setInterestRate(e.target.value)}
+                              className="w-full py-2 pl-2 pr-4 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-xs font-bold text-center outline-none focus:border-rose-500"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                      </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                      <button onClick={() => setInterestModal({isOpen:false, debtId:'', currentValue:0})} className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-bold">Cancelar</button>
+                      <button onClick={applyInterest} className="flex-1 py-2.5 bg-rose-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-rose-500/20">Aplicar</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Agreement Modal */}
       {agreementModal.isOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -181,31 +282,49 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
              </div>
              
              <p className="text-slate-600 dark:text-slate-300 text-sm mb-6">
-               Qual foi o valor final negociado? Vamos atualizar o card e agendar o pagamento.
+               Qual foi o valor final negociado? Vamos atualizar o card e agendar o(s) pagamento(s).
              </p>
 
              <form onSubmit={confirmAgreement} className="space-y-4">
                 <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase">Valor Fechado (R$)</label>
+                   <label className="text-xs font-bold text-slate-500 uppercase">Valor Total Fechado (R$)</label>
                    <input 
                       type="number" 
                       required
                       step="0.01"
-                      placeholder="Valor final do acordo"
+                      placeholder="Valor total a pagar"
                       value={agreementDetails.amount}
                       onChange={e => setAgreementDetails({...agreementDetails, amount: e.target.value})}
                       className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-bold text-lg outline-none focus:ring-2 focus:ring-emerald-500"
                    />
                 </div>
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase">Data do Pagamento</label>
-                   <input 
-                      type="date" 
-                      required
-                      value={agreementDetails.date}
-                      onChange={e => setAgreementDetails({...agreementDetails, date: e.target.value})}
-                      className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                   />
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">1ª Parcela</label>
+                        <input 
+                            type="date" 
+                            required
+                            value={agreementDetails.date}
+                            onChange={e => setAgreementDetails({...agreementDetails, date: e.target.value})}
+                            className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Nº Parcelas</label>
+                        <div className="relative">
+                            <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input 
+                                type="number" 
+                                required
+                                min="1"
+                                max="60"
+                                value={agreementDetails.installments}
+                                onChange={e => setAgreementDetails({...agreementDetails, installments: parseInt(e.target.value)})}
+                                className="w-full p-3 pl-9 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                        </div>
+                    </div>
                 </div>
                 
                 <div className="flex gap-3 mt-6">
@@ -220,7 +339,7 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                       type="submit" 
                       className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-lg shadow-emerald-500/30"
                    >
-                      Confirmar Acordo
+                      Gerar Parcelas
                    </button>
                 </div>
              </form>
@@ -333,6 +452,33 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
              />
           </div>
 
+          {/* New Platform Selection Field */}
+          <div className="md:col-span-2">
+             <label className="text-xs font-semibold text-slate-500 mb-1 block">Plataforma de Negociação</label>
+             <select
+                value={newDebt.platform}
+                onChange={(e) => setNewDebt({ ...newDebt, platform: e.target.value })}
+                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none mb-2"
+             >
+                {NEGOTIATION_PLATFORMS.map(plat => (
+                    <option key={plat} value={plat}>{plat}</option>
+                ))}
+             </select>
+             
+             {newDebt.platform === 'Outros' && (
+                 <div className="animate-fade-in">
+                     <input
+                        type="text"
+                        placeholder="Digite o nome da plataforma ou pessoa..."
+                        value={newDebt.customPlatform}
+                        onChange={(e) => setNewDebt({ ...newDebt, customPlatform: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-rose-500"
+                        autoFocus
+                     />
+                 </div>
+             )}
+          </div>
+
           <div className="md:col-span-2 flex justify-end gap-2 mt-2">
             <button
               type="button"
@@ -438,7 +584,7 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                   
                   {/* Left Info */}
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       {isAgreement ? (
                          <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
                             <Handshake className="w-3 h-3" /> ACORDO FECHADO
@@ -461,9 +607,16 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                          </span>
                       )}
                       
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      {/* Platform Badge */}
+                      {debt.platform && (
+                          <span className="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-indigo-100 dark:border-indigo-800">
+                              <Globe className="w-3 h-3" /> {debt.platform}
+                          </span>
+                      )}
+
+                      <span className="text-xs text-slate-400 flex items-center gap-1 ml-auto md:ml-0">
                          <CalendarClock className="w-3 h-3" />
-                         Vencimento: {new Date(debt.dueDate).toLocaleDateString('pt-BR')}
+                         {new Date(debt.dueDate).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
 
@@ -475,9 +628,12 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                           <p className="font-medium text-slate-700 dark:text-slate-300">{formatValue(debt.originalAmount)}</p>
                        </div>
                        <div className="flex items-center text-slate-400"><ArrowRight className="w-4 h-4"/></div>
-                       <div>
-                          <p className="text-xs text-slate-500">Valor Atual (Juros)</p>
-                          <p className={`font-bold ${isPaid ? 'text-slate-500' : prescribed ? 'text-slate-600 dark:text-slate-400' : 'text-rose-600'}`}>
+                       <div className="group/value cursor-pointer" onClick={() => !isPaid && !isAgreement && openInterestModal(debt)} title="Clique para atualizar juros">
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                              Valor Atual
+                              {!isPaid && !isAgreement && <TrendingUp className="w-3 h-3 text-rose-500 opacity-50 group-hover/value:opacity-100" />}
+                          </p>
+                          <p className={`font-bold transition-colors ${isPaid ? 'text-slate-500' : prescribed ? 'text-slate-600 dark:text-slate-400' : 'text-rose-600 group-hover/value:text-rose-700'}`}>
                              {formatValue(debt.currentAmount)}
                           </p>
                        </div>
@@ -551,7 +707,7 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                                 <Calendar className="w-4 h-4" /> Acordo Firmado: {formatValue(debt.agreedAmount || 0)}
                             </p>
                             <p className="text-emerald-600/80 dark:text-emerald-400/80 mt-1 pl-5">
-                                Não esqueça de pagar na data combinada. O lançamento já foi criado em suas transações.
+                                Não esqueça de pagar na data combinada. {debt.agreedAmount && debt.agreedAmount > 0 ? "As parcelas já foram lançadas no seu fluxo." : ""}
                             </p>
                          </div>
                     ) : debt.status === 'negotiating' ? (

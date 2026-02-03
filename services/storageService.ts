@@ -10,7 +10,10 @@ import {
   onSnapshot, 
   query, 
   getDocs,
-  writeBatch
+  writeBatch,
+  runTransaction,
+  limit,
+  orderBy
 } from 'firebase/firestore';
 
 // --- LOCAL STORAGE (LEGACY / GUEST MODE) ---
@@ -22,7 +25,9 @@ const DEFAULT_DATA: AppData = {
   budgets: [],
   debts: [],
   shoppingList: [],
-  unlockedBadges: []
+  shoppingBudget: 0,
+  unlockedBadges: [],
+  walletBalance: 0
 };
 
 const getStorageKey = (userId?: string) => {
@@ -45,6 +50,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.unlockedBadges) data.unlockedBadges = [];
     if (!data.debts) data.debts = [];
     if (!data.shoppingList) data.shoppingList = [];
+    if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
     if (!data.budgets) {
       data.budgets = [];
@@ -54,6 +60,16 @@ export const loadData = (userId?: string): AppData => {
         isRecurring: b.isRecurring !== undefined ? b.isRecurring : true,
         month: b.month || undefined
       }));
+    }
+
+    // Calcula saldo inicial se não existir (para guest mode)
+    if (data.walletBalance === undefined) {
+        data.walletBalance = data.transactions.reduce((acc: number, t: Transaction) => {
+            if (t.status === 'paid') {
+                return acc + (t.type === 'income' ? t.amount : -t.amount);
+            }
+            return acc;
+        }, 0);
     }
     
     return data;
@@ -66,7 +82,15 @@ export const loadData = (userId?: string): AppData => {
 export const saveData = (data: AppData, userId?: string): void => {
   try {
     const key = getStorageKey(userId);
-    localStorage.setItem(key, JSON.stringify(data));
+    // Recalcula saldo antes de salvar para garantir consistência no Guest Mode
+    const calculatedBalance = data.transactions.reduce((acc: number, t: Transaction) => {
+        if (t.status === 'paid') {
+            return acc + (t.type === 'income' ? t.amount : -t.amount);
+        }
+        return acc;
+    }, 0);
+    const dataToSave = { ...data, walletBalance: calculatedBalance };
+    localStorage.setItem(key, JSON.stringify(dataToSave));
   } catch (e) {
     console.error("Failed to save data", e);
   }
@@ -74,9 +98,22 @@ export const saveData = (data: AppData, userId?: string): void => {
 
 // --- FIRESTORE SERVICE (CLOUD MODE) ---
 
-// 1. LISTENERS (Escuta em tempo real)
+// Helper: Calcula impacto de uma transação no saldo
+const getTransactionImpact = (t: Transaction): number => {
+    if (t.status === 'pending') return 0;
+    return t.type === 'income' ? t.amount : -t.amount;
+};
+
+// 1. LISTENERS (Escuta em tempo real OTIMIZADA)
 export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) => void) => {
-  const unsubTransactions = onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
+  // Otimização: Baixa apenas as últimas 300 transações
+  const qTransactions = query(
+      collection(db, 'users', uid, 'transactions'),
+      orderBy('date', 'desc'),
+      limit(300)
+  );
+
+  const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
     const transactions = snapshot.docs.map(doc => doc.data() as Transaction);
     onUpdate({ transactions });
   });
@@ -101,6 +138,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ shoppingList });
   });
   
+  // Escuta documento do usuário para saldo e configurações
   const unsubUserDoc = onSnapshot(doc(db, 'users', uid), (doc) => {
       if (doc.exists()) {
           const data = doc.data();
@@ -108,6 +146,8 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
           
           if (data.unlockedBadges) updates.unlockedBadges = data.unlockedBadges;
           if (data.wealthProfile) updates.wealthProfile = data.wealthProfile;
+          if (data.shoppingBudget !== undefined) updates.shoppingBudget = data.shoppingBudget;
+          if (data.walletBalance !== undefined) updates.walletBalance = data.walletBalance;
           
           if (Object.keys(updates).length > 0) onUpdate(updates);
       }
@@ -123,25 +163,85 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
   };
 };
 
-// 2. WRITERS (Escrita Atômica)
+// 2. WRITERS (Escrita Atômica com Atualização de Saldo)
 
 // TRANSACTIONS
 export const addTransactionFire = async (uid: string, item: Transaction) => {
-  await setDoc(doc(db, 'users', uid, 'transactions', item.id), item);
+  await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, 'users', uid);
+      const userDoc = await transaction.get(userRef);
+      const currentBalance = userDoc.data()?.walletBalance || 0;
+      
+      const impact = getTransactionImpact(item);
+      
+      const transRef = doc(db, 'users', uid, 'transactions', item.id);
+      transaction.set(transRef, item);
+      transaction.update(userRef, { walletBalance: currentBalance + impact });
+  });
 };
-export const updateTransactionFire = async (uid: string, id: string, data: Partial<Transaction>) => {
-  await updateDoc(doc(db, 'users', uid, 'transactions', id), data);
+
+export const updateTransactionFire = async (uid: string, id: string, newData: Partial<Transaction>) => {
+  await runTransaction(db, async (transaction) => {
+      const transRef = doc(db, 'users', uid, 'transactions', id);
+      const userRef = doc(db, 'users', uid);
+      
+      const transDoc = await transaction.get(transRef);
+      if (!transDoc.exists()) throw new Error("Transaction not found");
+      
+      const oldData = transDoc.data() as Transaction;
+      const userDoc = await transaction.get(userRef);
+      const currentBalance = userDoc.data()?.walletBalance || 0;
+
+      // Reverte impacto antigo e aplica novo
+      const oldImpact = getTransactionImpact(oldData);
+      const newTransactionFull = { ...oldData, ...newData };
+      const newImpact = getTransactionImpact(newTransactionFull);
+      
+      transaction.update(transRef, newData);
+      transaction.update(userRef, { walletBalance: currentBalance - oldImpact + newImpact });
+  });
 };
+
 export const deleteTransactionFire = async (uid: string, id: string) => {
-  await deleteDoc(doc(db, 'users', uid, 'transactions', id));
+    await runTransaction(db, async (transaction) => {
+        const transRef = doc(db, 'users', uid, 'transactions', id);
+        const userRef = doc(db, 'users', uid);
+        
+        const transDoc = await transaction.get(transRef);
+        if (!transDoc.exists()) throw new Error("Transaction not found");
+        
+        const oldData = transDoc.data() as Transaction;
+        const userDoc = await transaction.get(userRef);
+        const currentBalance = userDoc.data()?.walletBalance || 0;
+        
+        const impact = getTransactionImpact(oldData);
+        
+        transaction.delete(transRef);
+        transaction.update(userRef, { walletBalance: currentBalance - impact });
+    });
 };
+
+export const recalculateBalanceFire = async (uid: string) => {
+    const q = query(collection(db, 'users', uid, 'transactions'));
+    const snapshot = await getDocs(q);
+    let total = 0;
+    
+    snapshot.forEach(doc => {
+        const t = doc.data() as Transaction;
+        total += getTransactionImpact(t);
+    });
+    
+    await updateDoc(doc(db, 'users', uid), { walletBalance: total });
+    return total;
+};
+
 
 // INVESTMENTS
 export const addInvestmentFire = async (uid: string, item: Investment) => {
   await setDoc(doc(db, 'users', uid, 'investments', item.id), item);
 };
-export const updateInvestmentFire = async (uid: string, id: string, amount: number) => {
-  await updateDoc(doc(db, 'users', uid, 'investments', id), { amount });
+export const updateInvestmentFire = async (uid: string, id: string, data: Partial<Investment>) => {
+  await updateDoc(doc(db, 'users', uid, 'investments', id), data);
 };
 export const deleteInvestmentFire = async (uid: string, id: string) => {
   await deleteDoc(doc(db, 'users', uid, 'investments', id));
@@ -150,6 +250,9 @@ export const deleteInvestmentFire = async (uid: string, id: string) => {
 // BUDGETS
 export const addBudgetFire = async (uid: string, item: Budget) => {
   await setDoc(doc(db, 'users', uid, 'budgets', item.id), item);
+};
+export const updateBudgetFire = async (uid: string, id: string, data: Partial<Budget>) => {
+  await updateDoc(doc(db, 'users', uid, 'budgets', id), data);
 };
 export const deleteBudgetFire = async (uid: string, id: string) => {
   await deleteDoc(doc(db, 'users', uid, 'budgets', id));
@@ -186,8 +289,15 @@ export const clearShoppingListFire = async (uid: string) => {
   await batch.commit();
 };
 
+// SHOPPING BUDGET
+export const updateShoppingBudgetFire = async (uid: string, amount: number) => {
+    await setDoc(doc(db, 'users', uid), { 
+        shoppingBudget: amount 
+    }, { merge: true });
+};
 
-// BADGES & WEALTH PROFILE (User Document)
+
+// BADGES & WEALTH PROFILE
 export const unlockBadgeFire = async (uid: string, badgeId: string, currentBadges: string[]) => {
     if (!currentBadges.includes(badgeId)) {
         await setDoc(doc(db, 'users', uid), { 
@@ -202,13 +312,15 @@ export const saveWealthProfileFire = async (uid: string, profile: WealthProfile)
     }, { merge: true });
 };
 
-// MIGRATION HELPER (Local -> Cloud)
 export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     const batch = writeBatch(db);
     
+    let calculatedBalance = 0;
+
     localData.transactions.forEach(t => {
         const ref = doc(db, 'users', uid, 'transactions', t.id);
         batch.set(ref, t);
+        calculatedBalance += getTransactionImpact(t);
     });
     
     localData.investments.forEach(i => {
@@ -232,7 +344,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     });
 
     const userRef = doc(db, 'users', uid);
-    const userData: any = { unlockedBadges: localData.unlockedBadges };
+    const userData: any = { 
+        unlockedBadges: localData.unlockedBadges,
+        walletBalance: calculatedBalance,
+        shoppingBudget: localData.shoppingBudget || 0
+    };
     if (localData.wealthProfile) userData.wealthProfile = localData.wealthProfile;
     
     batch.set(userRef, userData, { merge: true });

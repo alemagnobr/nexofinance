@@ -5,10 +5,10 @@ import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, Transacti
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
-  addBudgetFire, deleteBudgetFire,
+  addBudgetFire, deleteBudgetFire, updateBudgetFire,
   addDebtFire, updateDebtFire, deleteDebtFire,
-  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire,
-  unlockBadgeFire, saveWealthProfileFire, subscribeToData
+  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
+  unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire
 } from '../services/storageService';
 
 const DEFAULT_DATA: AppData = {
@@ -17,7 +17,9 @@ const DEFAULT_DATA: AppData = {
     budgets: [],
     debts: [],
     shoppingList: [],
-    unlockedBadges: []
+    shoppingBudget: 0,
+    unlockedBadges: [],
+    walletBalance: 0
 };
 
 export const useAppData = (user: User | null, isGuest: boolean) => {
@@ -33,7 +35,16 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     }
   }, [user, isGuest]);
 
-  // Processamento de Transações Recorrentes (mantido igual)
+  // Migração de Saldo (One-time check)
+  useEffect(() => {
+      if (user && !isGuest && data.transactions.length > 0 && data.walletBalance === undefined) {
+          // Se carregou transações mas não tem saldo salvo, recalcula no banco
+          console.log("Migrando para sistema de Saldo Otimizado...");
+          recalculateBalanceFire(user.uid);
+      }
+  }, [user, isGuest, data.transactions.length, data.walletBalance]);
+
+  // Processamento de Transações Recorrentes
   useEffect(() => {
     if (user || isGuest) {
         const processRecurring = async () => {
@@ -123,21 +134,37 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
     if (user) {
         await updateTransactionFire(user.uid, id, { status: newStatus });
+        
+        // Debt Sync Logic
         if (targetTransaction.debtId) {
              const debt = data.debts.find(d => d.id === targetTransaction.debtId);
              if (debt) {
-                 const newDebtStatus = newStatus === 'paid' ? 'paid' : 'agreement';
-                 await updateDebtFire(user.uid, debt.id, { status: newDebtStatus });
+                 const relatedTransactions = data.transactions.filter(t => t.debtId === targetTransaction.debtId);
+                 const allPaid = relatedTransactions.every(t => {
+                     if (t.id === id) return newStatus === 'paid';
+                     return t.status === 'paid';
+                 });
+
+                 const newDebtStatus = allPaid ? 'paid' : 'agreement';
+                 
+                 if (debt.status !== newDebtStatus) {
+                    await updateDebtFire(user.uid, debt.id, { status: newDebtStatus });
+                 }
              }
         }
     } else {
         setData(prev => {
             const updatedTransactions = prev.transactions.map(t => t.id === id ? { ...t, status: newStatus } : t);
+            
             let updatedDebts = prev.debts;
             if (targetTransaction.debtId) {
+                const relatedTransactions = updatedTransactions.filter(t => t.debtId === targetTransaction.debtId);
+                const allPaid = relatedTransactions.every(t => t.status === 'paid');
+                const newDebtStatus = allPaid ? 'paid' : 'agreement';
+
                 updatedDebts = prev.debts.map(d => {
                     if (d.id === targetTransaction.debtId) {
-                         return { ...d, status: newStatus === 'paid' ? 'paid' : 'agreement' };
+                         return { ...d, status: newDebtStatus };
                     }
                     return d;
                 });
@@ -153,9 +180,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, investments: [...prev.investments, newInvestment] }));
   };
 
-  const updateInvestment = async (id: string, newAmount: number) => {
-    if (user) await updateInvestmentFire(user.uid, id, newAmount);
-    else setData(prev => ({ ...prev, investments: prev.investments.map(inv => inv.id === id ? { ...inv, amount: newAmount } : inv) }));
+  const updateInvestment = async (id: string, updates: Partial<Investment>) => {
+    if (user) await updateInvestmentFire(user.uid, id, updates);
+    else setData(prev => ({ ...prev, investments: prev.investments.map(inv => inv.id === id ? { ...inv, ...updates } : inv) }));
   };
 
   const deleteInvestment = async (id: string) => {
@@ -167,6 +194,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     const newBudget: Budget = { ...b, id: crypto.randomUUID() };
     if (user) await addBudgetFire(user.uid, newBudget);
     else setData(prev => ({ ...prev, budgets: [...(prev.budgets || []), newBudget] }));
+  };
+
+  const updateBudget = async (id: string, updates: Partial<Budget>) => {
+    if (user) await updateBudgetFire(user.uid, id, updates);
+    else setData(prev => ({ ...prev, budgets: prev.budgets.map(b => b.id === id ? { ...b, ...updates } : b) }));
   };
 
   const deleteBudget = async (id: string) => {
@@ -211,6 +243,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingList: [] }));
   };
 
+  const setShoppingBudget = async (amount: number) => {
+    if (user) await updateShoppingBudgetFire(user.uid, amount);
+    else setData(prev => ({ ...prev, shoppingBudget: amount }));
+  };
+
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
@@ -238,6 +275,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         updateInvestment,
         deleteInvestment,
         addBudget,
+        updateBudget,
         deleteBudget,
         addDebt,
         updateDebt,
@@ -246,6 +284,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         updateShoppingItem,
         deleteShoppingItem,
         clearShoppingList,
+        setShoppingBudget,
         unlockBadge,
         saveWealthProfile
     }

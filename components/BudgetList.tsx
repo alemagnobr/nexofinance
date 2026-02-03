@@ -1,26 +1,33 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Budget, Transaction } from '../types';
-import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Edit2, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3 } from 'lucide-react';
+import { Budget, Transaction, Investment, View } from '../types';
+import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Edit2, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3, ArrowRight, Save, X, Ghost, Medal, LineChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
 interface BudgetListProps {
   budgets: Budget[];
   transactions: Transaction[];
+  investments: Investment[];
   onAdd: (budget: Omit<Budget, 'id'>) => void;
+  onUpdate: (id: string, updates: Partial<Budget>) => void;
   onDelete: (id: string) => void;
+  onNavigate: (view: View) => void;
   privacyMode: boolean;
   quickActionSignal?: number; // Prop to trigger form open
 }
 
 const CATEGORY_OPTIONS = ['Casa', 'Mobilidade', 'Alimentos', 'Lazer', 'Pets', 'Outros'];
 
-export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, onAdd, onDelete, privacyMode, quickActionSignal }) => {
+export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, investments, onAdd, onUpdate, onDelete, onNavigate, privacyMode, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   
   // Date Navigation State
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Inline Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
 
   const [newBudget, setNewBudget] = useState({
     category: 'Lazer',
@@ -33,7 +40,6 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
   useEffect(() => {
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
-        // Default to current month when opened via quick action
         setNewBudget({ 
             category: 'Lazer', 
             limit: '', 
@@ -75,21 +81,18 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
     e.preventDefault();
     
     // Check conflicts
-    // 1. If trying to add Recurring: check if Recurring exists
     if (newBudget.isRecurring) {
         if (budgets.some(b => b.category === newBudget.category && b.isRecurring)) {
             alert(`Já existe um orçamento recorrente para ${newBudget.category}. Exclua o anterior para criar um novo.`);
             return;
         }
     } else {
-        // 2. If trying to add Specific: check if Specific exists for that month
         if (budgets.some(b => b.category === newBudget.category && b.month === newBudget.month)) {
             alert(`Já existe um orçamento de ${newBudget.category} para ${newBudget.month}.`);
             return;
         }
     }
 
-    // Construct payload ensuring no undefined fields if strictness is an issue
     const payload: Omit<Budget, 'id'> = {
       category: newBudget.category,
       limit: parseFloat(newBudget.limit),
@@ -101,9 +104,21 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
     }
 
     onAdd(payload);
-    
     setNewBudget({ category: 'Outros', limit: '', isRecurring: true, month: getCurrentMonthKey() });
     setIsFormOpen(false);
+  };
+
+  const handleSaveEdit = (id: string) => {
+      const val = parseFloat(editValue);
+      if (!isNaN(val) && val > 0) {
+          onUpdate(id, { limit: val });
+      }
+      setEditingId(null);
+  };
+
+  const startEditing = (budget: Budget) => {
+      setEditingId(budget.id);
+      setEditValue(budget.limit.toString());
   };
 
   const formatValue = (val: number) => {
@@ -111,7 +126,6 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
     return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
-  // Helper to calculate spent amount for the VIEWED month for a category
   const getSpentAmount = (category: string) => {
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth();
@@ -128,28 +142,45 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  // LOGIC: Get effective budgets for the currently selected month
-  // We want to show:
-  // 1. Specific budgets defined for this month.
-  // 2. Recurring budgets (if no specific budget overrides it).
   const effectiveBudgets = useMemo(() => {
      const monthKey = getCurrentMonthKey();
-     
-     // 1. Find specific budgets for this month
      const specific = budgets.filter(b => b.month === monthKey);
      const specificCategories = new Set(specific.map(b => b.category));
-
-     // 2. Find recurring budgets that are NOT overridden by specific ones
      const recurring = budgets.filter(b => b.isRecurring && !specificCategories.has(b.category));
-
      return [...specific, ...recurring].sort((a, b) => a.category.localeCompare(b.category));
   }, [budgets, currentDate]);
 
+  // Goals (Investments with Target)
+  const investmentGoals = useMemo(() => {
+      return investments
+        .filter(i => i.targetAmount > 0)
+        .sort((a, b) => {
+            const progressA = a.amount / a.targetAmount;
+            const progressB = b.amount / b.targetAmount;
+            return progressB - progressA;
+        });
+  }, [investments]);
+
+  // FORECASTING HELPER
+  const calculateForecast = (spent: number) => {
+      const today = new Date();
+      // Only forecast if looking at current month
+      if (today.getMonth() !== currentDate.getMonth() || today.getFullYear() !== currentDate.getFullYear()) {
+          return null;
+      }
+      
+      const day = today.getDate();
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      
+      if (day === 1) return spent; // Too early
+      
+      const dailyAverage = spent / day;
+      return dailyAverage * daysInMonth;
+  };
+
   // --- ANALYTICS LOGIC ---
   const performanceData = useMemo(() => {
-    // Look back 6 months
     const stats = new Map<string, { totalSpent: number, totalLimit: number, count: number }>();
-    
     const today = new Date();
     for (let i = 0; i < 6; i++) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -157,7 +188,6 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
         const m = d.getMonth();
         const monthKey = `${y}-${String(m + 1).padStart(2, '0')}`;
 
-        // Get active categories in this month history
         const activeCategories = new Set<string>(transactions
             .filter(t => {
                 const tDate = new Date(t.date);
@@ -167,7 +197,6 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
         );
 
         activeCategories.forEach((cat) => {
-            // Find effective budget for that past month
             let budget = budgets.find(b => b.category === cat && b.month === monthKey);
             if (!budget) budget = budgets.find(b => b.category === cat && b.isRecurring);
 
@@ -194,12 +223,11 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
         return {
             name: cat,
             adherence: avgAdherence,
-            spent: data.totalSpent / data.count, // Average per month
+            spent: data.totalSpent / data.count, 
             limit: data.totalLimit / data.count
         };
     });
 
-    // Sort: Most exceeded first
     return chartData.sort((a, b) => b.adherence - a.adherence);
   }, [budgets, transactions]);
 
@@ -208,8 +236,8 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Planejamento & Metas</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm capitalize">Controle de gastos para {formatMonth(currentDate)}</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Planejamento</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm capitalize">Defina limites e acompanhe suas metas.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -243,7 +271,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
             className="flex items-center gap-2 bg-pink-600 text-white px-4 py-2.5 rounded-lg hover:bg-pink-700 transition-colors shadow-sm text-sm font-medium"
             >
             <Plus className="w-4 h-4" />
-            Definir Limite
+            Definir Teto
             </button>
         </div>
       </div>
@@ -256,11 +284,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
                       <TrendingUp className="w-5 h-5 text-indigo-500" />
                       Performance Histórica (Últimos 6 Meses)
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Veja quais categorias você costuma estourar (acima de 100%) e quais estão sob controle.
-                  </p>
               </div>
-              
               <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={performanceData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -294,7 +318,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
       {isFormOpen && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
           <div className="col-span-1 md:col-span-2">
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Novo Limite Mensal</h3>
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Novo Limite de Gastos</h3>
           </div>
           
           <div className="flex flex-col gap-1">
@@ -311,7 +335,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
           </div>
 
           <div className="flex flex-col gap-1">
-             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Valor Limite (R$)</label>
+             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Valor Teto (R$)</label>
              <input
                 required
                 type="number"
@@ -338,7 +362,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
              
              {newBudget.isRecurring ? (
                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> Este limite será aplicado automaticamente em todos os meses futuros, a menos que você defina um específico.
+                    <Info className="w-3 h-3" /> Este limite será aplicado automaticamente em todos os meses futuros.
                  </p>
              ) : (
                  <div className="animate-fade-in">
@@ -350,124 +374,213 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, o
                         onChange={(e) => setNewBudget({...newBudget, month: e.target.value})}
                         className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 outline-none w-full max-w-[200px]"
                      />
-                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-1">
-                        <CalendarClock className="w-3 h-3" /> Este limite valerá APENAS para o mês selecionado.
-                     </p>
                  </div>
              )}
           </div>
 
           <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-2">
-            <button
-              type="button"
-              onClick={() => setIsFormOpen(false)}
-              className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 font-medium"
-            >
-              Salvar Meta
-            </button>
+            <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">Cancelar</button>
+            <button type="submit" className="px-6 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 font-medium">Salvar Teto</button>
           </div>
         </form>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {effectiveBudgets.length === 0 ? (
-          <div className="col-span-full py-12 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
-             <Target className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-             <p className="text-slate-500 dark:text-slate-400 font-medium">Nenhum limite definido para {formatMonth(currentDate)}.</p>
-             <p className="text-slate-400 text-sm">Crie metas recorrentes ou específicas para controlar seus gastos.</p>
-          </div>
-        ) : (
-            effectiveBudgets.map(budget => {
-            const spent = getSpentAmount(budget.category);
-            const percentage = Math.min(100, (spent / budget.limit) * 100);
-            const isOverLimit = spent > budget.limit;
-            
-            // Color Logic
-            let progressColor = 'bg-emerald-500';
-            let statusColor = 'text-emerald-600 dark:text-emerald-400';
-            let icon = <CheckCircle className="w-5 h-5" />;
-            
-            if (percentage > 100) {
-              progressColor = 'bg-rose-500';
-              statusColor = 'text-rose-600 dark:text-rose-400';
-              icon = <AlertCircle className="w-5 h-5" />;
-            } else if (percentage > 75) {
-              progressColor = 'bg-amber-500';
-              statusColor = 'text-amber-600 dark:text-amber-400';
-              icon = <AlertTriangle className="w-5 h-5" />;
-            }
-
-            const remaining = Math.max(0, budget.limit - spent);
-
-            return (
-              <div key={budget.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all relative overflow-hidden group">
-                
-                {/* Delete Button (Visible on Hover) */}
-                <button 
-                  onClick={() => onDelete(budget.id)}
-                  className="absolute top-4 right-4 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-3 rounded-lg bg-slate-100 dark:bg-slate-700 ${statusColor}`}>
-                    {icon}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-800 dark:text-white">{budget.category}</h3>
-                        {/* Source Indicator */}
-                        {budget.isRecurring ? (
-                            <span title="Meta Recorrente (Padrão)" className="text-slate-400">
-                                <Repeat className="w-3 h-3" />
-                            </span>
-                        ) : (
-                            <span title={`Meta Específica para ${budget.month}`} className="text-pink-500">
-                                <CalendarClock className="w-3 h-3" />
-                            </span>
-                        )}
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Meta: {formatValue(budget.limit)}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-end text-sm">
-                    <span className="text-slate-600 dark:text-slate-300 font-medium">
-                      Gasto: <span className={isOverLimit ? 'text-rose-500 font-bold' : ''}>{formatValue(spent)}</span>
-                    </span>
-                    <span className="text-slate-400 text-xs">
-                      {percentage.toFixed(0)}%
-                    </span>
-                  </div>
-                  
-                  <div className="w-full h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-1000 ${progressColor}`} 
-                      style={{ width: `${percentage}%` }}
-                    ></div>
-                  </div>
-
-                  <p className="text-xs text-right mt-2 font-medium">
-                    {isOverLimit ? (
-                      <span className="text-rose-500">Excedido em {formatValue(spent - budget.limit)}</span>
-                    ) : (
-                      <span className="text-emerald-600 dark:text-emerald-400">Resta {formatValue(remaining)}</span>
-                    )}
-                  </p>
-                </div>
+      {/* --- SECTION 1: SPENDING LIMITS (Tetos) --- */}
+      <div className="mb-10">
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+             <AlertCircle className="w-5 h-5 text-rose-500" /> Tetos de Gastos
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {effectiveBudgets.length === 0 ? (
+              <div className="col-span-full py-12 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                <Target className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 dark:text-slate-400 font-medium">Nenhum teto definido.</p>
               </div>
-            );
-          })
-        )}
+            ) : (
+                effectiveBudgets.map(budget => {
+                const spent = getSpentAmount(budget.category);
+                const forecast = calculateForecast(spent);
+                const percentage = Math.min(100, (spent / budget.limit) * 100);
+                const forecastPercentage = forecast ? Math.min(100, (forecast / budget.limit) * 100) : 0;
+                
+                const isOverLimit = spent > budget.limit;
+                
+                // Alert Colors
+                let progressColor = 'bg-emerald-500';
+                let icon = <CheckCircle className="w-5 h-5 text-emerald-600" />;
+                if (percentage > 100) { progressColor = 'bg-rose-500'; icon = <AlertCircle className="w-5 h-5 text-rose-600" />; }
+                else if (percentage > 85) { progressColor = 'bg-rose-500'; icon = <AlertTriangle className="w-5 h-5 text-rose-500" />; }
+                else if (percentage > 70) { progressColor = 'bg-amber-500'; icon = <AlertTriangle className="w-5 h-5 text-amber-500" />; }
+
+                return (
+                  <div key={budget.id} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all relative group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-lg bg-slate-100 dark:bg-slate-700`}>{icon}</div>
+                        <div>
+                           <h3 className="font-bold text-slate-800 dark:text-white">{budget.category}</h3>
+                           <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                               {budget.isRecurring ? <Repeat className="w-3 h-3"/> : <CalendarClock className="w-3 h-3"/>}
+                               {budget.isRecurring ? 'Mensal' : 'Específico'}
+                           </p>
+                        </div>
+                      </div>
+                      
+                      {/* Inline Edit Trigger */}
+                      {editingId === budget.id ? (
+                          <div className="flex items-center gap-1 animate-fade-in">
+                             <input 
+                                autoFocus
+                                type="number"
+                                className="w-20 p-1 text-sm border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(budget.id)}
+                             />
+                             <button onClick={() => handleSaveEdit(budget.id)} className="p-1 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"><Save className="w-3 h-3"/></button>
+                             <button onClick={() => setEditingId(null)} className="p-1 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"><X className="w-3 h-3"/></button>
+                          </div>
+                      ) : (
+                          <div className="text-right group-hover:hidden">
+                             <p className="text-xs text-slate-500">Limite</p>
+                             <p className="font-bold text-slate-800 dark:text-white cursor-pointer hover:text-indigo-500" onClick={() => startEditing(budget)}>
+                                {formatValue(budget.limit)}
+                             </p>
+                          </div>
+                      )}
+                      
+                      {/* Actions on Hover */}
+                      <div className="hidden group-hover:flex gap-1 absolute top-4 right-4 bg-white dark:bg-slate-800 pl-2">
+                          <button onClick={() => startEditing(budget)} className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded"><Edit2 className="w-4 h-4"/></button>
+                          <button onClick={() => onDelete(budget.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 relative">
+                      <div className="flex justify-between items-end text-sm">
+                        <span className="text-slate-600 dark:text-slate-300 font-medium">
+                          Gasto: <span className={isOverLimit ? 'text-rose-500 font-bold' : ''}>{formatValue(spent)}</span>
+                        </span>
+                        <span className="text-slate-400 text-xs">{percentage.toFixed(0)}%</span>
+                      </div>
+                      
+                      <div className="w-full h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden relative">
+                        {/* Ghost Bar (Forecast) */}
+                        {forecast && forecast > spent && !isOverLimit && (
+                             <div 
+                                className="absolute top-0 left-0 h-full bg-slate-200 dark:bg-slate-600 opacity-50 border-r-2 border-slate-400 dark:border-slate-400 transition-all duration-1000"
+                                style={{ width: `${forecastPercentage}%` }}
+                                title={`Previsão de fechar o mês em ${formatValue(forecast)}`}
+                             ></div>
+                        )}
+                        {/* Actual Bar */}
+                        <div 
+                          className={`h-full rounded-full transition-all duration-1000 ${progressColor} relative z-10`} 
+                          style={{ width: `${percentage}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="flex justify-between items-center mt-2">
+                         {forecast && forecast > budget.limit && !isOverLimit && (
+                             <p className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 font-semibold animate-pulse">
+                                 <Ghost className="w-3 h-3" /> Previsão de estouro: {formatValue(forecast)}
+                             </p>
+                         )}
+                         <div className="flex-1"></div>
+                         <p className="text-xs text-right font-medium">
+                            {isOverLimit ? (
+                            <span className="text-rose-500">Excedido: {formatValue(spent - budget.limit)}</span>
+                            ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400">Restam: {formatValue(budget.limit - spent)}</span>
+                            )}
+                         </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
       </div>
+
+      {/* --- SECTION 2: INVESTMENT GOALS (Metas Positivas) --- */}
+      <div>
+          <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                 <Medal className="w-5 h-5 text-yellow-500" /> Objetivos de Conquista
+              </h3>
+              <button 
+                 onClick={() => onNavigate(View.INVESTMENTS)}
+                 className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 flex items-center gap-1 transition-colors"
+              >
+                 Gerenciar Carteira <ArrowRight className="w-3 h-3" />
+              </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {investmentGoals.length === 0 ? (
+                  <div className="col-span-full py-8 text-center bg-yellow-50/50 dark:bg-yellow-900/10 rounded-xl border border-dashed border-yellow-200 dark:border-yellow-800">
+                      <Target className="w-10 h-10 text-yellow-400 mx-auto mb-2" />
+                      <p className="text-slate-600 dark:text-slate-400 text-sm">Defina uma "Meta Final" nos seus investimentos para vê-los aqui.</p>
+                      <button 
+                         onClick={() => onNavigate(View.INVESTMENTS)}
+                         className="mt-3 text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                      >
+                         Ir para Investimentos
+                      </button>
+                  </div>
+              ) : (
+                  investmentGoals.map(goal => {
+                      const percentage = Math.min(100, (goal.amount / goal.targetAmount) * 100);
+                      
+                      return (
+                          <div 
+                             key={goal.id} 
+                             onClick={() => onNavigate(View.INVESTMENTS)}
+                             className="bg-gradient-to-br from-white to-yellow-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-xl shadow-sm border border-yellow-200 dark:border-yellow-900/30 relative overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all group"
+                          >
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <LineChart className="w-4 h-4 text-slate-400" />
+                              </div>
+
+                              <div className="flex justify-between items-start mb-4 relative z-10">
+                                  <div className="flex items-center gap-3">
+                                      <div className="p-2.5 rounded-lg bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                          <TrendingUp className="w-5 h-5" />
+                                      </div>
+                                      <div>
+                                          <h3 className="font-bold text-slate-800 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{goal.name}</h3>
+                                          <p className="text-xs text-slate-500 dark:text-slate-400">Meta: {formatValue(goal.targetAmount)}</p>
+                                      </div>
+                                  </div>
+                                  <div className="text-right">
+                                      <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{percentage.toFixed(0)}%</p>
+                                  </div>
+                              </div>
+
+                              <div className="w-full h-4 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative z-10">
+                                  <div 
+                                      className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
+                                      style={{ width: `${percentage}%` }}
+                                  >
+                                      {/* Shimmer effect */}
+                                      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+                                  </div>
+                              </div>
+                              
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 text-right relative z-10">
+                                  Faltam {formatValue(goal.targetAmount - goal.amount)}
+                              </p>
+
+                              {/* Decorative bg icon */}
+                              <Medal className="absolute -bottom-4 -right-4 w-32 h-32 text-yellow-500/5 rotate-12 pointer-events-none" />
+                          </div>
+                      );
+                  })
+              )}
+          </div>
+      </div>
+
     </div>
   );
 };

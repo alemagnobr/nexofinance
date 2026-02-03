@@ -19,7 +19,8 @@ export interface Transaction {
 export interface Investment {
   id: string;
   name: string;
-  amount: number;
+  amount: number; // Valor Atual (Mercado)
+  investedAmount?: number; // Custo de Aquisição (Para cálculo de ROI)
   targetAmount: number;
   type: string;
   date: string;
@@ -42,8 +43,11 @@ export interface Debt {
   agreedAmount?: number; // Valor final fechado no acordo
   dueDate: string; // Data original do vencimento (para prescrição)
   status: 'open' | 'negotiating' | 'agreement' | 'paid';
+  platform?: string; // Onde está sendo negociado (Serasa, Desenrola, etc)
   notes?: string;
 }
+
+export type ShoppingCategory = 'Hortifruti' | 'Carnes' | 'Laticínios' | 'Mercearia' | 'Bebidas' | 'Limpeza' | 'Higiene' | 'Padaria' | 'Outros';
 
 export interface ShoppingItem {
   id: string;
@@ -51,6 +55,7 @@ export interface ShoppingItem {
   quantity: number;
   actualPrice: number; // O valor que o usuário digita no mercado (calculadora)
   isChecked: boolean; // Se já pegou o item
+  category?: ShoppingCategory; // Novo campo
 }
 
 export interface Badge {
@@ -85,8 +90,10 @@ export interface AppData {
   budgets: Budget[];
   debts: Debt[];
   shoppingList: ShoppingItem[];
+  shoppingBudget?: number; // Novo campo: Teto de gastos da ida ao mercado
   unlockedBadges: string[];
-  wealthProfile?: WealthProfile; // Novo campo opcional
+  wealthProfile?: WealthProfile;
+  walletBalance?: number; // Saldo calculado e persistido para performance
 }
 
 export enum View {
@@ -99,5 +106,5 @@ export enum View {
   AI_ASSISTANT = 'AI_ASSISTANT',
   DEBTS = 'DEBTS',
   SHOPPING_LIST = 'SHOPPING_LIST',
-  WEALTH_PLANNER = 'WEALTH_PLANNER' // Nova View
+  WEALTH_PLANNER = 'WEALTH_PLANNER'
 }

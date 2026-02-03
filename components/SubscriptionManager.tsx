@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Transaction } from '../types';
-import { Repeat, X, AlertOctagon, TrendingUp, CalendarClock, DollarSign, BarChart3 } from 'lucide-react';
+import { Repeat, X, AlertOctagon, TrendingUp, CalendarClock, DollarSign, BarChart3, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 interface SubscriptionManagerProps {
@@ -17,17 +17,33 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
   onDeleteTransaction, 
   privacyMode 
 }) => {
-  // Filter for recurring expenses
-  const subscriptions = transactions.filter(t => t.type === 'expense' && t.isRecurring);
+  // 1. LÓGICA CORRIGIDA: Agrupamento por Assinatura Única
+  // Evita somar histórico (ex: 6 meses de Netflix) no custo mensal atual
+  const uniqueSubscriptions = useMemo(() => {
+      const map = new Map<string, Transaction>();
+      
+      // Filtra apenas despesas recorrentes
+      const recurring = transactions.filter(t => t.type === 'expense' && t.isRecurring);
+      
+      recurring.forEach(t => {
+          const existing = map.get(t.description);
+          // Mantém a transação mais recente para pegar o valor atualizado e data correta
+          if (!existing || new Date(t.date) > new Date(existing.date)) {
+              map.set(t.description, t);
+          }
+      });
+      
+      // Retorna array ordenado por valor (maior para menor)
+      return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [transactions]);
 
-  // Calculate totals
-  const totalMonthly = subscriptions.reduce((sum, sub) => sum + sub.amount, 0);
+  // Calculate totals based on UNIQUE active subscriptions
+  const totalMonthly = uniqueSubscriptions.reduce((sum, sub) => sum + sub.amount, 0);
   const totalYearly = totalMonthly * 12;
 
   // Sorting for Chart (Highest Cost First)
   const chartData = useMemo(() => {
-      return [...subscriptions]
-        .sort((a, b) => b.amount - a.amount)
+      return uniqueSubscriptions
         .slice(0, 10) // Top 10 expensive subs
         .map(sub => ({
             name: sub.description,
@@ -35,7 +51,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
             annual: sub.amount * 12,
             color: sub.amount > 200 ? '#ef4444' : sub.amount > 50 ? '#f59e0b' : '#3b82f6'
         }));
-  }, [subscriptions]);
+  }, [uniqueSubscriptions]);
 
   const formatValue = (val: number) => {
     if (privacyMode) return '••••';
@@ -46,6 +62,29 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
     if (confirm('Deseja parar de considerar este item como recorrente? Ele continuará como uma transação comum.')) {
       onUpdateTransaction(id, { isRecurring: false });
     }
+  };
+
+  // Helper para calcular dias até renovação
+  const getRenewalInfo = (dateStr: string) => {
+      const tDate = new Date(dateStr);
+      const day = tDate.getDate(); // Dia do vencimento (ex: 15)
+      
+      const today = new Date();
+      // Cria data de vencimento neste mês
+      let nextDate = new Date(today.getFullYear(), today.getMonth(), day);
+      
+      // Se já passou hoje, joga para mês que vem
+      // Ex: Hoje dia 20, vencimento dia 15 -> Próximo é 15 do mês que vem
+      if (nextDate.setHours(0,0,0,0) < today.setHours(0,0,0,0)) {
+          nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+      
+      const diffTime = nextDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      
+      if (diffDays === 0) return { label: 'Hoje', color: 'text-rose-500 font-bold bg-rose-100 dark:bg-rose-900/30' };
+      if (diffDays === 1) return { label: 'Amanhã', color: 'text-amber-500 font-bold bg-amber-100 dark:bg-amber-900/30' };
+      return { label: `em ${diffDays} dias`, color: 'text-slate-500 bg-slate-100 dark:bg-slate-700' };
   };
 
   // Custom Tooltip to show Annual Cost
@@ -92,9 +131,9 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-indigo-600 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
           <div className="relative z-10">
-            <p className="text-indigo-200 text-sm font-medium mb-1 uppercase tracking-wider">Custo Mensal</p>
+            <p className="text-indigo-200 text-sm font-medium mb-1 uppercase tracking-wider">Custo Mensal Real</p>
             <h3 className="text-3xl font-bold">{formatValue(totalMonthly)}</h3>
-            <p className="text-indigo-200 text-xs mt-2 opacity-80">Gasto fixo todo mês</p>
+            <p className="text-indigo-200 text-xs mt-2 opacity-80">{uniqueSubscriptions.length} assinaturas ativas</p>
           </div>
           <CalendarClock className="absolute right-4 bottom-4 w-24 h-24 text-indigo-500 opacity-20" />
         </div>
@@ -148,15 +187,18 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subscriptions.length === 0 ? (
+        {uniqueSubscriptions.length === 0 ? (
           <div className="col-span-full py-12 text-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
              <Repeat className="w-12 h-12 text-slate-300 mx-auto mb-3" />
              <p className="text-slate-500 dark:text-slate-400 font-medium">Nenhuma assinatura encontrada.</p>
              <p className="text-slate-400 text-sm">Marque a opção "Recorrente" ao adicionar uma despesa.</p>
           </div>
         ) : (
-          subscriptions.map(sub => (
-            <div key={sub.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all group">
+          uniqueSubscriptions.map(sub => {
+            const renewal = getRenewalInfo(sub.date);
+            
+            return (
+            <div key={sub.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all group relative">
                <div className="flex justify-between items-start mb-4">
                   <div className="overflow-hidden mr-2">
                      <h4 className="font-bold text-slate-800 dark:text-white text-lg truncate mb-1">{sub.description}</h4>
@@ -180,7 +222,14 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                   </div>
                </div>
                
-               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+               <div className="flex items-center justify-between mt-2 mb-4">
+                   <div className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-1 rounded-md ${renewal.color}`}>
+                       <Calendar className="w-3 h-3" />
+                       Renova {renewal.label}
+                   </div>
+               </div>
+               
+               <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <div>
                     <span className="text-xs text-slate-400 block">Mensal</span>
                     <span className="font-bold text-slate-700 dark:text-slate-200">{formatValue(sub.amount)}</span>
@@ -191,7 +240,7 @@ export const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({
                   </div>
                </div>
             </div>
-          ))
+          )})
         )}
       </div>
     </div>

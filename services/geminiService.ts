@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AppData, Investment, ChatMessage, RiskProfile } from '../types';
+import { AppData, Investment, ChatMessage, RiskProfile, ShoppingItem } from '../types';
 
 const CATEGORIES = ['Casa', 'Mobilidade', 'Alimentos', 'Lazer', 'Pets', 'Outros'];
 const API_KEY_STORAGE = 'nexo_user_api_key';
@@ -41,6 +41,42 @@ export interface WealthAnalysisResult {
     actionItems: { title: string; type: 'buy' | 'sell' | 'hold'; description: string }[];
 }
 
+export const generateShoppingListFromRecipe = async (prompt: string): Promise<Omit<ShoppingItem, 'id' | 'actualPrice' | 'isChecked'>[]> => {
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const systemPrompt = `
+    Você é um assistente de compras inteligente.
+    O usuário vai pedir uma receita, evento ou lista genérica.
+    Gere uma lista de compras JSON com ingredientes/itens.
+    
+    CATEGORIAS PERMITIDAS: 'Hortifruti', 'Carnes', 'Laticínios', 'Mercearia', 'Bebidas', 'Limpeza', 'Higiene', 'Padaria', 'Outros'.
+
+    RESPONDA APENAS JSON VÁLIDO neste formato:
+    [
+      { "name": "Nome do item", "quantity": 1, "category": "Categoria" }
+    ]
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Gere a lista para: ${prompt}`,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text?.trim() || "[]";
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Erro ao gerar lista:", error);
+    return [];
+  }
+};
 
 export const suggestCategory = async (description: string): Promise<string> => {
   const apiKey = getApiKey();
