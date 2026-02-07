@@ -419,7 +419,7 @@ const App: React.FC = () => {
            </div>
         </div>
 
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto animate-fade-in">
           {/* Quick Actions Bar */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
              <button 

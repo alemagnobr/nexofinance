@@ -133,6 +133,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   // Mobile Tabs State
   const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
 
+  // Greeting Logic
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }, []);
+
   // Check Badges Effect
   useEffect(() => {
     AVAILABLE_BADGES.forEach(badge => {
@@ -359,7 +367,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   // --- CHART COMPONENTS (Reused for Mobile/Desktop) ---
 
   const renderFlowChart = (
-    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 h-full">
          <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="w-5 h-5 text-indigo-500" />
             <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Fluxo de Caixa (6 Meses)</h3>
@@ -385,7 +393,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   );
 
   const renderAllocationChart = (
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 h-full">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
             <PieChartIcon className="w-5 h-5 text-indigo-500" />
             Distribuição de Patrimônio
@@ -492,7 +500,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:flex-1 min-w-0">
-             <h2 className="text-2xl font-bold text-slate-800 dark:text-white whitespace-nowrap flex-shrink-0">Visão Geral</h2>
+             <div>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white whitespace-nowrap">{greeting}!</h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Visão geral das suas finanças.</p>
+             </div>
 
              {/* Badge Strip (Header) */}
              <div className="flex-1 flex items-center gap-2 px-4 py-2 sm:border-l sm:border-slate-300 dark:sm:border-slate-600 overflow-x-auto no-scrollbar mask-gradient w-full">
@@ -561,7 +572,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Card 1: Health Score */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Scale className="w-20 h-20 text-slate-400" />
           </div>
@@ -589,7 +600,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
 
         {/* Card 2: Current Balance & Runway */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saldo em Caixa</h3>
@@ -615,7 +626,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
 
         {/* Card 3: Payables (Smart List) */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">A Pagar (Mês)</h3>
@@ -655,7 +666,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
 
         {/* Card 4: Investments (Top Assets) */}
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
              <div>
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Total Investido</h3>
@@ -692,7 +703,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       
       {/* --- DESKTOP VIEW (GRID) --- */}
       <div className="hidden lg:block space-y-6">
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-6 h-full">
            {renderFlowChart}
            {renderAllocationChart}
         </div>

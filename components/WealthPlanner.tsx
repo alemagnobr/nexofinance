@@ -300,7 +300,7 @@ export const WealthPlanner: React.FC<WealthPlannerProps> = ({ data, onSaveProfil
               <button 
                  onClick={handleRunAi}
                  disabled={!hasApiKey || loadingAi}
-                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-sm"
+                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-sm shadow-md"
               >
                  {loadingAi ? <span className="animate-spin">⏳</span> : <Sparkles className="w-4 h-4" />}
                  {aiAnalysis ? 'Atualizar Análise' : 'Gerar Estratégia Private'}

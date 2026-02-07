@@ -9,7 +9,7 @@ import {
 import { View } from '../types';
 
 interface SidebarProps {
-  user: any; // Using any for Firebase User type simplicity here, or import User from firebase/auth
+  user: any; 
   isGuest: boolean;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User Info */}
       <div className="p-4 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+          <div className="flex items-center gap-3 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50 backdrop-blur-sm">
               <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center border border-slate-600 overflow-hidden text-xs text-white">
                   {user?.photoURL ? <img src={user.photoURL} alt="User" /> : (user?.email?.substring(0,2).toUpperCase() || 'CV')}
               </div>
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col">
+      <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col no-scrollbar">
         <div className="space-y-1">
             <p className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Menu Principal</p>
             
@@ -246,7 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Credits & Version */}
         <div className="pt-4 mt-3 border-t border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 font-mono">v2.1.7 Beta</p>
+            <p className="text-[10px] text-slate-500 font-mono">v2.1.8 Stable</p>
             <a 
               href="https://www.linkedin.com/in/alemagnobr/" 
               target="_blank" 
