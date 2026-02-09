@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -69,8 +69,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   
-  // --- EDITING STATE ---
+  // --- EDITING & RECURRENCE STATE ---
   const [editingId, setEditingId] = useState<string | null>(null); // For full form
+  const [recurrenceMode, setRecurrenceMode] = useState<'monthly' | 'days'>('monthly');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
   const [newTransaction, setNewTransaction] = useState({
     description: '',
@@ -213,6 +215,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const resetForm = () => {
     setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, installments: '' });
     setEditingId(null);
+    setRecurrenceMode('monthly');
+    setSelectedDays([]);
   }
 
   const handleEdit = (t: Transaction) => {
@@ -223,25 +227,67 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     setIsFormOpen(true);
   };
 
+  const toggleDay = (day: number) => {
+      setSelectedDays(prev => 
+          prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+      );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const transactionData = {
       description: newTransaction.description, amount: parseFloat(newTransaction.amount), type: newTransaction.type, category: newTransaction.category, date: newTransaction.date, status: newTransaction.status, paymentMethod: newTransaction.paymentMethod, isRecurring: newTransaction.isRecurring
     };
-    const numInstallments = parseInt(newTransaction.installments);
-    if (newTransaction.isRecurring && !isNaN(numInstallments) && numInstallments > 1) {
-        const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); 
-        for(let i=0; i < numInstallments; i++) {
-             const nextDate = new Date(baseDateObj);
-             nextDate.setMonth(baseDateObj.getMonth() + i);
-             const isoDate = nextDate.toISOString().split('T')[0];
-             const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
-             onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
+
+    // LOGIC FOR RECURRENCE
+    if (newTransaction.isRecurring) {
+        
+        // Mode 1: Daily Recurrence (Specific Days in Month)
+        if (recurrenceMode === 'days' && selectedDays.length > 0) {
+            const [year, month] = newTransaction.date.split('-').map(Number);
+            // Limit to valid days in selected month
+            const daysInMonth = new Date(year, month, 0).getDate();
+            
+            selectedDays.forEach(day => {
+                if (day <= daysInMonth) {
+                    const dayStr = String(day).padStart(2, '0');
+                    const monthStr = String(month).padStart(2, '0');
+                    const isoDate = `${year}-${monthStr}-${dayStr}`;
+                    
+                    onAdd({
+                        ...transactionData,
+                        description: `${newTransaction.description} (Dia ${day})`,
+                        date: isoDate,
+                        isRecurring: false // Individual entries are not recurring themselves
+                    });
+                }
+            });
+        } 
+        // Mode 2: Standard Monthly / Installments
+        else {
+            const numInstallments = parseInt(newTransaction.installments);
+            if (!isNaN(numInstallments) && numInstallments > 1) {
+                const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); 
+                for(let i=0; i < numInstallments; i++) {
+                     const nextDate = new Date(baseDateObj);
+                     nextDate.setMonth(baseDateObj.getMonth() + i);
+                     const isoDate = nextDate.toISOString().split('T')[0];
+                     const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
+                     onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
+                }
+            } else {
+                // Just marked as Recurring (Infinite Subscription)
+                if (editingId) onUpdate(editingId, transactionData);
+                else onAdd(transactionData);
+            }
         }
-    } else {
+    } 
+    // NO RECURRENCE
+    else {
         if (editingId) onUpdate(editingId, transactionData);
         else onAdd(transactionData);
     }
+    
     resetForm();
     setIsFormOpen(false);
   };
@@ -464,22 +510,71 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             </div>
 
             {newTransaction.isRecurring && (
-                <div className="mt-2 pl-2 md:pl-6 animate-fade-in">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-                            Repetir por quantas vezes? (Opcional)
-                        </label>
-                        <div className="flex items-center gap-2">
-                            <Layers className="w-4 h-4 text-slate-400" />
-                            <input
-                                type="number"
-                                placeholder="Ex: 12 (Deixe vazio para assinatura infinita)"
-                                value={newTransaction.installments}
-                                onChange={e => setNewTransaction({...newTransaction, installments: e.target.value})}
-                                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm w-full outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
+                <div className="mt-2 pl-2 md:pl-6 animate-fade-in space-y-3">
+                    {/* Recurrence Type Selector */}
+                    <div className="flex gap-2 mb-3">
+                       <button
+                          type="button"
+                          onClick={() => setRecurrenceMode('monthly')}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition-colors ${recurrenceMode === 'monthly' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}
+                       >
+                          Mensal / Parcelado
+                       </button>
+                       <button
+                          type="button"
+                          onClick={() => setRecurrenceMode('days')}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold border transition-colors ${recurrenceMode === 'days' ? 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800' : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}
+                       >
+                          Dias Específicos
+                       </button>
                     </div>
+
+                    {recurrenceMode === 'monthly' ? (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                Repetir por quantas vezes? (Opcional)
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-slate-400" />
+                                <input
+                                    type="number"
+                                    placeholder="Ex: 12 (Deixe vazio para assinatura infinita)"
+                                    value={newTransaction.installments}
+                                    onChange={e => setNewTransaction({...newTransaction, installments: e.target.value})}
+                                    className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm w-full outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
+                                <CalendarDays className="w-3 h-3" /> Selecione os dias do mês
+                            </label>
+                            <div className="grid grid-cols-7 gap-2">
+                                {[...Array(31)].map((_, i) => {
+                                    const day = i + 1;
+                                    const isSelected = selectedDays.includes(day);
+                                    return (
+                                        <button
+                                            key={day}
+                                            type="button"
+                                            onClick={() => toggleDay(day)}
+                                            className={`h-8 rounded-md text-xs font-bold transition-all ${
+                                                isSelected 
+                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 transform scale-105' 
+                                                : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                            }`}
+                                        >
+                                            {day}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                                Uma transação será criada para cada dia selecionado neste mês.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
           </div>
