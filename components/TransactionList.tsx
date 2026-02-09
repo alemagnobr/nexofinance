@@ -145,10 +145,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
               groups[t.date] = { transactions: [], total: 0 };
           }
           groups[t.date].transactions.push(t);
+          
+          // Somar TUDO (Pago ou Pendente) para projeção
           const val = t.type === 'income' ? t.amount : -t.amount;
-          if (t.status === 'paid') {
-             groups[t.date].total += val;
-          }
+          groups[t.date].total += val;
       });
 
       // 2. Create array sorted Newest -> Oldest (Standard display order)
@@ -175,6 +175,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   // --- DYNAMIC TOTALS ---
   const dynamicTotals = useMemo(() => {
+      // Totais do cabeçalho também devem refletir a visão projetada (tudo o que está na tela)
       const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
       const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
       return { income, expense, balance: income - expense };
@@ -386,7 +387,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(dynamicTotals.expense)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado</p>
+          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Proj.)</p>
           <p className={`text-sm md:text-lg font-bold truncate ${dynamicTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
             {formatValue(dynamicTotals.balance)}
           </p>
