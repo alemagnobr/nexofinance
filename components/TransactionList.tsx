@@ -662,9 +662,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           </>
                                       ) : (
                                           <>
-                                              {/* Date (Day) */}
+                                              {/* Date (Day) - Fixed Timezone Issue by string parsing */}
                                               <div className="w-8 text-center font-bold text-slate-400 text-xs">
-                                                  {new Date(t.date).getDate()}
+                                                  {parseInt(t.date.split('-')[2])}
                                               </div>
 
                                               {/* Category */}
