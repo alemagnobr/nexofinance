@@ -69,14 +69,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   
-  // --- INLINE EDITING STATE ---
+  // --- EDITING STATE ---
   const [editingId, setEditingId] = useState<string | null>(null); // For full form
-  const [inlineEditId, setInlineEditId] = useState<string | null>(null); // For row edit
-  const [editValues, setEditValues] = useState<{
-      description: string;
-      amount: string;
-      category: string;
-  }>({ description: '', amount: '', category: '' });
 
   const [newTransaction, setNewTransaction] = useState({
     description: '',
@@ -227,28 +221,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     });
     setEditingId(t.id);
     setIsFormOpen(true);
-  };
-
-  // --- INLINE EDITING LOGIC ---
-  const startInlineEdit = (t: Transaction) => {
-      setInlineEditId(t.id);
-      setEditValues({
-          description: t.description,
-          amount: t.amount.toString(),
-          category: t.category
-      });
-  };
-
-  const saveInlineEdit = (id: string) => {
-      const amount = parseFloat(editValues.amount);
-      if (editValues.description && !isNaN(amount) && amount > 0) {
-          onUpdate(id, {
-              description: editValues.description,
-              amount: amount,
-              category: editValues.category
-          });
-      }
-      setInlineEditId(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -576,9 +548,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                           </div>
                       </div>
 
-                      {/* Desktop Header Row (Only shown once per group or handled via grid in list) */}
-                      {/* Keeping it simple: We use a list of items that change layout on desktop */}
-
                       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden divide-y divide-slate-100 dark:divide-slate-700">
                           {group.transactions.map((t) => (
                               <div key={t.id} className="group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -593,7 +562,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                       </div>
 
                                       {/* Main Content */}
-                                      <div className="flex-1 min-w-0">
+                                      <div className="flex-1 min-w-0" onClick={() => handleEdit(t)}>
                                           <div className="flex justify-between items-start">
                                               <h4 className="font-bold text-slate-800 dark:text-white truncate pr-2 text-sm">{t.description}</h4>
                                               <span className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
@@ -613,24 +582,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       </span>
                                                   )}
                                               </div>
-
-                                              {/* Actions */}
-                                              <div className="flex items-center gap-3">
-                                                  <button 
-                                                      onClick={() => onToggleStatus(t.id)}
-                                                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                                          t.status === 'paid' 
-                                                          ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                                          : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
-                                                      }`}
-                                                  >
-                                                      <CheckCircle className="w-3.5 h-3.5" />
-                                                  </button>
-                                                  <button onClick={() => handleEdit(t)} className="p-1 text-slate-400">
-                                                       <MoreHorizontal className="w-4 h-4" />
-                                                  </button>
-                                              </div>
                                           </div>
+                                      </div>
+
+                                      {/* Actions */}
+                                      <div className="flex items-center gap-3 pl-2">
+                                          <button 
+                                              onClick={() => onToggleStatus(t.id)}
+                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                  t.status === 'paid' 
+                                                  ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                                  : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
+                                              }`}
+                                          >
+                                              <CheckCircle className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button onClick={() => handleEdit(t)} className="p-1 text-slate-400">
+                                                <MoreHorizontal className="w-4 h-4" />
+                                          </button>
                                       </div>
                                   </div>
 
@@ -643,113 +612,69 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           {t.type === 'income' ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
                                       </div>
 
-                                      {/* Inline Edit Mode or Display Mode */}
-                                      {inlineEditId === t.id ? (
-                                          <>
-                                              <div className="flex-1 grid grid-cols-12 gap-2 items-center">
-                                                  {/* Category Select */}
-                                                  <div className="col-span-2">
-                                                      <select 
-                                                          value={editValues.category}
-                                                          onChange={(e) => setEditValues({...editValues, category: e.target.value})}
-                                                          className="w-full p-1.5 text-xs rounded border border-slate-300 dark:bg-slate-700 dark:border-slate-600"
-                                                      >
-                                                          {[...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES].map(c => <option key={c} value={c}>{c}</option>)}
-                                                      </select>
-                                                  </div>
-                                                  
-                                                  {/* Description Input */}
-                                                  <div className="col-span-5">
-                                                      <input 
-                                                          autoFocus
-                                                          type="text"
-                                                          value={editValues.description}
-                                                          onChange={(e) => setEditValues({...editValues, description: e.target.value})}
-                                                          className="w-full p-1.5 text-xs rounded border border-slate-300 dark:bg-slate-700 dark:border-slate-600"
-                                                      />
-                                                  </div>
+                                      {/* Display Mode */}
+                                      <>
+                                          {/* Date (Day) */}
+                                          <div className="w-8 text-center font-bold text-slate-400 text-xs">
+                                              {parseInt(t.date.split('-')[2])}
+                                          </div>
 
-                                                  {/* Amount Input */}
-                                                  <div className="col-span-3">
-                                                      <input 
-                                                          type="number"
-                                                          value={editValues.amount}
-                                                          onChange={(e) => setEditValues({...editValues, amount: e.target.value})}
-                                                          className="w-full p-1.5 text-xs rounded border border-slate-300 dark:bg-slate-700 dark:border-slate-600 font-bold"
-                                                      />
-                                                  </div>
+                                          {/* Category */}
+                                          <div className="w-24 shrink-0">
+                                              <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${CATEGORY_STYLES[t.category]?.replace('bg-', 'border-').split(' ')[2] || 'border-slate-200'}`}>
+                                                  {t.category}
+                                              </span>
+                                          </div>
 
-                                                  {/* Actions */}
-                                                  <div className="col-span-2 flex gap-1 justify-end">
-                                                      <button onClick={() => saveInlineEdit(t.id)} className="p-1.5 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"><Save className="w-3 h-3"/></button>
-                                                      <button onClick={() => setInlineEditId(null)} className="p-1.5 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"><X className="w-3 h-3"/></button>
-                                                  </div>
-                                              </div>
-                                          </>
-                                      ) : (
-                                          <>
-                                              {/* Date (Day) - Fixed Timezone Issue by string parsing */}
-                                              <div className="w-8 text-center font-bold text-slate-400 text-xs">
-                                                  {parseInt(t.date.split('-')[2])}
-                                              </div>
+                                          {/* Description */}
+                                          <div 
+                                              className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500"
+                                              onClick={() => handleEdit(t)}
+                                              title="Clique para editar"
+                                          >
+                                              {t.description}
+                                              {t.isRecurring && <span className="ml-2 text-[10px] text-slate-400 italic">({t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Recorrente'})</span>}
+                                          </div>
 
-                                              {/* Category */}
-                                              <div className="w-24 shrink-0">
-                                                  <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${CATEGORY_STYLES[t.category]?.replace('bg-', 'border-').split(' ')[2] || 'border-slate-200'}`}>
-                                                      {t.category}
-                                                  </span>
-                                              </div>
+                                          {/* Payment Method */}
+                                          <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
+                                              <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
+                                              <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                          </div>
 
-                                              {/* Description */}
-                                              <div 
-                                                  className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500"
-                                                  onClick={() => startInlineEdit(t)}
-                                                  title="Clique para editar"
+                                          {/* Amount */}
+                                          <div 
+                                              className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
+                                              onClick={() => handleEdit(t)}
+                                          >
+                                              {formatValue(t.amount)}
+                                          </div>
+
+                                          {/* Status */}
+                                          <div className="w-8 flex justify-center">
+                                              <button 
+                                                  onClick={() => onToggleStatus(t.id)}
+                                                  className={`transition-all hover:scale-110 ${
+                                                      t.status === 'paid' 
+                                                      ? 'text-emerald-500' 
+                                                      : 'text-slate-300 hover:text-emerald-400'
+                                                  }`}
+                                                  title={t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
                                               >
-                                                  {t.description}
-                                                  {t.isRecurring && <span className="ml-2 text-[10px] text-slate-400 italic">({t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Recorrente'})</span>}
-                                              </div>
+                                                  <CheckCircle className="w-5 h-5" />
+                                              </button>
+                                          </div>
 
-                                              {/* Payment Method */}
-                                              <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
-                                                  <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
-                                                  <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
-                                              </div>
-
-                                              {/* Amount */}
-                                              <div 
-                                                  className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
-                                                  onClick={() => startInlineEdit(t)}
-                                              >
-                                                  {formatValue(t.amount)}
-                                              </div>
-
-                                              {/* Status */}
-                                              <div className="w-8 flex justify-center">
-                                                  <button 
-                                                      onClick={() => onToggleStatus(t.id)}
-                                                      className={`transition-all hover:scale-110 ${
-                                                          t.status === 'paid' 
-                                                          ? 'text-emerald-500' 
-                                                          : 'text-slate-300 hover:text-emerald-400'
-                                                      }`}
-                                                      title={t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
-                                                  >
-                                                      <CheckCircle className="w-5 h-5" />
-                                                  </button>
-                                              </div>
-
-                                              {/* Actions */}
-                                              <div className="w-16 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                  <button onClick={() => startInlineEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                      <Pencil className="w-4 h-4" />
-                                                  </button>
-                                                  <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                      <Trash2 className="w-4 h-4" />
-                                                  </button>
-                                              </div>
-                                          </>
-                                      )}
+                                          {/* Actions */}
+                                          <div className="w-16 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                  <Pencil className="w-4 h-4" />
+                                              </button>
+                                              <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      </>
                                   </div>
                               </div>
                           ))}
