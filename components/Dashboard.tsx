@@ -205,10 +205,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   const totalExpense = data.transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const totalPending = data.transactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
   
-  // Use walletBalance from DB if available (Optimized), otherwise fallback to calculation (Legacy/Guest)
-  const currentBalance = data.walletBalance !== undefined 
-      ? data.walletBalance 
-      : (totalIncome - data.transactions.filter(t => t.type === 'expense' && t.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0));
+  // FIX: Lógica de saldo aprimorada para evitar "saldos fantasmas"
+  // Calcula o saldo real baseado nas transações carregadas
+  const realTimeBalance = data.transactions
+      .filter(t => t.status === 'paid')
+      .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+
+  // Se tivermos poucas transações (modo local ou poucos dados na nuvem), confiamos no cálculo em tempo real.
+  // Se tivermos muitas (>300), usamos o saldo persistido do banco (otimização), a menos que seja undefined.
+  // Se não houver transações (length === 0), o saldo DEVE ser zero.
+  const currentBalance = (data.transactions.length < 300) 
+      ? realTimeBalance 
+      : (data.walletBalance !== undefined ? data.walletBalance : realTimeBalance);
   
   const totalInvested = data.investments.reduce((acc, curr) => acc + curr.amount, 0);
 
