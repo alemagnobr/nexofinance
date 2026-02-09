@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -135,10 +135,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, currentDate, viewFilter, searchQuery, categoryFilter, paymentFilter]);
 
-  // --- GROUPING LOGIC (By Date) ---
+  // --- GROUPING LOGIC (By Date) with ACCUMULATED BALANCE ---
   const groupedTransactions = useMemo(() => {
       const groups: Record<string, { transactions: Transaction[], total: number }> = {};
       
+      // 1. Group transactions by date
       filteredTransactions.forEach(t => {
           if (!groups[t.date]) {
               groups[t.date] = { transactions: [], total: 0 };
@@ -150,9 +151,26 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           }
       });
 
-      return Object.entries(groups)
+      // 2. Create array sorted Newest -> Oldest (Standard display order)
+      const sortedGroups = Object.entries(groups)
           .map(([date, data]) => ({ date, ...data }))
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // 3. Calculate Running Balance (Accumulated)
+      // To calculate accumulation correctly (Day 1 + Day 2...), we need to process Chronologically (Oldest -> Newest)
+      // Then map the result back to our display order.
+      
+      const chronological = [...sortedGroups].reverse(); // Oldest first
+      let runningTotal = 0;
+      
+      const chronologicalWithBalance = chronological.map(group => {
+          runningTotal += group.total;
+          return { ...group, runningBalance: runningTotal };
+      });
+
+      // Reverse back to Newest -> Oldest for display
+      return chronologicalWithBalance.reverse();
+
   }, [filteredTransactions]);
 
   // --- DYNAMIC TOTALS ---
@@ -539,15 +557,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           ) : (
               groupedTransactions.map((group) => (
                   <div key={group.date} className="animate-fade-in">
-                      {/* Date Header */}
+                      {/* Date Header with Running Balance */}
                       <div className="flex items-center justify-between px-3 py-2 mb-1 sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg border-b border-slate-100 dark:border-slate-800">
                           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                               <Calendar className="w-3 h-3" />
                               {formatDateFriendly(group.date)}
                           </h3>
-                          <span className={`text-xs font-bold ${group.total >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                              {group.total !== 0 && (group.total > 0 ? '+' : '') + formatValue(group.total)}
-                          </span>
+                          <div className="flex items-center gap-3">
+                              <span className={`text-xs font-bold ${group.total >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                  {group.total !== 0 && (group.total > 0 ? '+' : '') + formatValue(group.total)}
+                              </span>
+                              <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
+                              <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-1" title="Saldo acumulado até este dia">
+                                  <Sigma className="w-3 h-3" />
+                                  {formatValue(group.runningBalance)}
+                              </span>
+                          </div>
                       </div>
 
                       {/* Desktop Header Row (Only shown once per group or handled via grid in list) */}
