@@ -258,13 +258,23 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   }, [filteredTransactions]);
 
-  // --- DYNAMIC TOTALS ---
-  const dynamicTotals = useMemo(() => {
-      // Totais do cabeçalho também devem refletir a visão projetada (tudo o que está na tela)
-      const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  // --- MONTHLY TOTALS (Fixed Scope: Selected Month, Unfiltered) ---
+  const monthlyTotals = useMemo(() => {
+      const targetYear = currentDate.getFullYear();
+      const targetMonth = currentDate.getMonth() + 1;
+
+      // Calculates totals for the entire selected month, ignoring list filters (search, tabs, etc.)
+      // to keep the summary cards consistent.
+      const monthTransactions = transactions.filter(t => {
+          const [tYear, tMonth] = t.date.split('-').map(Number);
+          return tYear === targetYear && tMonth === targetMonth;
+      });
+
+      const income = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const expense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      
       return { income, expense, balance: income - expense };
-  }, [filteredTransactions]);
+  }, [transactions, currentDate]);
 
   const formatValue = (val: number) => {
     if (privacyMode) return '••••';
@@ -555,20 +565,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
          </div>
       )}
 
-      {/* 3. DYNAMIC SUMMARY CARDS */}
+      {/* 3. DYNAMIC SUMMARY CARDS (MONTHLY UNFILTERED) */}
       <div className="grid grid-cols-3 gap-3 md:gap-4">
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Entradas</p>
-          <p className="text-sm md:text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatValue(dynamicTotals.income)}</p>
+          <p className="text-sm md:text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatValue(monthlyTotals.income)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Saídas</p>
-          <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(dynamicTotals.expense)}</p>
+          <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(monthlyTotals.expense)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Proj.)</p>
-          <p className={`text-sm md:text-lg font-bold truncate ${dynamicTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
-            {formatValue(dynamicTotals.balance)}
+          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Mês)</p>
+          <p className={`text-sm md:text-lg font-bold truncate ${monthlyTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
+            {formatValue(monthlyTotals.balance)}
           </p>
         </div>
       </div>
