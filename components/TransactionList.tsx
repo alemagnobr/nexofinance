@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -85,7 +85,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     status: 'paid' as TransactionStatus,
     paymentMethod: 'credit_card' as PaymentMethod,
     isRecurring: false,
-    installments: ''
+    installments: '',
+    observation: ''
   });
 
   useEffect(() => {
@@ -225,7 +226,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const resetForm = () => {
-    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, installments: '' });
+    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, installments: '', observation: '' });
     setEditingId(null);
     setRecurrenceMode('monthly');
     setSelectedDays([]);
@@ -241,7 +242,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         status: t.status || 'paid', 
         paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), 
         isRecurring: t.isRecurring || false, 
-        installments: ''
+        installments: '',
+        observation: t.observation || ''
     });
     setEditingId(t.id);
     setIsFormOpen(true);
@@ -256,7 +258,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const transactionData = {
-      description: newTransaction.description, amount: parseFloat(newTransaction.amount), type: newTransaction.type, category: newTransaction.category, date: newTransaction.date, status: newTransaction.status, paymentMethod: newTransaction.paymentMethod, isRecurring: newTransaction.isRecurring
+      description: newTransaction.description, 
+      amount: parseFloat(newTransaction.amount), 
+      type: newTransaction.type, 
+      category: newTransaction.category, 
+      date: newTransaction.date, 
+      status: newTransaction.status, 
+      paymentMethod: newTransaction.paymentMethod, 
+      isRecurring: newTransaction.isRecurring,
+      observation: newTransaction.observation
     };
 
     // LOGIC FOR RECURRENCE
@@ -517,6 +527,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </select>
 
           <div className="md:col-span-2">
+            <textarea
+                placeholder="Observações (opcional)"
+                value={newTransaction.observation}
+                onChange={e => setNewTransaction({ ...newTransaction, observation: e.target.value })}
+                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 w-full outline-none resize-none h-20 text-sm"
+            />
+          </div>
+
+          <div className="md:col-span-2">
             <div className="flex items-center gap-2 p-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
                <input 
                   type="checkbox" 
@@ -700,6 +719,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   )}
                                               </div>
                                           </div>
+                                          
+                                          {t.observation && (
+                                              <p className="text-[10px] text-slate-400 mt-1 italic truncate flex items-center gap-1">
+                                                  <StickyNote className="w-3 h-3" /> {t.observation}
+                                              </p>
+                                          )}
                                       </div>
 
                                       {/* Actions */}
@@ -745,12 +770,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
                                           {/* Description */}
                                           <div 
-                                              className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500"
+                                              className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500 flex flex-col justify-center"
                                               onClick={() => handleEdit(t)}
                                               title="Clique para editar"
                                           >
-                                              {t.description}
-                                              {t.isRecurring && <span className="ml-2 text-[10px] text-slate-400 italic">({t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Recorrente'})</span>}
+                                              <div className="flex items-center gap-2">
+                                                  {t.description}
+                                                  {t.isRecurring && <span className="text-[10px] text-slate-400 italic">({t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Recorrente'})</span>}
+                                              </div>
+                                              {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                           </div>
 
                                           {/* Payment Method */}

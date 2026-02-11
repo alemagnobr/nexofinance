@@ -14,6 +14,7 @@ export interface Transaction {
   isRecurring?: boolean;
   paymentMethod?: PaymentMethod;
   debtId?: string; // ID da dívida vinculada (se houver)
+  observation?: string; // Notas opcionais do usuário
 }
 
 export interface Investment {

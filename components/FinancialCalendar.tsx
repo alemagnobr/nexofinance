@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign } from 'lucide-react';
@@ -31,7 +30,7 @@ const exportToICS = (events: any[]) => {
         icsContent += `DTSTART;VALUE=DATE:${dateStr}\n`;
         icsContent += `DTEND;VALUE=DATE:${dateStr}\n`;
         icsContent += `SUMMARY:${evt.description} (${evt.type === 'income' ? '+' : '-'} R$ ${evt.amount})\n`;
-        icsContent += `DESCRIPTION:Categoria: ${evt.category} | Status: ${evt.status}\n`;
+        icsContent += `DESCRIPTION:Categoria: ${evt.category} | Status: ${evt.status} ${evt.observation ? '| Obs: ' + evt.observation : ''}\n`;
         icsContent += "END:VEVENT\n";
     });
     
@@ -59,7 +58,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
       type: 'expense' as TransactionType,
       category: 'Outros',
       paymentMethod: 'credit_card' as PaymentMethod,
-      status: 'pending' as TransactionStatus
+      status: 'pending' as TransactionStatus,
+      observation: ''
   });
 
   const year = currentDate.getFullYear();
@@ -170,7 +170,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
           type: 'expense',
           category: 'Outros',
           paymentMethod: 'credit_card',
-          status: 'pending'
+          status: 'pending',
+          observation: ''
       });
       setIsModalOpen(true);
   };
@@ -189,7 +190,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
           date: dateStr,
           status: formData.status,
           paymentMethod: formData.paymentMethod,
-          isRecurring: false // Simple add via calendar is usually one-off
+          isRecurring: false, // Simple add via calendar is usually one-off
+          observation: formData.observation
       });
 
       setIsModalOpen(false);
@@ -387,6 +389,17 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
                            </div>
                        </div>
 
+                        <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Observações (Opcional)</label>
+                           <input 
+                               type="text" 
+                               placeholder="Detalhes adicionais..."
+                               value={formData.observation}
+                               onChange={(e) => setFormData({...formData, observation: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           />
+                       </div>
+
                        <button 
                            type="submit"
                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 mt-4"
@@ -522,7 +535,10 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
                                  <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded uppercase font-bold">Previsto</span>
                              )}
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{t.category}</p>
+                          <div className="flex flex-col">
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{t.category}</p>
+                              {t.observation && <p className="text-[10px] text-slate-400 italic mt-0.5">{t.observation}</p>}
+                          </div>
                        </div>
                     </div>
                     <div className="text-right">
