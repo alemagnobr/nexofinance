@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -37,6 +37,25 @@ const PAYMENT_LABELS: Record<string, string> = {
   'direct_debit': 'Déb. Auto',
   'bank_transfer': 'TED/DOC',
   'deposit': 'Depósito',
+};
+
+// Helper: Calculate Nth Business Day of a month
+const getNthBusinessDay = (year: number, monthIndex: number, n: number): string => {
+    let date = new Date(year, monthIndex, 1);
+    let count = 0;
+    // Safety break
+    let loopLimit = 0;
+    while (count < n && loopLimit < 31) {
+        // 0 = Sun, 6 = Sat
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            count++;
+        }
+        if (count === n) break;
+        date.setDate(date.getDate() + 1);
+        loopLimit++;
+    }
+    return date.toISOString().split('T')[0];
 };
 
 // Icons for payment methods
@@ -77,6 +96,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [hasAlimony, setHasAlimony] = useState(false);
   const [alimonyPercentage, setAlimonyPercentage] = useState('');
 
+  // --- BUSINESS DAY STATE (Salário) ---
+  const [useBusinessDay, setUseBusinessDay] = useState(false);
+  const [businessDayOrdinal, setBusinessDayOrdinal] = useState('5');
+
   // Ref for auto-scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -109,6 +132,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         }, 100);
     }
   }, [isFormOpen, editingId]);
+
+  // Effect to auto-update date if Business Day logic is active
+  useEffect(() => {
+      if (useBusinessDay && newTransaction.category === 'Salário') {
+          const [year, month] = newTransaction.date.split('-').map(Number);
+          const ordinal = parseInt(businessDayOrdinal) || 5;
+          const newDate = getNthBusinessDay(year, month - 1, ordinal);
+          
+          if (newDate !== newTransaction.date) {
+              setNewTransaction(prev => ({ ...prev, date: newDate }));
+          }
+      }
+  }, [useBusinessDay, businessDayOrdinal, newTransaction.category]); // Depend on category to trigger, but be careful with loops
 
   const currentCategoryOptions = useMemo(() => {
     return newTransaction.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -272,6 +308,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     setSelectedDays([]);
     setHasAlimony(false);
     setAlimonyPercentage('');
+    setUseBusinessDay(false);
+    setBusinessDayOrdinal('5');
   }
 
   const handleEdit = (t: Transaction) => {
@@ -359,11 +397,25 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         else {
             const numInstallments = parseInt(newTransaction.installments);
             if (!isNaN(numInstallments) && numInstallments > 1) {
-                const baseDateObj = new Date(newTransaction.date + 'T12:00:00'); 
+                // Determine Start Date Context
+                const [startYear, startMonth, startDay] = newTransaction.date.split('-').map(Number);
+                const businessOrdinal = parseInt(businessDayOrdinal) || 5;
+
                 for(let i=0; i < numInstallments; i++) {
-                     const nextDate = new Date(baseDateObj);
-                     nextDate.setMonth(baseDateObj.getMonth() + i);
-                     const isoDate = nextDate.toISOString().split('T')[0];
+                     // Determine Next Date
+                     let isoDate;
+                     
+                     // SPECIAL LOGIC: Business Days for Salary
+                     if (useBusinessDay && newTransaction.category === 'Salário' && newTransaction.type === 'income') {
+                         // Calculate Nth business day for the target month (month is 0-indexed in JS Date, but our split gives 1-based)
+                         // (startMonth - 1) is current month index. + i adds months.
+                         isoDate = getNthBusinessDay(startYear, (startMonth - 1) + i, businessOrdinal);
+                     } else {
+                         // Standard: Same calendar day
+                         const nextDate = new Date(startYear, (startMonth - 1) + i, startDay);
+                         isoDate = nextDate.toISOString().split('T')[0];
+                     }
+
                      const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
                      onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
                 }
@@ -682,19 +734,51 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                     </div>
 
                     {recurrenceMode === 'monthly' ? (
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                Repetir por quantas vezes? (Opcional)
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-slate-400" />
-                                <input
-                                    type="number"
-                                    placeholder="Ex: 12 (Deixe vazio para assinatura infinita)"
-                                    value={newTransaction.installments}
-                                    onChange={e => setNewTransaction({...newTransaction, installments: e.target.value})}
-                                    className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm w-full outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
+                        <div className="space-y-3">
+                            {/* BUSINESS DAY OPTION FOR SALARY */}
+                            {newTransaction.category === 'Salário' && newTransaction.type === 'income' && (
+                                <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30 animate-fade-in">
+                                    <input 
+                                        type="checkbox" 
+                                        id="useBusinessDay"
+                                        checked={useBusinessDay}
+                                        onChange={(e) => setUseBusinessDay(e.target.checked)}
+                                        className="w-3.5 h-3.5 text-emerald-600 rounded"
+                                    />
+                                    <label htmlFor="useBusinessDay" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer flex-1">
+                                        <Briefcase className="w-3 h-3" /> Considerar dia útil?
+                                    </label>
+                                    
+                                    {useBusinessDay && (
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                max="20"
+                                                value={businessDayOrdinal}
+                                                onChange={(e) => setBusinessDayOrdinal(e.target.value)}
+                                                className="w-10 py-0.5 px-1 text-xs border border-emerald-300 rounded text-center outline-none focus:border-emerald-500 font-bold dark:bg-slate-700 dark:text-white"
+                                            />
+                                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">º dia</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    Repetir por quantas vezes? (Opcional)
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="number"
+                                        placeholder="Ex: 12 (Deixe vazio para assinatura infinita)"
+                                        value={newTransaction.installments}
+                                        onChange={e => setNewTransaction({...newTransaction, installments: e.target.value})}
+                                        className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 text-sm w-full outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
                             </div>
                         </div>
                     ) : (
