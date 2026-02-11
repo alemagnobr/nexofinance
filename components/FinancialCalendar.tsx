@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell } from 'lucide-react';
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
+  budgets: Budget[]; // Added budget prop
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
   privacyMode: boolean;
 }
@@ -45,7 +46,7 @@ const exportToICS = (events: any[]) => {
     document.body.removeChild(link);
 };
 
-export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactions, onAddTransaction, privacyMode }) => {
+export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactions, budgets, onAddTransaction, privacyMode }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
   const [filterType, setFilterType] = useState<ViewFilter>('all');
@@ -71,6 +72,42 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
+
+  // --- ALERTS LOGIC (Copied from Dashboard but focused on Exceeded) ---
+  const budgetAlerts = useMemo(() => {
+    const alerts: { title: string; message: string; type: 'warning' }[] = [];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const monthStr = today.toISOString().slice(0, 7);
+
+    // Only process if we are viewing the current month to show relevant alerts
+    // or always show alerts for current real time month regardless of calendar view?
+    // Let's show alerts based on "Real Time" status like dashboard
+    
+    budgets.forEach(budget => {
+        // Find if this budget applies to current real month
+        const isRelevant = (budget.isRecurring && !budgets.some(b => b.category === budget.category && b.month === monthStr && !b.isRecurring)) || budget.month === monthStr;
+        
+        if (!isRelevant) return;
+
+        const spent = transactions
+            .filter(t => t.type === 'expense' && t.category === budget.category &&
+                new Date(t.date).getMonth() === currentMonth &&
+                new Date(t.date).getFullYear() === currentYear
+            )
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        if (spent >= budget.limit) {
+                alerts.push({
+                title: `Limite Excedido: ${budget.category}`,
+                message: `Você estourou o teto definido para esta categoria.`,
+                type: 'warning'
+            });
+        }
+    });
+    return alerts;
+  }, [budgets, transactions]);
 
   // --- GHOSTING LOGIC (Projection) ---
   const displayedTransactions = useMemo(() => {
@@ -273,6 +310,23 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
        
+       {/* ALERTS SECTION */}
+       {budgetAlerts.length > 0 && (
+         <div className="space-y-2 mb-4">
+            {budgetAlerts.map((alert, idx) => (
+               <div key={idx} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3 animate-fade-in-down shadow-sm">
+                  <div className="bg-amber-100 dark:bg-amber-800 p-2 rounded-full flex-shrink-0">
+                     <Bell className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+                  </div>
+                  <div>
+                     <h4 className="font-bold text-amber-800 dark:text-amber-300 text-sm">{alert.title}</h4>
+                     <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">{alert.message}</p>
+                  </div>
+               </div>
+            ))}
+         </div>
+       )}
+
        {/* ADD TRANSACTION MODAL */}
        {isModalOpen && (
            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">

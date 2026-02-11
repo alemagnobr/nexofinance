@@ -117,6 +117,42 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const handlePrevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
 
+  // --- ALERTS LOGIC (Copied from Dashboard) ---
+  const budgetAlerts = useMemo(() => {
+    const alerts: { title: string; message: string; type: 'warning' }[] = [];
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const monthStr = today.toISOString().slice(0, 7);
+
+    // Only process if we are viewing the current month to show relevant alerts
+    // or always show alerts for current real time month regardless of filter?
+    // Let's show alerts based on "Real Time" status like dashboard
+    
+    budgets.forEach(budget => {
+        // Find if this budget applies to current real month
+        const isRelevant = (budget.isRecurring && !budgets.some(b => b.category === budget.category && b.month === monthStr && !b.isRecurring)) || budget.month === monthStr;
+        
+        if (!isRelevant) return;
+
+        const spent = transactions
+            .filter(t => t.type === 'expense' && t.category === budget.category &&
+                new Date(t.date).getMonth() === currentMonth &&
+                new Date(t.date).getFullYear() === currentYear
+            )
+            .reduce((sum, t) => sum + t.amount, 0);
+
+        if (spent >= budget.limit) {
+                alerts.push({
+                title: `Limite Excedido: ${budget.category}`,
+                message: `Você estourou o teto definido para esta categoria.`,
+                type: 'warning'
+            });
+        }
+    });
+    return alerts;
+  }, [budgets, transactions]);
+
   // --- FILTERING LOGIC ---
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
@@ -424,7 +460,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           )}
       </div>
 
-      {/* 2. DYNAMIC SUMMARY CARDS */}
+      {/* 2. BUDGET ALERTS */}
+      {budgetAlerts.length > 0 && (
+         <div className="space-y-2">
+            {budgetAlerts.map((alert, idx) => (
+               <div key={idx} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3 animate-fade-in-down shadow-sm">
+                  <div className="bg-amber-100 dark:bg-amber-800 p-2 rounded-full flex-shrink-0">
+                     <Bell className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+                  </div>
+                  <div>
+                     <h4 className="font-bold text-amber-800 dark:text-amber-300 text-sm">{alert.title}</h4>
+                     <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">{alert.message}</p>
+                  </div>
+               </div>
+            ))}
+         </div>
+      )}
+
+      {/* 3. DYNAMIC SUMMARY CARDS */}
       <div className="grid grid-cols-3 gap-3 md:gap-4">
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Entradas</p>
@@ -442,7 +495,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         </div>
       </div>
 
-      {/* 3. FORM */}
+      {/* 4. FORM */}
       <div ref={formRef} className="scroll-mt-24">
       {isFormOpen && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
@@ -631,7 +684,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       )}
       </div>
 
-      {/* 4. TABS (View Filter) */}
+      {/* 5. TABS (View Filter) */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex">
           <button 
               onClick={() => setViewFilter('all')}
@@ -653,7 +706,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </button>
       </div>
 
-      {/* 5. LIST AREA (Grouped by Date) */}
+      {/* 6. LIST AREA (Grouped by Date) */}
       <div className="space-y-4 pb-20 md:pb-0">
           {groupedTransactions.length === 0 ? (
               <div className="text-center py-16 text-slate-400">

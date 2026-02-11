@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Target, Calendar, ShieldAlert, Hexagon, Loader2, Key, Menu, PlusCircle, ShoppingCart, AppWindow } from 'lucide-react';
 import { View, Transaction, TransactionStatus, ShoppingItem, PaymentMethod, AppData } from './types';
@@ -315,6 +314,7 @@ const App: React.FC = () => {
         return (
           <FinancialCalendar 
             transactions={data.transactions} 
+            budgets={data.budgets}
             onAddTransaction={actions.addTransaction}
             privacyMode={privacyMode} 
           />
