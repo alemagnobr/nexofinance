@@ -264,16 +264,29 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       const targetMonth = currentDate.getMonth() + 1;
 
       // Calculates totals for the entire selected month, ignoring list filters (search, tabs, etc.)
-      // to keep the summary cards consistent.
-      const monthTransactions = transactions.filter(t => {
+      // to keep the summary cards consistent and up-to-date.
+      const acc = transactions.reduce((acc, t) => {
           const [tYear, tMonth] = t.date.split('-').map(Number);
-          return tYear === targetYear && tMonth === targetMonth;
-      });
-
-      const income = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const expense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+          
+          // Check if transaction belongs to current view month
+          if (tYear === targetYear && tMonth === targetMonth) {
+              // Ensure we are working with numbers to prevent string concatenation bugs
+              const amountVal = Number(t.amount);
+              
+              if (t.type === 'income') {
+                  acc.income += amountVal;
+              } else if (t.type === 'expense') {
+                  acc.expense += amountVal;
+              }
+          }
+          return acc;
+      }, { income: 0, expense: 0 });
       
-      return { income, expense, balance: income - expense };
+      return { 
+          income: acc.income, 
+          expense: acc.expense, 
+          balance: acc.income - acc.expense 
+      };
   }, [transactions, currentDate]);
 
   const formatValue = (val: number) => {
@@ -679,7 +692,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             value={newTransaction.date}
             onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
             className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
-          />
+          >
+            <option value="paid">Pago/Recebido</option>
+            <option value="pending">Pendente</option>
+          </select>
 
           <select
             value={newTransaction.status}
