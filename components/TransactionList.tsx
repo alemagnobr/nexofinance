@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -72,6 +72,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [editingId, setEditingId] = useState<string | null>(null); // For full form
   const [recurrenceMode, setRecurrenceMode] = useState<'monthly' | 'days'>('monthly');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
+
+  // --- ALIMONY STATE (Pensão) ---
+  const [hasAlimony, setHasAlimony] = useState(false);
+  const [alimonyPercentage, setAlimonyPercentage] = useState('');
 
   // Ref for auto-scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
@@ -266,6 +270,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     setEditingId(null);
     setRecurrenceMode('monthly');
     setSelectedDays([]);
+    setHasAlimony(false);
+    setAlimonyPercentage('');
   }
 
   const handleEdit = (t: Transaction) => {
@@ -293,16 +299,36 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prepare Data
+    let finalAmount = parseFloat(newTransaction.amount);
+    let finalObservation = newTransaction.observation;
+
+    // --- ALIMONY LOGIC (Pensão) ---
+    // Only applies for Income + Salary + Checkbox checked
+    if (newTransaction.type === 'income' && newTransaction.category === 'Salário' && hasAlimony) {
+        const pct = parseFloat(alimonyPercentage);
+        if (!isNaN(pct) && pct > 0 && pct < 100) {
+            const deduction = finalAmount * (pct / 100);
+            const originalGross = finalAmount;
+            finalAmount = finalAmount - deduction;
+            
+            // Append info to observation so user knows what happened
+            const note = `(Salário Bruto: R$ ${originalGross.toFixed(2)} | Desc. Pensão: ${pct}%)`;
+            finalObservation = finalObservation ? `${finalObservation} ${note}` : note;
+        }
+    }
+
     const transactionData = {
       description: newTransaction.description, 
-      amount: parseFloat(newTransaction.amount), 
+      amount: finalAmount,
       type: newTransaction.type, 
       category: newTransaction.category, 
       date: newTransaction.date, 
       status: newTransaction.status, 
       paymentMethod: newTransaction.paymentMethod, 
       isRecurring: newTransaction.isRecurring,
-      observation: newTransaction.observation
+      observation: finalObservation
     };
 
     // LOGIC FOR RECURRENCE
@@ -524,14 +550,47 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             </button>
           </div>
           
-          <input
-            required
-            type="number"
-            placeholder="Valor (R$)"
-            value={newTransaction.amount}
-            onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-            className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 outline-none"
-          />
+          <div className="flex flex-col gap-1">
+              <input
+                required
+                type="number"
+                placeholder="Valor (R$)"
+                value={newTransaction.amount}
+                onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 outline-none"
+              />
+              
+              {/* DISCREET ALIMONY OPTION */}
+              {newTransaction.type === 'income' && newTransaction.category === 'Salário' && !editingId && (
+                  <div className="flex items-center gap-2 mt-1 px-1 animate-fade-in">
+                      <div 
+                          className="flex items-center gap-2 cursor-pointer group select-none"
+                          onClick={() => setHasAlimony(!hasAlimony)}
+                      >
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${hasAlimony ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                              {hasAlimony && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
+                              <Baby className="w-3 h-3" /> Descontar Pensão?
+                          </span>
+                      </div>
+                      
+                      {hasAlimony && (
+                          <div className="flex items-center gap-1 animate-scale-in ml-auto">
+                              <input 
+                                  autoFocus
+                                  type="number" 
+                                  placeholder="%" 
+                                  className="w-12 py-0.5 px-1 text-xs border border-slate-300 rounded text-center outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
+                                  value={alimonyPercentage}
+                                  onChange={(e) => setAlimonyPercentage(e.target.value)}
+                              />
+                              <span className="text-[10px] text-slate-400 font-bold">%</span>
+                          </div>
+                      )}
+                  </div>
+              )}
+          </div>
 
           <select
             value={newTransaction.type}
