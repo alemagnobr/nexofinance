@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -205,19 +204,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   const totalExpense = data.transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const totalPending = data.transactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
   
-  // FIX: Lógica de saldo aprimorada para evitar "saldos fantasmas"
-  // Calcula o saldo real baseado nas transações carregadas
+  // FIX: Lógica de saldo aprimorada
+  // 1. Calcula o saldo real baseado puramente nas transações carregadas agora (Pago/Recebido)
   const realTimeBalance = data.transactions
       .filter(t => t.status === 'paid')
       .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
 
-  // Se tivermos poucas transações (modo local ou poucos dados na nuvem), confiamos no cálculo em tempo real.
-  // Se tivermos muitas (>300), usamos o saldo persistido do banco (otimização), a menos que seja undefined.
-  // Se não houver transações (length === 0), o saldo DEVE ser zero.
-  const currentBalance = (data.transactions.length < 300) 
-      ? realTimeBalance 
-      : (data.walletBalance !== undefined ? data.walletBalance : realTimeBalance);
+  // 2. Decide qual saldo exibir:
+  // - Se NÃO tem transações, o saldo É ZERO (ignora cache que pode estar sujo).
+  // - Se tem poucas transações (<300), usa o realTimeBalance para garantir precisão.
+  // - Se tem muitas, usa o walletBalance (cache do Firestore) se disponível.
+  const currentBalance = (data.transactions.length === 0) 
+      ? 0 
+      : (data.transactions.length < 300) 
+          ? realTimeBalance 
+          : (data.walletBalance !== undefined ? data.walletBalance : realTimeBalance);
   
+  // 3. Calcula APENAS a SOMA das ENTRADAS pendentes (conforme solicitado)
+  const pendingIncome = data.transactions
+      .filter(t => t.status === 'pending' && t.type === 'income')
+      .reduce((acc, t) => acc + t.amount, 0);
+
   const totalInvested = data.investments.reduce((acc, curr) => acc + curr.amount, 0);
 
   // --- NEW: Detailed Metrics for Cards ---
@@ -607,7 +614,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           </div>
         </div>
 
-        {/* Card 2: Current Balance & Runway */}
+        {/* Card 2: Current Balance & Pending Income */}
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -615,6 +622,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                <Wallet className="w-4 h-4 text-emerald-500" />
             </div>
             <p className="text-2xl font-bold text-slate-800 dark:text-white truncate">{formatValue(currentBalance)}</p>
+            
+            {/* NEW: Only Pending Income (A Receber) */}
+            {pendingIncome > 0 && (
+                <div className="flex items-center gap-1 mt-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded w-fit border border-emerald-100 dark:border-emerald-800/30">
+                    <Clock className="w-3 h-3 text-emerald-500" />
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        +{formatValue(pendingIncome)}
+                    </span>
+                    <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-medium">A Receber</span>
+                </div>
+            )}
           </div>
           
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
