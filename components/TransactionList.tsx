@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase } from 'lucide-react';
@@ -157,7 +158,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const handlePrevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
 
-  // --- ALERTS LOGIC (Copied from Dashboard) ---
+  // --- ALERTS LOGIC ---
   const budgetAlerts = useMemo(() => {
     const alerts: { title: string; message: string; type: 'warning' }[] = [];
     const today = new Date();
@@ -165,10 +166,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     const currentYear = today.getFullYear();
     const monthStr = today.toISOString().slice(0, 7);
 
-    // Only process if we are viewing the current month to show relevant alerts
-    // or always show alerts for current real time month regardless of filter?
-    // Let's show alerts based on "Real Time" status like dashboard
-    
     budgets.forEach(budget => {
         // Find if this budget applies to current real month
         const isRelevant = (budget.isRecurring && !budgets.some(b => b.category === budget.category && b.month === monthStr && !b.isRecurring)) || budget.month === monthStr;
@@ -193,7 +190,29 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     return alerts;
   }, [budgets, transactions]);
 
-  // --- FILTERING LOGIC ---
+  // --- DYNAMIC TOTALS (MONTHLY VIEW) ---
+  // Calculates totals based on CURRENT MONTH regardless of search/type filters
+  const monthlyTotals = useMemo(() => {
+      const currentMonthTransactions = transactions.filter(t => {
+          const [year, month] = t.date.split('-');
+          return (
+              parseInt(year) === currentDate.getFullYear() &&
+              parseInt(month) === currentDate.getMonth() + 1
+          );
+      });
+
+      const income = currentMonthTransactions
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + t.amount, 0);
+
+      const expense = currentMonthTransactions
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + t.amount, 0);
+
+      return { income, expense, balance: income - expense };
+  }, [transactions, currentDate]);
+
+  // --- FILTERING LOGIC (FOR THE LIST) ---
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       // 1. Month Filter
@@ -242,9 +261,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       // 3. Calculate Running Balance (Accumulated)
-      // To calculate accumulation correctly (Day 1 + Day 2...), we need to process Chronologically (Oldest -> Newest)
-      // Then map the result back to our display order.
-      
       const chronological = [...sortedGroups].reverse(); // Oldest first
       let runningTotal = 0;
       
@@ -256,14 +272,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       // Reverse back to Newest -> Oldest for display
       return chronologicalWithBalance.reverse();
 
-  }, [filteredTransactions]);
-
-  // --- DYNAMIC TOTALS ---
-  const dynamicTotals = useMemo(() => {
-      // Totais do cabeçalho também devem refletir a visão projetada (tudo o que está na tela)
-      const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-      return { income, expense, balance: income - expense };
   }, [filteredTransactions]);
 
   const formatValue = (val: number) => {
@@ -555,20 +563,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
          </div>
       )}
 
-      {/* 3. DYNAMIC SUMMARY CARDS */}
+      {/* 3. DYNAMIC SUMMARY CARDS (MONTHLY TOTALS) */}
       <div className="grid grid-cols-3 gap-3 md:gap-4">
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Entradas</p>
-          <p className="text-sm md:text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatValue(dynamicTotals.income)}</p>
+          <p className="text-sm md:text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatValue(monthlyTotals.income)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Saídas</p>
-          <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(dynamicTotals.expense)}</p>
+          <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(monthlyTotals.expense)}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Proj.)</p>
-          <p className={`text-sm md:text-lg font-bold truncate ${dynamicTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
-            {formatValue(dynamicTotals.balance)}
+          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Mês)</p>
+          <p className={`text-sm md:text-lg font-bold truncate ${monthlyTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
+            {formatValue(monthlyTotals.balance)}
           </p>
         </div>
       </div>
