@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
@@ -74,6 +73,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [recurrenceMode, setRecurrenceMode] = useState<'monthly' | 'days'>('monthly');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
+  // Ref for auto-scrolling to form
+  const formRef = useRef<HTMLDivElement>(null);
+
   const [newTransaction, setNewTransaction] = useState({
     description: '',
     amount: '',
@@ -92,6 +94,16 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         resetForm();
     }
   }, [quickActionSignal]);
+
+  // Effect to scroll to form when it opens or editing changes
+  useEffect(() => {
+    if (isFormOpen && formRef.current) {
+        // Delay slightly to ensure render and avoid sticky header overlap
+        setTimeout(() => {
+            formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    }
+  }, [isFormOpen, editingId]);
 
   const currentCategoryOptions = useMemo(() => {
     return newTransaction.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -221,7 +233,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   const handleEdit = (t: Transaction) => {
     setNewTransaction({
-        description: t.description, amount: t.amount.toString(), type: t.type, category: t.category, date: t.date, status: t.status, paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), isRecurring: t.isRecurring || false, installments: ''
+        description: t.description || '', 
+        amount: (t.amount || 0).toString(), 
+        type: t.type || 'expense', 
+        category: t.category || 'Outros', 
+        date: t.date || new Date().toISOString().split('T')[0], 
+        status: t.status || 'paid', 
+        paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), 
+        isRecurring: t.isRecurring || false, 
+        installments: ''
     });
     setEditingId(t.id);
     setIsFormOpen(true);
@@ -413,6 +433,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       </div>
 
       {/* 3. FORM */}
+      <div ref={formRef} className="scroll-mt-24">
       {isFormOpen && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
           <div className="col-span-1 md:col-span-2">
@@ -589,6 +610,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </div>
         </form>
       )}
+      </div>
 
       {/* 4. TABS (View Filter) */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex">
