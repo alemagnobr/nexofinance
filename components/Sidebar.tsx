@@ -119,12 +119,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col no-scrollbar">
-        <div className="space-y-1">
-            <p className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Menu Principal</p>
-            
+        
+        {/* Seção Destaque: Visão Geral */}
+        <div className="mb-6 space-y-1">
+            <p className="px-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Visão Geral</p>
             <NavItem view={View.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
-            <NavItem view={View.CALENDAR} icon={Calendar} label="Agenda" />
             <NavItem view={View.TRANSACTIONS} icon={Receipt} label="Transações" />
+            <NavItem view={View.CALENDAR} icon={Calendar} label="Agenda" />
+        </div>
+
+        {/* Seção Padrão: Gestão */}
+        <div className="space-y-1">
+            <p className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Gestão Financeira</p>
+            
             <NavItem view={View.BUDGETS} icon={Target} label="Metas" />
             <NavItem view={View.SUBSCRIPTIONS} icon={Repeat} label="Assinaturas" />
             <NavItem view={View.INVESTMENTS} icon={LineChart} label="Investir" />
@@ -246,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Credits & Version */}
         <div className="pt-4 mt-3 border-t border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 font-mono">v2.1.8 Stable</p>
+            <p className="text-[10px] text-slate-500 font-mono">v2.2.0 Stable</p>
             <a 
               href="https://www.linkedin.com/in/alemagnobr/" 
               target="_blank" 
