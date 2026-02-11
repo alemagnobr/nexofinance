@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -224,6 +224,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   const pendingIncome = data.transactions
       .filter(t => t.status === 'pending' && t.type === 'income')
       .reduce((acc, t) => acc + t.amount, 0);
+
+  // 4. Calcula Total Pago (Total Despesas - Total Pendente)
+  const totalPaidExpenses = totalExpense - totalPending;
 
   const totalInvested = data.investments.reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -651,20 +654,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           </div>
         </div>
 
-        {/* Card 3: Payables (Smart List) */}
+        {/* Card 3: Saídas (Paid vs Pending) - REDESIGNED */}
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">A Pagar (Mês)</h3>
-              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">{formatValue(totalPending)}</p>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+               <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saídas (Mês)</h3>
+               <ArrowDownCircle className="w-4 h-4 text-rose-500" />
             </div>
-            <div className="bg-rose-50 dark:bg-rose-900/20 p-2 rounded-lg">
-               <AlertCircle className="w-5 h-5 text-rose-500" />
-            </div>
+            
+            {/* Main Value: Realized (Paid) Expenses */}
+            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 truncate">
+               -{formatValue(totalPaidExpenses)}
+            </p>
+            
+            {/* Secondary Value: Pending Expenses */}
+            {totalPending > 0 ? (
+                <div className="flex items-center gap-1 mt-1 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit border border-amber-100 dark:border-amber-800/30">
+                    <Clock className="w-3 h-3 text-amber-500" />
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                        -{formatValue(totalPending)}
+                    </span>
+                    <span className="text-[10px] text-amber-600/70 dark:text-amber-400/70 uppercase font-medium">A Pagar</span>
+                </div>
+            ) : (
+                <div className="flex items-center gap-1 mt-1 px-2 py-1">
+                    <CheckCheck className="w-3 h-3 text-emerald-500" />
+                    <span className="text-[10px] text-emerald-500 font-bold uppercase">Tudo Pago</span>
+                </div>
+            )}
           </div>
           
-          <div className="flex-1 flex flex-col justify-end space-y-2">
-            <p className="text-[10px] text-slate-400 font-semibold uppercase border-b border-slate-100 dark:border-slate-700/50 pb-1">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex-1 flex flex-col justify-end space-y-2">
+            <p className="text-[10px] text-slate-400 font-semibold uppercase pb-1">
                Próximos Vencimentos
             </p>
             {upcomingBills.length === 0 ? (
