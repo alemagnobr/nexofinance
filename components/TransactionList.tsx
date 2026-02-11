@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -916,9 +916,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       {t.category}
                                                   </span>
                                                   {t.isRecurring && (
-                                                      <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">
-                                                          <Repeat className="w-3 h-3" /> 
-                                                          {t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Fixo'}
+                                                      <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded" title="Recorrente Infinito">
+                                                          <Infinity className="w-3 h-3" /> 
+                                                          Fixo
                                                       </span>
                                                   )}
                                               </div>
@@ -980,7 +980,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           >
                                               <div className="flex items-center gap-2">
                                                   {t.description}
-                                                  {t.isRecurring && <span className="text-[10px] text-slate-400 italic">({t.description.match(/\(\d+\/\d+\)/) ? 'Parcela' : 'Recorrente'})</span>}
+                                                  {t.isRecurring && (
+                                                      <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Recorrência Infinita">
+                                                          <Infinity className="w-3 h-3" /> Recorrente
+                                                      </span>
+                                                  )}
                                               </div>
                                               {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                           </div>
