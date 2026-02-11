@@ -66,6 +66,19 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
             const newTransactions: Transaction[] = [];
 
             recurringTemplates.forEach((template, description) => {
+                // CORREÇÃO: Verifica se a data de início da recorrência é futura em relação ao mês atual
+                // Se eu estou em Fevereiro, mas a conta começa em Março, não deve gerar nada agora.
+                const [tStartYear, tStartMonth] = template.date.split('-').map(Number);
+                
+                // Cria datas comparáveis (Dia 1 de cada mês para ignorar o dia específico)
+                const processingMonthDate = new Date(currentYear, currentMonth, 1);
+                const recurrenceStartDate = new Date(tStartYear, tStartMonth - 1, 1);
+
+                // Se o mês atual é anterior ao mês de início da transação, ignora
+                if (processingMonthDate < recurrenceStartDate) {
+                    return;
+                }
+
                 const existsInCurrentMonth = data.transactions.some(t => {
                     const tDate = new Date(t.date);
                     return t.description === description &&
@@ -75,16 +88,19 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
                 });
 
                 if (!existsInCurrentMonth) {
-                    const tDate = new Date(template.date);
+                    const tDate = new Date(template.date + 'T00:00:00'); // Garante leitura correta da data local
                     const targetDay = tDate.getDate();
                     const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
                     const finalDay = Math.min(targetDay, daysInCurrentMonth);
-                    const newDateObj = new Date(currentYear, currentMonth, finalDay);
+                    // Formata a data manualmente para evitar problemas de timezone UTC
+                    const newMonthStr = String(currentMonth + 1).padStart(2, '0');
+                    const newDayStr = String(finalDay).padStart(2, '0');
+                    const newDateIso = `${currentYear}-${newMonthStr}-${newDayStr}`;
                     
                     newTransactions.push({
                         ...template,
                         id: crypto.randomUUID(),
-                        date: newDateObj.toISOString().split('T')[0],
+                        date: newDateIso,
                         status: 'pending',
                         isRecurring: true
                     });
