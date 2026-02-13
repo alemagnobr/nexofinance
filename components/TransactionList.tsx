@@ -671,13 +671,45 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             ))}
           </select>
 
-          <input
-            required
-            type="date"
-            value={newTransaction.date}
-            onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-            className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
-          />
+          <div>
+              <input
+                required
+                type="date"
+                value={newTransaction.date}
+                onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 w-full"
+              />
+              
+              {/* BUSINESS DAY OPTION FOR SALARY - Moved here */}
+              {newTransaction.category === 'Salário' && newTransaction.type === 'income' && (
+                  <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30 animate-fade-in mt-2">
+                      <input 
+                          type="checkbox" 
+                          id="useBusinessDay"
+                          checked={useBusinessDay}
+                          onChange={(e) => setUseBusinessDay(e.target.checked)}
+                          className="w-3.5 h-3.5 text-emerald-600 rounded"
+                      />
+                      <label htmlFor="useBusinessDay" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer flex-1">
+                          <Briefcase className="w-3 h-3" /> Considerar dia útil?
+                      </label>
+                      
+                      {useBusinessDay && (
+                          <div className="flex items-center gap-1">
+                              <input 
+                                  type="number"
+                                  min="1"
+                                  max="20"
+                                  value={businessDayOrdinal}
+                                  onChange={(e) => setBusinessDayOrdinal(e.target.value)}
+                                  className="w-10 py-0.5 px-1 text-xs border border-emerald-300 rounded text-center outline-none focus:border-emerald-500 font-bold dark:bg-slate-700 dark:text-white"
+                              />
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">º dia</span>
+                          </div>
+                      )}
+                  </div>
+              )}
+          </div>
 
           <select
             value={newTransaction.status}
@@ -743,36 +775,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
                     {recurrenceMode === 'monthly' ? (
                         <div className="space-y-3">
-                            {/* BUSINESS DAY OPTION FOR SALARY */}
-                            {newTransaction.category === 'Salário' && newTransaction.type === 'income' && (
-                                <div className="flex items-center gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800/30 animate-fade-in">
-                                    <input 
-                                        type="checkbox" 
-                                        id="useBusinessDay"
-                                        checked={useBusinessDay}
-                                        onChange={(e) => setUseBusinessDay(e.target.checked)}
-                                        className="w-3.5 h-3.5 text-emerald-600 rounded"
-                                    />
-                                    <label htmlFor="useBusinessDay" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer flex-1">
-                                        <Briefcase className="w-3 h-3" /> Considerar dia útil?
-                                    </label>
-                                    
-                                    {useBusinessDay && (
-                                        <div className="flex items-center gap-1">
-                                            <input 
-                                                type="number"
-                                                min="1"
-                                                max="20"
-                                                value={businessDayOrdinal}
-                                                onChange={(e) => setBusinessDayOrdinal(e.target.value)}
-                                                className="w-10 py-0.5 px-1 text-xs border border-emerald-300 rounded text-center outline-none focus:border-emerald-500 font-bold dark:bg-slate-700 dark:text-white"
-                                            />
-                                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">º dia</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
                                     Repetir por quantas vezes? (Opcional)
