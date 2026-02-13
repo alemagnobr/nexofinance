@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, KanbanCard, Transaction, TransactionType } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet } from 'lucide-react';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2 } from 'lucide-react';
 
 interface KanbanBoardProps {
   columns: KanbanColumn[];
@@ -27,6 +27,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardAmount, setNewCardAmount] = useState('');
   const [newCardColor, setNewCardColor] = useState('blue');
+
+  // Edit Column Title State
+  const [editingColumn, setEditingColumn] = useState<{ id: string, title: string } | null>(null);
 
   // Drag State
   const [draggedCard, setDraggedCard] = useState<{ cardId: string, sourceColId: string } | null>(null);
@@ -56,6 +59,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
       };
       onSaveColumn(newCol);
       setNewColumnTitle('');
+  };
+
+  const startEditingColumn = (col: KanbanColumn) => {
+      setEditingColumn({ id: col.id, title: col.title });
+  };
+
+  const saveColumnTitle = () => {
+      if (!editingColumn) return;
+      const col = columns.find(c => c.id === editingColumn.id);
+      if (col && editingColumn.title.trim()) {
+          onSaveColumn({ ...col, title: editingColumn.title });
+      }
+      setEditingColumn(null);
   };
 
   const handleAddCard = (columnId: string) => {
@@ -184,30 +200,93 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
           </form>
       </div>
 
+      {/* Custom Styles for Scrollbar Visibility */}
+      <style>{`
+        .kanban-scroll::-webkit-scrollbar {
+            height: 12px;
+        }
+        .kanban-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+            border-radius: 10px;
+            margin: 0 10px;
+        }
+        .kanban-scroll::-webkit-scrollbar-thumb {
+            background-color: #94a3b8;
+            border-radius: 10px;
+            border: 3px solid transparent;
+            background-clip: content-box;
+        }
+        .kanban-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #64748b;
+        }
+        .dark .kanban-scroll::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        .dark .kanban-scroll::-webkit-scrollbar-thumb {
+            background-color: #475569;
+        }
+        .dark .kanban-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
+      `}</style>
+
       {/* BOARD CONTAINER */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
-          <div className="flex h-full gap-4 min-w-max px-1">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 kanban-scroll">
+          <div className="flex h-full gap-4 min-w-max px-2">
               
               {sortedColumns.map(col => (
                   <div 
                       key={col.id} 
-                      className={`w-80 flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-sm transition-colors ${draggedCard && draggedCard.sourceColId !== col.id ? 'bg-indigo-50/30 border-indigo-200 border-dashed' : ''}`}
+                      className={`w-72 flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-sm transition-colors ${draggedCard && draggedCard.sourceColId !== col.id ? 'bg-indigo-50/30 border-indigo-200 border-dashed' : ''}`}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, col.id)}
                   >
                       {/* Column Header */}
-                      <div className={`p-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center ${col.isConclusion ? 'bg-emerald-50 dark:bg-emerald-900/10 rounded-t-xl' : ''}`}>
-                          <div className="flex items-center gap-2">
-                              {col.isConclusion && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                              <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wide">{col.title}</h3>
-                              <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                  {col.cards.length}
-                              </span>
+                      <div className={`p-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center group/header ${col.isConclusion ? 'bg-emerald-50 dark:bg-emerald-900/10 rounded-t-xl' : ''}`}>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {col.isConclusion && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
+                              
+                              {editingColumn?.id === col.id ? (
+                                  <input 
+                                      autoFocus
+                                      className="w-full bg-white dark:bg-slate-900 border border-indigo-500 rounded px-1 py-0.5 text-sm font-bold text-slate-800 dark:text-white outline-none"
+                                      value={editingColumn.title}
+                                      onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
+                                      onBlur={saveColumnTitle}
+                                      onKeyDown={(e) => e.key === 'Enter' && saveColumnTitle()}
+                                  />
+                              ) : (
+                                  <div className="flex items-center gap-2 overflow-hidden w-full">
+                                      <h3 
+                                          className="font-bold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wide truncate cursor-pointer hover:text-indigo-600 transition-colors"
+                                          onDoubleClick={() => startEditingColumn(col)}
+                                          title="Duplo clique para renomear"
+                                      >
+                                          {col.title}
+                                      </h3>
+                                      <button 
+                                          onClick={() => startEditingColumn(col)}
+                                          className="opacity-0 group-hover/header:opacity-100 transition-opacity p-1 text-slate-400 hover:text-indigo-500"
+                                      >
+                                          <Edit2 className="w-3 h-3" />
+                                      </button>
+                                  </div>
+                              )}
+
+                              {editingColumn?.id !== col.id && (
+                                <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0">
+                                    {col.cards.length}
+                                </span>
+                              )}
                           </div>
                           
                           {!col.isConclusion && (
-                              <button onClick={() => { if(confirm('Excluir coluna?')) onDeleteColumn(col.id) }} className="text-slate-400 hover:text-rose-500">
-                                  <MoreHorizontal className="w-4 h-4" />
+                              <button 
+                                  onClick={() => { if(confirm('Excluir coluna?')) onDeleteColumn(col.id) }} 
+                                  className="text-slate-400 hover:text-rose-500 ml-2"
+                                  title="Excluir Coluna"
+                              >
+                                  <X className="w-4 h-4" />
                               </button>
                           )}
                       </div>
