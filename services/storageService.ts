@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -26,6 +26,7 @@ const DEFAULT_DATA: AppData = {
   debts: [],
   shoppingList: [],
   shoppingBudget: 0,
+  kanbanColumns: [],
   unlockedBadges: [],
   walletBalance: 0
 };
@@ -50,6 +51,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.unlockedBadges) data.unlockedBadges = [];
     if (!data.debts) data.debts = [];
     if (!data.shoppingList) data.shoppingList = [];
+    if (!data.kanbanColumns) data.kanbanColumns = [];
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
     if (!data.budgets) {
@@ -137,6 +139,12 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     const shoppingList = snapshot.docs.map(doc => doc.data() as ShoppingItem);
     onUpdate({ shoppingList });
   });
+
+  // NEW: Kanban Listener
+  const unsubKanban = onSnapshot(query(collection(db, 'users', uid, 'kanban_columns'), orderBy('order')), (snapshot) => {
+    const kanbanColumns = snapshot.docs.map(doc => doc.data() as KanbanColumn);
+    onUpdate({ kanbanColumns });
+  });
   
   // Escuta documento do usuário para saldo e configurações
   const unsubUserDoc = onSnapshot(doc(db, 'users', uid), (doc) => {
@@ -159,6 +167,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubBudgets();
     unsubDebts();
     unsubShopping();
+    unsubKanban();
     unsubUserDoc();
   };
 };
@@ -296,6 +305,14 @@ export const updateShoppingBudgetFire = async (uid: string, amount: number) => {
     }, { merge: true });
 };
 
+// KANBAN
+export const saveKanbanColumnFire = async (uid: string, column: KanbanColumn) => {
+    await setDoc(doc(db, 'users', uid, 'kanban_columns', column.id), column);
+};
+export const deleteKanbanColumnFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'kanban_columns', id));
+};
+
 
 // BADGES & WEALTH PROFILE
 export const unlockBadgeFire = async (uid: string, badgeId: string, currentBadges: string[]) => {
@@ -341,6 +358,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     localData.shoppingList.forEach(s => {
       const ref = doc(db, 'users', uid, 'shopping_list', s.id);
       batch.set(ref, s);
+    });
+
+    localData.kanbanColumns.forEach(k => {
+        const ref = doc(db, 'users', uid, 'kanban_columns', k.id);
+        batch.set(ref, k);
     });
 
     const userRef = doc(db, 'users', uid);

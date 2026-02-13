@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Receipt, LineChart, Target, Calendar, Repeat, 
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
-  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow 
+  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -125,6 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <p className="px-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Visão Geral</p>
             <NavItem view={View.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
             <NavItem view={View.TRANSACTIONS} icon={Receipt} label="Transações" />
+            <NavItem view={View.KANBAN} icon={Wallet} label="NEXO Flow" />
             <NavItem view={View.CALENDAR} icon={Calendar} label="Agenda" />
         </div>
 
@@ -253,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Credits & Version */}
         <div className="pt-4 mt-3 border-t border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 font-mono">v2.2.0 Stable</p>
+            <p className="text-[10px] text-slate-500 font-mono">v2.3.0 Stable</p>
             <a 
               href="https://www.linkedin.com/in/alemagnobr/" 
               target="_blank" 

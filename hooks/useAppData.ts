@@ -1,13 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
   addBudgetFire, deleteBudgetFire, updateBudgetFire,
   addDebtFire, updateDebtFire, deleteDebtFire,
   addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
+  saveKanbanColumnFire, deleteKanbanColumnFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire
 } from '../services/storageService';
 
@@ -18,6 +19,7 @@ const DEFAULT_DATA: AppData = {
     debts: [],
     shoppingList: [],
     shoppingBudget: 0,
+    kanbanColumns: [],
     unlockedBadges: [],
     walletBalance: 0
 };
@@ -264,6 +266,23 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingBudget: amount }));
   };
 
+  // --- KANBAN ACTIONS ---
+  const saveKanbanColumn = async (column: KanbanColumn) => {
+      if (user) await saveKanbanColumnFire(user.uid, column);
+      else setData(prev => {
+          const exists = prev.kanbanColumns.some(c => c.id === column.id);
+          if (exists) {
+              return { ...prev, kanbanColumns: prev.kanbanColumns.map(c => c.id === column.id ? column : c) };
+          }
+          return { ...prev, kanbanColumns: [...prev.kanbanColumns, column] };
+      });
+  };
+
+  const deleteKanbanColumn = async (id: string) => {
+      if (user) await deleteKanbanColumnFire(user.uid, id);
+      else setData(prev => ({ ...prev, kanbanColumns: prev.kanbanColumns.filter(c => c.id !== id) }));
+  };
+
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
@@ -301,6 +320,8 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         deleteShoppingItem,
         clearShoppingList,
         setShoppingBudget,
+        saveKanbanColumn,
+        deleteKanbanColumn,
         unlockBadge,
         saveWealthProfile
     }

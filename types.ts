@@ -59,6 +59,22 @@ export interface ShoppingItem {
   category?: ShoppingCategory; // Novo campo
 }
 
+// --- KANBAN TYPES ---
+export interface KanbanCard {
+  id: string;
+  title: string;
+  amount: number;
+  color: string; // 'blue' | 'green' | 'yellow' | 'purple' | 'rose'
+}
+
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  cards: KanbanCard[];
+  isConclusion?: boolean; // Se true, soltar um card aqui dispara a criação de transação
+  order: number;
+}
+
 export interface Badge {
   id: string;
   name: string;
@@ -92,6 +108,7 @@ export interface AppData {
   debts: Debt[];
   shoppingList: ShoppingItem[];
   shoppingBudget?: number; // Novo campo: Teto de gastos da ida ao mercado
+  kanbanColumns: KanbanColumn[]; // Novo campo: Colunas do Kanban
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
@@ -107,5 +124,6 @@ export enum View {
   AI_ASSISTANT = 'AI_ASSISTANT',
   DEBTS = 'DEBTS',
   SHOPPING_LIST = 'SHOPPING_LIST',
-  WEALTH_PLANNER = 'WEALTH_PLANNER'
+  WEALTH_PLANNER = 'WEALTH_PLANNER',
+  KANBAN = 'KANBAN'
 }

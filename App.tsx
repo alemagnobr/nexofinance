@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Target, Calendar, ShieldAlert, Hexagon, Loader2, Key, Menu, PlusCircle, ShoppingCart, AppWindow } from 'lucide-react';
 import { View, Transaction, TransactionStatus, ShoppingItem, PaymentMethod, AppData } from './types';
@@ -16,7 +17,8 @@ import { FinancialCalendar } from './components/FinancialCalendar';
 import { AiAssistant } from './components/AiAssistant';
 import { DebtManager } from './components/DebtManager';
 import { ShoppingList } from './components/ShoppingList';
-import { WealthPlanner } from './components/WealthPlanner'; // Nova Importação
+import { WealthPlanner } from './components/WealthPlanner';
+import { KanbanBoard } from './components/KanbanBoard'; // New Import
 import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
 import { useAppData } from './hooks/useAppData';
@@ -109,7 +111,7 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: []
+            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: []
         });
     } else {
         await signOut(auth);
@@ -340,6 +342,20 @@ const App: React.FC = () => {
              onSaveProfile={actions.saveWealthProfile}
              privacyMode={privacyMode}
              hasApiKey={hasKey}
+          />
+        );
+      case View.KANBAN:
+        return (
+          <KanbanBoard 
+             columns={data.kanbanColumns || []}
+             onSaveColumn={actions.saveKanbanColumn}
+             onDeleteColumn={actions.deleteKanbanColumn}
+             onAddTransaction={(t) => {
+                 actions.addTransaction(t);
+                 alert('Transação criada a partir do card!');
+                 setCurrentView(View.TRANSACTIONS);
+             }}
+             privacyMode={privacyMode}
           />
         );
       default:
