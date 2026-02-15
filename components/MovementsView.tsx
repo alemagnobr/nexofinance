@@ -22,18 +22,41 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
 }) => {
   
   const tabs = [
-    { id: View.TRANSACTIONS, label: 'Transações', icon: Receipt },
-    { id: View.CALENDAR, label: 'Agenda', icon: Calendar },
-    { id: View.SUBSCRIPTIONS, label: 'Assinaturas', icon: Repeat },
-    { id: View.DEBTS, label: 'Dívidas', icon: ShieldAlert },
+    { 
+      id: View.TRANSACTIONS, 
+      label: 'Transações', 
+      icon: Receipt,
+      activeClass: 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200'
+    },
+    { 
+      id: View.CALENDAR, 
+      label: 'Agenda', 
+      icon: Calendar,
+      activeClass: 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200'
+    },
+    { 
+      id: View.SUBSCRIPTIONS, 
+      label: 'Assinaturas', 
+      icon: Repeat,
+      activeClass: 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/30 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-200'
+    },
+    { 
+      id: View.DEBTS, 
+      label: 'Dívidas', 
+      icon: ShieldAlert,
+      activeClass: 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200'
+    },
   ];
 
   return (
     <div className="space-y-6">
       {/* Internal Tabs Navigation - Enhanced Design */}
       <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Navegação</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {tabs.map(tab => {
             const isActive = currentView === tab.id;
             return (
@@ -42,19 +65,11 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
                 onClick={() => onNavigate(tab.id)}
                 className={`
                   relative flex flex-col md:flex-row items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold transition-all duration-200 border-2
-                  ${isActive 
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.02]' 
-                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-700'
-                  }
+                  ${isActive ? `${tab.activeClass} scale-[1.02]` : `${tab.inactiveClass}`}
                 `}
               >
-                <tab.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <tab.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'currentColor'}`} />
                 <span className="text-sm">{tab.label}</span>
-                
-                {/* Active Indicator Dot (Optional Visual Cue) */}
-                {isActive && (
-                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-400/50 rounded-full blur-sm md:hidden"></span>
-                )}
               </button>
             );
           })}
