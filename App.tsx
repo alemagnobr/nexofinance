@@ -18,7 +18,8 @@ import { AiAssistant } from './components/AiAssistant';
 import { DebtManager } from './components/DebtManager';
 import { ShoppingList } from './components/ShoppingList';
 import { WealthPlanner } from './components/WealthPlanner';
-import { KanbanBoard } from './components/KanbanBoard'; // New Import
+import { KanbanBoard } from './components/KanbanBoard';
+import { Notes } from './components/Notes'; // New Import
 import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
 import { useAppData } from './hooks/useAppData';
@@ -111,7 +112,7 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: []
+            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], notes: []
         });
     } else {
         await signOut(auth);
@@ -355,6 +356,16 @@ const App: React.FC = () => {
                  alert('Transação criada a partir do card!');
                  setCurrentView(View.TRANSACTIONS);
              }}
+             privacyMode={privacyMode}
+          />
+        );
+      case View.NOTES:
+        return (
+          <Notes 
+             notes={data.notes || []}
+             onAdd={actions.addNote}
+             onUpdate={actions.updateNote}
+             onDelete={actions.deleteNote}
              privacyMode={privacyMode}
           />
         );

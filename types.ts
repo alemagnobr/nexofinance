@@ -77,6 +77,16 @@ export interface KanbanColumn {
   order: number;
 }
 
+// --- NOTES TYPES ---
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  date: string; // ISO Date
+  color: 'slate' | 'yellow' | 'green' | 'blue' | 'rose' | 'purple';
+  isPinned: boolean;
+}
+
 export interface Badge {
   id: string;
   name: string;
@@ -111,6 +121,7 @@ export interface AppData {
   shoppingList: ShoppingItem[];
   shoppingBudget?: number; // Novo campo: Teto de gastos da ida ao mercado
   kanbanColumns: KanbanColumn[]; // Novo campo: Colunas do Kanban
+  notes: Note[]; // Novo campo: Notas
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
@@ -127,5 +138,6 @@ export enum View {
   DEBTS = 'DEBTS',
   SHOPPING_LIST = 'SHOPPING_LIST',
   WEALTH_PLANNER = 'WEALTH_PLANNER',
-  KANBAN = 'KANBAN'
+  KANBAN = 'KANBAN',
+  NOTES = 'NOTES'
 }

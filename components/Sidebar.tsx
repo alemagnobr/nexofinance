@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Receipt, LineChart, Target, Calendar, Repeat, 
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
-  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet
+  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -138,6 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavItem view={View.INVESTMENTS} icon={LineChart} label="Investir" />
             <NavItem view={View.DEBTS} icon={ShieldAlert} label="Limpa Nome" />
             <NavItem view={View.SHOPPING_LIST} icon={ShoppingCart} label="Lista de Compras" />
+            <NavItem view={View.NOTES} icon={StickyNote} label="Bloco de Notas" />
             <NavItem view={View.WEALTH_PLANNER} icon={Landmark} label="Planejamento" customClass="text-amber-400" />
         </div>
 
@@ -254,7 +255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Credits & Version */}
         <div className="pt-4 mt-3 border-t border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 font-mono">v2.3.0 Stable</p>
+            <p className="text-[10px] text-slate-500 font-mono">v2.4.0 Notes</p>
             <a 
               href="https://www.linkedin.com/in/alemagnobr/" 
               target="_blank" 

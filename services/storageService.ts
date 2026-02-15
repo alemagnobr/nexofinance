@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, Note } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -27,6 +27,7 @@ const DEFAULT_DATA: AppData = {
   shoppingList: [],
   shoppingBudget: 0,
   kanbanColumns: [],
+  notes: [],
   unlockedBadges: [],
   walletBalance: 0
 };
@@ -52,6 +53,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.debts) data.debts = [];
     if (!data.shoppingList) data.shoppingList = [];
     if (!data.kanbanColumns) data.kanbanColumns = [];
+    if (!data.notes) data.notes = [];
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
     if (!data.budgets) {
@@ -140,10 +142,14 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ shoppingList });
   });
 
-  // NEW: Kanban Listener
   const unsubKanban = onSnapshot(query(collection(db, 'users', uid, 'kanban_columns'), orderBy('order')), (snapshot) => {
     const kanbanColumns = snapshot.docs.map(doc => doc.data() as KanbanColumn);
     onUpdate({ kanbanColumns });
+  });
+
+  const unsubNotes = onSnapshot(query(collection(db, 'users', uid, 'notes'), orderBy('date', 'desc')), (snapshot) => {
+    const notes = snapshot.docs.map(doc => doc.data() as Note);
+    onUpdate({ notes });
   });
   
   // Escuta documento do usuário para saldo e configurações
@@ -168,6 +174,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubDebts();
     unsubShopping();
     unsubKanban();
+    unsubNotes();
     unsubUserDoc();
   };
 };
@@ -313,6 +320,17 @@ export const deleteKanbanColumnFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'kanban_columns', id));
 };
 
+// NOTES
+export const addNoteFire = async (uid: string, note: Note) => {
+    await setDoc(doc(db, 'users', uid, 'notes', note.id), note);
+};
+export const updateNoteFire = async (uid: string, id: string, data: Partial<Note>) => {
+    await updateDoc(doc(db, 'users', uid, 'notes', id), data);
+};
+export const deleteNoteFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'notes', id));
+};
+
 
 // BADGES & WEALTH PROFILE
 export const unlockBadgeFire = async (uid: string, badgeId: string, currentBadges: string[]) => {
@@ -363,6 +381,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     localData.kanbanColumns.forEach(k => {
         const ref = doc(db, 'users', uid, 'kanban_columns', k.id);
         batch.set(ref, k);
+    });
+
+    localData.notes.forEach(n => {
+        const ref = doc(db, 'users', uid, 'notes', n.id);
+        batch.set(ref, n);
     });
 
     const userRef = doc(db, 'users', uid);
