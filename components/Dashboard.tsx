@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppData, Badge, Budget } from '../types';
+import { AppData, Badge, Budget, View } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
   privacyMode: boolean;
   onUnlockBadge: (id: string) => void;
+  onNavigate: (view: View) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -119,7 +121,7 @@ const getEffectiveBudget = (budgets: Budget[], category: string, date: Date) => 
   return budgets.find(b => b.category === category && b.isRecurring);
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate }) => {
   
   // History Chart State
   const [historyStartMonth, setHistoryStartMonth] = useState(() => {
@@ -192,6 +194,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
     return alerts;
   }, [data.budgets, data.transactions]);
+
+  // --- NOTES WIDGET LOGIC ---
+  const pinnedNotes = useMemo(() => {
+      return data.notes
+        .sort((a, b) => {
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+        })
+        .slice(0, 3);
+  }, [data.notes]);
 
   // Helper to mask values
   const formatValue = (val: number) => {
@@ -587,7 +599,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       </div>
 
       {/* Top Cards with Rich Data */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         
         {/* Card 1: Health Score */}
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -746,6 +758,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
              )}
           </div>
         </div>
+
+        {/* Card 5: Notes Widget */}
+        <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <StickyNote className="w-4 h-4" /> Notas Fixadas
+                </h3>
+                <button 
+                    onClick={() => onNavigate(View.NOTES)} 
+                    className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
+                    title="Ver todas"
+                >
+                    <ArrowRight className="w-4 h-4" />
+                </button>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto max-h-[140px] no-scrollbar">
+                {pinnedNotes.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                        <StickyNote className="w-6 h-6 opacity-30" />
+                        <p className="text-xs italic text-center">Nenhuma nota fixada.</p>
+                    </div>
+                ) : (
+                    pinnedNotes.map(note => {
+                        const borderColor = note.color === 'slate' ? 'border-slate-200 dark:border-slate-600' : `border-${note.color}-200 dark:border-${note.color}-800`;
+                        const bgColor = note.color === 'slate' ? 'bg-slate-50 dark:bg-slate-700/50' : `bg-${note.color}-50 dark:bg-${note.color}-900/20`;
+                        
+                        return (
+                            <div 
+                                key={note.id} 
+                                onClick={() => onNavigate(View.NOTES)}
+                                className={`text-xs p-2.5 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${borderColor} ${bgColor}`}
+                            >
+                                <span className="font-bold mr-1 block truncate mb-0.5 text-slate-800 dark:text-slate-200">{note.title || 'Sem título'}</span>
+                                <span className="text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{note.content}</span>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+
       </div>
       
       {/* --- DESKTOP VIEW (GRID) --- */}

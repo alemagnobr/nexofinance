@@ -245,7 +245,14 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case View.DASHBOARD:
-        return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} />;
+        return (
+            <Dashboard 
+                data={data} 
+                privacyMode={privacyMode} 
+                onUnlockBadge={actions.unlockBadge}
+                onNavigate={(view) => setCurrentView(view)}
+            />
+        );
       case View.TRANSACTIONS:
         return (
           <TransactionList 
@@ -370,7 +377,7 @@ const App: React.FC = () => {
           />
         );
       default:
-        return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} />;
+        return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} />;
     }
   };
 

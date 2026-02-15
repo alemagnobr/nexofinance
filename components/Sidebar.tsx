@@ -127,6 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavItem view={View.TRANSACTIONS} icon={Receipt} label="Transações" />
             <NavItem view={View.KANBAN} icon={Wallet} label="NEXO Flow" />
             <NavItem view={View.CALENDAR} icon={Calendar} label="Agenda" />
+            <NavItem view={View.NOTES} icon={StickyNote} label="NEXO Notes" />
         </div>
 
         {/* Seção Padrão: Gestão */}
@@ -138,7 +139,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <NavItem view={View.INVESTMENTS} icon={LineChart} label="Investir" />
             <NavItem view={View.DEBTS} icon={ShieldAlert} label="Limpa Nome" />
             <NavItem view={View.SHOPPING_LIST} icon={ShoppingCart} label="Lista de Compras" />
-            <NavItem view={View.NOTES} icon={StickyNote} label="Bloco de Notas" />
             <NavItem view={View.WEALTH_PLANNER} icon={Landmark} label="Planejamento" customClass="text-amber-400" />
         </div>
 
