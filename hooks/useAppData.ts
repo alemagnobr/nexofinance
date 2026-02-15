@@ -13,6 +13,7 @@ import {
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire
 } from '../services/storageService';
+import { deleteCalendarEvent, updateCalendarEvent } from '../services/calendarService';
 
 const DEFAULT_DATA: AppData = {
     transactions: [],
@@ -179,11 +180,31 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    // 1. Google Calendar Integration: Update event if connected
+    const currentTransaction = data.transactions.find(t => t.id === id);
+    if (currentTransaction && currentTransaction.googleEventId && user) {
+        // Se a data, valor ou descrição mudaram, atualiza no Google
+        if (updates.date || updates.amount || updates.description || updates.category) {
+            const updatedTx = { ...currentTransaction, ...updates };
+            // Fire and forget (não espera terminar para atualizar UI)
+            updateCalendarEvent(updatedTx, currentTransaction.googleEventId)
+                .catch(err => console.warn("Falha ao atualizar Google Agenda:", err));
+        }
+    }
+
     if (user) await updateTransactionFire(user.uid, id, updates);
     else setData(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === id ? { ...t, ...updates } : t) }));
   };
 
   const deleteTransaction = async (id: string) => {
+    // 1. Google Calendar Integration: Delete event if connected
+    const transactionToDelete = data.transactions.find(t => t.id === id);
+    if (transactionToDelete && transactionToDelete.googleEventId && user) {
+        // Fire and forget
+        deleteCalendarEvent(transactionToDelete.googleEventId)
+            .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
+    }
+
     if (user) await deleteTransactionFire(user.uid, id);
     else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
   };
