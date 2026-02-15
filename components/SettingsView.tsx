@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { View, Category, TransactionType } from '../types';
+import { View, Category, TransactionType, AppData } from '../types';
 import { Settings, Key, Database, Palette, Shield, Download, Upload, Trash2, Plus, X, Monitor, Moon, Sun, Lock } from 'lucide-react';
 
 interface SettingsViewProps {
-  data: any;
+  data: AppData;
   actions: any;
   privacyMode: boolean;
   setPrivacyMode: (v: boolean) => void;
