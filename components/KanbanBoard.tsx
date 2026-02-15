@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, KanbanCard, Transaction, TransactionType } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2 } from 'lucide-react';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles } from 'lucide-react';
 
 interface KanbanBoardProps {
   columns: KanbanColumn[];
@@ -17,6 +17,57 @@ const COLORS = [
     { label: 'Roxo', value: 'purple', bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-800', text: 'text-purple-700 dark:text-purple-300' },
     { label: 'Rosa', value: 'rose', bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-200 dark:border-rose-800', text: 'text-rose-700 dark:text-rose-300' },
     { label: 'Amarelo', value: 'yellow', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300' },
+];
+
+const COLUMN_THEMES = [
+    { // Index 0: Indigo (Ideias)
+        wrapper: 'bg-indigo-50/80 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800',
+        header: 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800',
+        title: 'text-indigo-900 dark:text-indigo-100',
+        count: 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200',
+        button: 'text-indigo-600 hover:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-900/30',
+        addButtonBg: 'bg-indigo-600 hover:bg-indigo-700'
+    },
+    { // Index 1: Cyan (Pesquisa)
+        wrapper: 'bg-cyan-50/80 dark:bg-cyan-900/10 border-cyan-200 dark:border-cyan-800',
+        header: 'bg-cyan-100 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-800',
+        title: 'text-cyan-900 dark:text-cyan-100',
+        count: 'bg-cyan-200 dark:bg-cyan-800 text-cyan-700 dark:text-cyan-200',
+        button: 'text-cyan-600 hover:bg-cyan-100 dark:text-cyan-300 dark:hover:bg-cyan-900/30',
+        addButtonBg: 'bg-cyan-600 hover:bg-cyan-700'
+    },
+    { // Index 2: Amber (Prioridade)
+        wrapper: 'bg-amber-50/80 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800',
+        header: 'bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800',
+        title: 'text-amber-900 dark:text-amber-100',
+        count: 'bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-200',
+        button: 'text-amber-600 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/30',
+        addButtonBg: 'bg-amber-600 hover:bg-amber-700'
+    },
+    { // Index 3: Emerald (Concluído)
+        wrapper: 'bg-emerald-50/80 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800',
+        header: 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800',
+        title: 'text-emerald-900 dark:text-emerald-100',
+        count: 'bg-emerald-200 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-200',
+        button: 'text-emerald-600 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/30',
+        addButtonBg: 'bg-emerald-600 hover:bg-emerald-700'
+    },
+    { // Index 4: Purple (Extra)
+        wrapper: 'bg-purple-50/80 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800',
+        header: 'bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800',
+        title: 'text-purple-900 dark:text-purple-100',
+        count: 'bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200',
+        button: 'text-purple-600 hover:bg-purple-100 dark:text-purple-300 dark:hover:bg-purple-900/30',
+        addButtonBg: 'bg-purple-600 hover:bg-purple-700'
+    },
+    { // Index 5: Rose (Extra)
+        wrapper: 'bg-rose-50/80 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800',
+        header: 'bg-rose-100 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800',
+        title: 'text-rose-900 dark:text-rose-100',
+        count: 'bg-rose-200 dark:bg-rose-800 text-rose-700 dark:text-rose-200',
+        button: 'text-rose-600 hover:bg-rose-100 dark:text-rose-300 dark:hover:bg-rose-900/30',
+        addButtonBg: 'bg-rose-600 hover:bg-rose-700'
+    }
 ];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn, onDeleteColumn, onAddTransaction, privacyMode }) => {
@@ -217,22 +268,28 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4 kanban-scroll">
           <div className="flex h-full gap-4 min-w-max px-2">
               
-              {sortedColumns.map(col => (
+              {sortedColumns.map((col, index) => {
+                  // Determine Theme
+                  let themeIndex = index % COLUMN_THEMES.length;
+                  if (col.isConclusion) themeIndex = 3; // Force Emerald for conclusion
+                  const theme = COLUMN_THEMES[themeIndex];
+
+                  return (
                   <div 
                       key={col.id} 
-                      className={`w-72 flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-sm transition-colors ${draggedCard && draggedCard.sourceColId !== col.id ? 'bg-indigo-50/30 border-indigo-200 border-dashed' : ''}`}
+                      className={`w-72 flex flex-col rounded-xl border backdrop-blur-sm transition-colors ${theme.wrapper} ${draggedCard && draggedCard.sourceColId !== col.id ? 'opacity-50 border-dashed' : 'shadow-sm'}`}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, col.id)}
                   >
                       {/* Column Header */}
-                      <div className={`p-3 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center group/header ${col.isConclusion ? 'bg-emerald-50 dark:bg-emerald-900/10 rounded-t-xl' : ''}`}>
+                      <div className={`p-3 border-b flex justify-between items-center group/header rounded-t-xl ${theme.header} ${theme.wrapper.split(' ')[2]}`}>
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                               {col.isConclusion && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
                               
                               {editingColumn?.id === col.id ? (
                                   <input 
                                       autoFocus
-                                      className="w-full bg-white dark:bg-slate-900 border border-indigo-500 rounded px-1 py-0.5 text-sm font-bold text-slate-800 dark:text-white outline-none"
+                                      className={`w-full bg-white dark:bg-slate-900 border rounded px-1 py-0.5 text-sm font-bold outline-none ${theme.title}`}
                                       value={editingColumn.title}
                                       onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
                                       onBlur={saveColumnTitle}
@@ -241,7 +298,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
                               ) : (
                                   <div className="flex items-center gap-2 overflow-hidden w-full">
                                       <h3 
-                                          className="font-bold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wide truncate cursor-pointer hover:text-indigo-600 transition-colors"
+                                          className={`font-bold text-sm uppercase tracking-wide truncate cursor-pointer transition-colors ${theme.title}`}
                                           onDoubleClick={() => startEditingColumn(col)}
                                           title="Duplo clique para renomear"
                                       >
@@ -257,7 +314,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
                               )}
 
                               {editingColumn?.id !== col.id && (
-                                <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${theme.count}`}>
                                     {col.cards.length}
                                 </span>
                               )}
@@ -308,7 +365,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
                       </div>
 
                       {/* Footer / Add Card */}
-                      <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 rounded-b-xl">
+                      <div className={`p-2 border-t rounded-b-xl bg-white/40 dark:bg-slate-900/20 ${theme.wrapper.split(' ')[2]}`}>
                           {addingCardToColumn === col.id ? (
                               <div className="space-y-2 p-1 animate-scale-in">
                                   <input 
@@ -338,20 +395,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
                                   </div>
                                   <div className="flex gap-2">
                                       <button onClick={() => setAddingCardToColumn(null)} className="flex-1 py-1 text-xs text-slate-500 bg-slate-200 rounded">Cancelar</button>
-                                      <button onClick={() => handleAddCard(col.id)} className="flex-1 py-1 text-xs text-white bg-indigo-600 rounded font-bold">Adicionar</button>
+                                      <button onClick={() => handleAddCard(col.id)} className={`flex-1 py-1 text-xs text-white rounded font-bold ${theme.addButtonBg}`}>Adicionar</button>
                                   </div>
                               </div>
                           ) : (
                               <button 
                                   onClick={() => setAddingCardToColumn(col.id)}
-                                  className="w-full py-2 flex items-center justify-center gap-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-sm font-medium"
+                                  className={`w-full py-2 flex items-center justify-center gap-1 rounded-lg transition-colors text-sm font-medium ${theme.button}`}
                               >
                                   <Plus className="w-4 h-4" /> Adicionar Card
                               </button>
                           )}
                       </div>
                   </div>
-              ))}
+              )})}
 
           </div>
       </div>
