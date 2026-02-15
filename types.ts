@@ -3,6 +3,15 @@ export type TransactionType = 'income' | 'expense';
 export type TransactionStatus = 'paid' | 'pending';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'pix' | 'direct_debit' | 'bank_transfer' | 'deposit';
 
+export interface Category {
+  id: string;
+  name: string;
+  type: TransactionType;
+  color: string; // 'blue', 'red', 'green', etc.
+  icon?: string;
+  isDefault?: boolean;
+}
+
 export interface Transaction {
   id: string;
   description: string;
@@ -115,6 +124,7 @@ export interface WealthProfile {
 
 export interface AppData {
   transactions: Transaction[];
+  categories: Category[]; // New field
   investments: Investment[];
   budgets: Budget[];
   debts: Debt[];
@@ -139,5 +149,6 @@ export enum View {
   SHOPPING_LIST = 'SHOPPING_LIST',
   WEALTH_PLANNER = 'WEALTH_PLANNER',
   KANBAN = 'KANBAN',
-  NOTES = 'NOTES'
+  NOTES = 'NOTES',
+  SETTINGS = 'SETTINGS'
 }

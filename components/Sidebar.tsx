@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Receipt, LineChart, Target, Calendar, Repeat, 
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
-  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote
+  HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote,
+  ArrowLeftRight, Layout, Settings
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -46,28 +47,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenKeyModal, onOpenDonateModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
 }) => {
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const handleNavClick = (view: View) => {
     onNavigate(view);
     setMobileMenuOpen(false);
   };
 
-  const NavItem = ({ view, icon: Icon, label, customClass = '' }: { view: View, icon: any, label: string, customClass?: string }) => (
+  const NavItem = ({ active, onClick, icon: Icon, label, customClass = '' }: { active: boolean, onClick: () => void, icon: any, label: string, customClass?: string }) => (
     <button
-      onClick={() => handleNavClick(view)}
+      onClick={onClick}
       className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium ${customClass} ${
-        currentView === view
+        active
           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20'
           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
     >
-      <Icon className={`w-5 h-5 ${currentView !== view && customClass ? 'text-purple-400 group-hover:text-white' : ''}`} />
+      <Icon className={`w-5 h-5 ${!active && customClass ? 'text-purple-400 group-hover:text-white' : ''}`} />
       <div className="flex-1 flex justify-between items-center">
           <span>{label}</span>
       </div>
     </button>
   );
+
+  // Group Logic Helpers to determine active state
+  const isMovementsActive = [View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
+  const isAssetsActive = [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView);
+  const isOrgActive = [View.KANBAN, View.NOTES, View.SHOPPING_LIST].includes(currentView);
 
   return (
     <nav 
@@ -118,31 +122,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col no-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col no-scrollbar space-y-1">
         
-        {/* Seção Destaque: Visão Geral */}
-        <div className="mb-6 space-y-1">
-            <p className="px-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Visão Geral</p>
-            <NavItem view={View.DASHBOARD} icon={LayoutDashboard} label="Dashboard" />
-            <NavItem view={View.TRANSACTIONS} icon={Receipt} label="Transações" />
-            <NavItem view={View.KANBAN} icon={Wallet} label="NEXO Flow" />
-            <NavItem view={View.CALENDAR} icon={Calendar} label="Agenda" />
-            <NavItem view={View.NOTES} icon={StickyNote} label="NEXO Notes" />
-        </div>
+        <p className="px-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 mt-2">Menu Principal</p>
+        
+        <NavItem 
+            active={currentView === View.DASHBOARD} 
+            onClick={() => handleNavClick(View.DASHBOARD)} 
+            icon={LayoutDashboard} 
+            label="Visão Geral" 
+        />
+        
+        <NavItem 
+            active={isMovementsActive} 
+            onClick={() => handleNavClick(View.TRANSACTIONS)} 
+            icon={ArrowLeftRight} 
+            label="Movimentações" 
+        />
+        
+        <NavItem 
+            active={isAssetsActive} 
+            onClick={() => handleNavClick(View.INVESTMENTS)} 
+            icon={LineChart} 
+            label="Patrimônio" 
+        />
+        
+        <NavItem 
+            active={isOrgActive} 
+            onClick={() => handleNavClick(View.KANBAN)} 
+            icon={Layout} 
+            label="Organização" 
+        />
 
-        {/* Seção Padrão: Gestão */}
-        <div className="space-y-1">
-            <p className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Gestão Financeira</p>
-            
-            <NavItem view={View.BUDGETS} icon={Target} label="Metas" />
-            <NavItem view={View.SUBSCRIPTIONS} icon={Repeat} label="Assinaturas" />
-            <NavItem view={View.INVESTMENTS} icon={LineChart} label="Investir" />
-            <NavItem view={View.DEBTS} icon={ShieldAlert} label="Limpa Nome" />
-            <NavItem view={View.SHOPPING_LIST} icon={ShoppingCart} label="Lista de Compras" />
-            <NavItem view={View.WEALTH_PLANNER} icon={Landmark} label="Planejamento" customClass="text-amber-400" />
-        </div>
-
-        {/* NEXO AI - Differentiated Section */}
+        {/* NEXO AI */}
         <div className="mt-6 pt-4 border-t border-slate-800">
              <button
               onClick={() => hasKey ? handleNavClick(View.AI_ASSISTANT) : onOpenKeyModal()}
@@ -177,76 +189,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
              </button>
          )}
 
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Configurações & Dados</p>
-        
-        <div className="grid grid-cols-4 gap-2">
-          {/* Row 1: Visual Preferences */}
+        {/* Simplified Footer Grid */}
+        <div className="flex justify-between items-center gap-2">
+          
+          <button
+            onClick={() => handleNavClick(View.SETTINGS)}
+            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.SETTINGS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            title="Configurações e Dados"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+
           <button
             onClick={toggleFullscreen}
-            className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
+            className="flex-1 flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
             title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
           >
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </button>
-          
-          <button
-            onClick={() => setPrivacyMode(!privacyMode)}
-            className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
-            title={privacyMode ? 'Mostrar Valores' : 'Ocultar Valores'}
-          >
-            {privacyMode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
-          
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
-            title={darkMode ? 'Modo Claro' : 'Modo Escuro'}
-          >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          
-          <button
-            onClick={onOpenKeyModal}
-            className={`flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${hasKey ? 'text-emerald-400 hover:bg-slate-800' : 'text-rose-400 hover:bg-slate-800 animate-pulse'}`}
-            title="Configurar Chave API"
-          >
-            <Key className="w-5 h-5" />
-          </button>
-
-          {/* Row 2: Data & Support */}
-          <button
-             onClick={onExportBackup}
-             className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition-all border border-slate-800 hover:border-slate-700"
-             title="Baixar Backup (Exportar)"
-          >
-             <HardDriveDownload className="w-5 h-5" />
-          </button>
-          
-          <label 
-             className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition-all border border-slate-800 hover:border-slate-700 cursor-pointer"
-             title="Restaurar Backup (Importar)"
-          >
-             <HardDriveUpload className="w-5 h-5" />
-             <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                accept=".json"
-                onChange={onImportBackup}
-             />
-          </label>
-
-          <button
-             onClick={onFactoryReset}
-             className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-rose-500 transition-all border border-slate-800 hover:border-slate-700"
-             title="Resetar App (Fábrica)"
-          >
-             <Trash2 className="w-5 h-5" />
-          </button>
 
           <button
             onClick={onOpenDonateModal}
-            className="flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-pink-500 transition-all border border-slate-800 hover:border-slate-700"
+            className="flex-1 flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-pink-500 transition-all border border-slate-800 hover:border-slate-700"
             title="Apoiar Projeto"
           >
             <Heart className="w-5 h-5" />
@@ -255,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Credits & Version */}
         <div className="pt-4 mt-3 border-t border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 font-mono">v2.4.0 Notes</p>
+            <p className="text-[10px] text-slate-500 font-mono">v2.6.0 Config</p>
             <a 
               href="https://www.linkedin.com/in/alemagnobr/" 
               target="_blank" 

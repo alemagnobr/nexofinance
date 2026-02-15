@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, Note } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, Note, Category } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -19,8 +19,23 @@ import {
 // --- LOCAL STORAGE (LEGACY / GUEST MODE) ---
 const BASE_STORAGE_KEY = 'finansmart_data_v2';
 
+const DEFAULT_CATEGORIES: Category[] = [
+    { id: 'cat_salario', name: 'Salário', type: 'income', color: 'emerald', isDefault: true },
+    { id: 'cat_renda_extra', name: 'Renda Extra', type: 'income', color: 'blue', isDefault: true },
+    { id: 'cat_investimentos_in', name: 'Investimentos', type: 'income', color: 'indigo', isDefault: true },
+    { id: 'cat_casa', name: 'Casa', type: 'expense', color: 'orange', isDefault: true },
+    { id: 'cat_mobilidade', name: 'Mobilidade', type: 'expense', color: 'blue', isDefault: true },
+    { id: 'cat_alimentos', name: 'Alimentos', type: 'expense', color: 'red', isDefault: true },
+    { id: 'cat_lazer', name: 'Lazer', type: 'expense', color: 'purple', isDefault: true },
+    { id: 'cat_saude', name: 'Saúde', type: 'expense', color: 'teal', isDefault: true },
+    { id: 'cat_educacao', name: 'Educação', type: 'expense', color: 'yellow', isDefault: true },
+    { id: 'cat_pets', name: 'Pets', type: 'expense', color: 'amber', isDefault: true },
+    { id: 'cat_outros', name: 'Outros', type: 'expense', color: 'slate', isDefault: true },
+];
+
 const DEFAULT_DATA: AppData = {
   transactions: [],
+  categories: DEFAULT_CATEGORIES,
   investments: [],
   budgets: [],
   debts: [],
@@ -54,6 +69,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.shoppingList) data.shoppingList = [];
     if (!data.kanbanColumns) data.kanbanColumns = [];
     if (!data.notes) data.notes = [];
+    if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
     if (!data.budgets) {
@@ -151,6 +167,14 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     const notes = snapshot.docs.map(doc => doc.data() as Note);
     onUpdate({ notes });
   });
+
+  const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
+      const categories = snapshot.docs.map(doc => doc.data() as Category);
+      // Se não houver categorias no banco, o hook useAppData deve lidar com o default
+      if (categories.length > 0) {
+          onUpdate({ categories });
+      }
+  });
   
   // Escuta documento do usuário para saldo e configurações
   const unsubUserDoc = onSnapshot(doc(db, 'users', uid), (doc) => {
@@ -175,6 +199,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubShopping();
     unsubKanban();
     unsubNotes();
+    unsubCategories();
     unsubUserDoc();
   };
 };
@@ -331,6 +356,22 @@ export const deleteNoteFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'notes', id));
 };
 
+// CATEGORIES
+export const addCategoryFire = async (uid: string, category: Category) => {
+    await setDoc(doc(db, 'users', uid, 'categories', category.id), category);
+};
+export const deleteCategoryFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'categories', id));
+};
+export const seedDefaultCategories = async (uid: string) => {
+    const batch = writeBatch(db);
+    DEFAULT_CATEGORIES.forEach(cat => {
+        const ref = doc(db, 'users', uid, 'categories', cat.id);
+        batch.set(ref, cat);
+    });
+    await batch.commit();
+};
+
 
 // BADGES & WEALTH PROFILE
 export const unlockBadgeFire = async (uid: string, badgeId: string, currentBadges: string[]) => {
@@ -386,6 +427,16 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     localData.notes.forEach(n => {
         const ref = doc(db, 'users', uid, 'notes', n.id);
         batch.set(ref, n);
+    });
+
+    // Migrating categories
+    const categoriesToMigrate = (localData.categories && localData.categories.length > 0) 
+        ? localData.categories 
+        : DEFAULT_CATEGORIES;
+    
+    categoriesToMigrate.forEach(c => {
+        const ref = doc(db, 'users', uid, 'categories', c.id);
+        batch.set(ref, c);
     });
 
     const userRef = doc(db, 'users', uid);

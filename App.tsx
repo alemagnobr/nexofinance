@@ -9,20 +9,16 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 
 import { Login } from './components/Login'; 
 import { Dashboard } from './components/Dashboard';
-import { TransactionList } from './components/TransactionList';
-import { InvestmentList } from './components/InvestmentList';
-import { BudgetList } from './components/BudgetList';
-import { SubscriptionManager } from './components/SubscriptionManager';
-import { FinancialCalendar } from './components/FinancialCalendar';
 import { AiAssistant } from './components/AiAssistant';
-import { DebtManager } from './components/DebtManager';
-import { ShoppingList } from './components/ShoppingList';
-import { WealthPlanner } from './components/WealthPlanner';
-import { KanbanBoard } from './components/KanbanBoard';
-import { Notes } from './components/Notes'; // New Import
 import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
 import { useAppData } from './hooks/useAppData';
+import { SettingsView } from './components/SettingsView';
+
+// New Wrapper Views
+import { MovementsView } from './components/MovementsView';
+import { AssetsView } from './components/AssetsView';
+import { OrganizationView } from './components/OrganizationView';
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -112,7 +108,7 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], notes: []
+            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], notes: [], categories: []
         });
     } else {
         await signOut(auth);
@@ -223,28 +219,10 @@ const App: React.FC = () => {
     setTimeout(() => setQuickActionSignal(Date.now()), 50);
   };
 
-  // Logic to finish shopping (Convert cart to expense)
-  const finishShopping = async (total: number, paymentMethod: string, category: string) => {
-     const transaction: Omit<Transaction, 'id'> = {
-         description: `Compra de Mercado (${new Date().toLocaleDateString()})`,
-         amount: total,
-         type: 'expense',
-         category: category,
-         date: new Date().toISOString().split('T')[0],
-         status: 'paid',
-         paymentMethod: paymentMethod as PaymentMethod,
-         isRecurring: false
-     };
-     await actions.addTransaction(transaction);
-     await actions.clearShoppingList();
-     alert("Compra finalizada! Despesa registrada com sucesso.");
-     setCurrentView(View.TRANSACTIONS);
-  };
-
-  // View Renderer
+  // View Renderer - Logic Updated for Grouped Views
   const renderContent = () => {
-    switch (currentView) {
-      case View.DASHBOARD:
+    // 1. Dashboard & AI are Top Level
+    if (currentView === View.DASHBOARD) {
         return (
             <Dashboard 
                 data={data} 
@@ -253,132 +231,77 @@ const App: React.FC = () => {
                 onNavigate={(view) => setCurrentView(view)}
             />
         );
-      case View.TRANSACTIONS:
-        return (
-          <TransactionList 
-            transactions={data.transactions}
-            budgets={data.budgets}
-            onAdd={actions.addTransaction}
-            onUpdate={actions.updateTransaction}
-            onDelete={actions.deleteTransaction}
-            onToggleStatus={actions.toggleTransactionStatus}
-            onNavigate={(view) => setCurrentView(view)}
-            privacyMode={privacyMode}
-            hasApiKey={hasKey}
-            quickActionSignal={quickActionSignal}
-          />
-        );
-      case View.INVESTMENTS:
-        return (
-          <InvestmentList 
-            investments={data.investments}
-            onAdd={actions.addInvestment}
-            onUpdate={actions.updateInvestment}
-            onDelete={actions.deleteInvestment}
-            onNavigate={(view) => setCurrentView(view)}
-            privacyMode={privacyMode}
-            hasApiKey={hasKey}
-            quickActionSignal={quickActionSignal}
-          />
-        );
-      case View.SHOPPING_LIST:
-        return (
-          <ShoppingList 
-             items={data.shoppingList || []}
-             onAdd={actions.addShoppingItem}
-             onUpdate={actions.updateShoppingItem}
-             onDelete={actions.deleteShoppingItem}
-             onClearList={actions.clearShoppingList}
-             onFinishShopping={finishShopping}
-             shoppingBudget={data.shoppingBudget}
-             onUpdateBudget={actions.setShoppingBudget}
-             hasApiKey={hasKey}
-             privacyMode={privacyMode}
-             quickActionSignal={quickActionSignal}
-          />
-        );
-      case View.BUDGETS:
-        return (
-          <BudgetList 
-            budgets={data.budgets || []} 
-            transactions={data.transactions}
-            investments={data.investments || []}
-            onAdd={actions.addBudget} 
-            onUpdate={actions.updateBudget}
-            onDelete={actions.deleteBudget}
-            onNavigate={(view) => setCurrentView(view)} 
-            privacyMode={privacyMode} 
-            quickActionSignal={quickActionSignal}
-          />
-        );
-      case View.SUBSCRIPTIONS:
-        return (
-          <SubscriptionManager 
-            transactions={data.transactions}
-            onUpdateTransaction={actions.updateTransaction}
-            onDeleteTransaction={actions.deleteTransaction}
-            privacyMode={privacyMode}
-          />
-        );
-      case View.CALENDAR:
-        return (
-          <FinancialCalendar 
-            transactions={data.transactions} 
-            budgets={data.budgets}
-            onAddTransaction={actions.addTransaction}
-            privacyMode={privacyMode} 
-          />
-        );
-      case View.DEBTS:
-        return (
-          <DebtManager 
-            debts={data.debts || []}
-            onAdd={actions.addDebt}
-            onUpdate={actions.updateDebt}
-            onDelete={actions.deleteDebt}
-            onAddTransaction={actions.addTransaction}
-            privacyMode={privacyMode}
-            quickActionSignal={quickActionSignal}
-          />
-        );
-      case View.AI_ASSISTANT:
-        return <AiAssistant data={data} privacyMode={privacyMode} />;
-      case View.WEALTH_PLANNER:
-        return (
-          <WealthPlanner 
-             data={data}
-             onSaveProfile={actions.saveWealthProfile}
-             privacyMode={privacyMode}
-             hasApiKey={hasKey}
-          />
-        );
-      case View.KANBAN:
-        return (
-          <KanbanBoard 
-             columns={data.kanbanColumns || []}
-             onSaveColumn={actions.saveKanbanColumn}
-             onDeleteColumn={actions.deleteKanbanColumn}
-             onAddTransaction={(t) => {
-                 actions.addTransaction(t);
-                 alert('Transação criada a partir do card!');
-                 setCurrentView(View.TRANSACTIONS);
-             }}
-             privacyMode={privacyMode}
-          />
-        );
-      case View.NOTES:
-        return (
-          <Notes 
-             notes={data.notes || []}
-             onAdd={actions.addNote}
-             onUpdate={actions.updateNote}
-             onDelete={actions.deleteNote}
-             privacyMode={privacyMode}
-          />
-        );
-      default:
-        return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} />;
     }
+    
+    if (currentView === View.AI_ASSISTANT) {
+        return <AiAssistant data={data} privacyMode={privacyMode} />;
+    }
+
+    if (currentView === View.SETTINGS) {
+        return (
+            <SettingsView 
+                data={data}
+                actions={actions}
+                privacyMode={privacyMode}
+                setPrivacyMode={setPrivacyMode}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                hasApiKey={hasKey}
+                onOpenKeyModal={() => setIsKeyModalOpen(true)}
+                onExportBackup={handleExportBackup}
+                onImportBackup={handleImportBackup}
+                onFactoryReset={handleFactoryReset}
+            />
+        );
+    }
+
+    // 2. Group: Movements (Transactions, Calendar, Subscriptions, Debts)
+    if ([View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)) {
+        return (
+            <MovementsView 
+                currentView={currentView}
+                onNavigate={setCurrentView}
+                data={data}
+                actions={actions}
+                privacyMode={privacyMode}
+                hasApiKey={hasKey}
+                quickActionSignal={quickActionSignal}
+            />
+        );
+    }
+
+    // 3. Group: Assets (Investments, Budgets, Wealth Planner)
+    if ([View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView)) {
+        return (
+            <AssetsView 
+                currentView={currentView}
+                onNavigate={setCurrentView}
+                data={data}
+                actions={actions}
+                privacyMode={privacyMode}
+                hasApiKey={hasKey}
+                quickActionSignal={quickActionSignal}
+            />
+        );
+    }
+
+    // 4. Group: Organization (Kanban, Notes, Shopping)
+    if ([View.KANBAN, View.NOTES, View.SHOPPING_LIST].includes(currentView)) {
+        return (
+            <OrganizationView 
+                currentView={currentView}
+                onNavigate={setCurrentView}
+                data={data}
+                actions={actions}
+                privacyMode={privacyMode}
+                hasApiKey={hasKey}
+                quickActionSignal={quickActionSignal}
+            />
+        );
+    }
+
+    // Fallback
+    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} />;
   };
 
   if (authLoading) {
@@ -454,60 +377,62 @@ const App: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto animate-fade-in">
-          {/* Quick Actions Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-             <button 
-                onClick={() => triggerQuickAction(View.TRANSACTIONS)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-blue-100 dark:border-blue-900/30 hover:border-blue-300 transition-all group"
-             >
-                <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600 dark:text-blue-400">
-                    <PlusCircle className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nova</p>
-                    <p className="font-bold text-slate-700 dark:text-white">Transação</p>
-                </div>
-             </button>
+          {/* Quick Actions Bar - Only visible on Dashboard usually, but keeping global for now as user likes it */}
+          {currentView === View.DASHBOARD && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <button 
+                    onClick={() => triggerQuickAction(View.TRANSACTIONS)}
+                    className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-blue-100 dark:border-blue-900/30 hover:border-blue-300 transition-all group"
+                >
+                    <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600 dark:text-blue-400">
+                        <PlusCircle className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Nova</p>
+                        <p className="font-bold text-slate-700 dark:text-white">Transação</p>
+                    </div>
+                </button>
 
-             <button 
-                onClick={() => triggerQuickAction(View.SHOPPING_LIST)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 transition-all group"
-             >
-                <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors text-emerald-600 dark:text-emerald-400">
-                    <ShoppingCart className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Calculadora</p>
-                    <p className="font-bold text-slate-700 dark:text-white">Mercado</p>
-                </div>
-             </button>
+                <button 
+                    onClick={() => triggerQuickAction(View.SHOPPING_LIST)}
+                    className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 transition-all group"
+                >
+                    <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors text-emerald-600 dark:text-emerald-400">
+                        <ShoppingCart className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Calculadora</p>
+                        <p className="font-bold text-slate-700 dark:text-white">Mercado</p>
+                    </div>
+                </button>
 
-             <button 
-                onClick={() => triggerQuickAction(View.DEBTS)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
-             >
-                <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
-                    <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Registrar</p>
-                    <p className="font-bold text-slate-700 dark:text-white">Dívida</p>
-                </div>
-             </button>
+                <button 
+                    onClick={() => triggerQuickAction(View.DEBTS)}
+                    className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
+                >
+                    <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
+                        <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Registrar</p>
+                        <p className="font-bold text-slate-700 dark:text-white">Dívida</p>
+                    </div>
+                </button>
 
-             <button 
-                onClick={() => triggerQuickAction(View.BUDGETS)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-pink-100 dark:border-pink-900/30 hover:border-pink-300 transition-all group"
-             >
-                <div className="bg-pink-100 dark:bg-pink-900/40 p-2.5 rounded-lg group-hover:bg-pink-600 group-hover:text-white transition-colors text-pink-600 dark:text-pink-400">
-                    <Target className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Definir</p>
-                    <p className="font-bold text-slate-700 dark:text-white">Meta/Limite</p>
-                </div>
-             </button>
-          </div>
+                <button 
+                    onClick={() => triggerQuickAction(View.BUDGETS)}
+                    className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-pink-100 dark:border-pink-900/30 hover:border-pink-300 transition-all group"
+                >
+                    <div className="bg-pink-100 dark:bg-pink-900/40 p-2.5 rounded-lg group-hover:bg-pink-600 group-hover:text-white transition-colors text-pink-600 dark:text-pink-400">
+                        <Target className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Definir</p>
+                        <p className="font-bold text-slate-700 dark:text-white">Meta/Limite</p>
+                    </div>
+                </button>
+            </div>
+          )}
 
           {renderContent()}
         </div>

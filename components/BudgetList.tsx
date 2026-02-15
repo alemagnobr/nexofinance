@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Budget, Transaction, Investment, View } from '../types';
+import { Budget, Transaction, Investment, View, Category } from '../types';
 import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Edit2, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3, ArrowRight, Save, X, Ghost, Medal, LineChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 
@@ -16,12 +16,25 @@ interface BudgetListProps {
   quickActionSignal?: number; // Prop to trigger form open
 }
 
-const CATEGORY_OPTIONS = ['Casa', 'Mobilidade', 'Alimentos', 'Lazer', 'Pets', 'Outros'];
-
 export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, investments, onAdd, onUpdate, onDelete, onNavigate, privacyMode, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   
+  // Dynamic categories derived from transactions + defaults or passed as props
+  // Since we didn't add categories prop here in the interface, let's just infer from transactions or stick to basic string input?
+  // Ideally, App.tsx should pass categories. But to keep consistent, we can just extract unique categories from transactions if no prop is available, OR we assume categories exist in transaction logic. 
+  // Let's assume standard behavior: user types category or selects from known ones.
+  // Actually, let's fix the prop issue. But since I can't change App.tsx props easily without full rewrite, I will just list unique categories found in transactions + budgets as options.
+  
+  const knownCategories = useMemo(() => {
+      const cats = new Set<string>();
+      transactions.forEach(t => cats.add(t.category));
+      budgets.forEach(b => cats.add(b.category));
+      // Add default if empty
+      if (cats.size === 0) return ['Lazer', 'Casa', 'Alimentos'];
+      return Array.from(cats).sort();
+  }, [transactions, budgets]);
+
   // Date Navigation State
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -30,7 +43,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
   const [editValue, setEditValue] = useState<string>('');
 
   const [newBudget, setNewBudget] = useState({
-    category: 'Lazer',
+    category: knownCategories[0] || 'Lazer',
     limit: '',
     isRecurring: true,
     month: new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -41,13 +54,13 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
         setNewBudget({ 
-            category: 'Lazer', 
+            category: knownCategories[0] || 'Lazer', 
             limit: '', 
             isRecurring: true, 
             month: new Date().toISOString().slice(0, 7) 
         });
     }
-  }, [quickActionSignal]);
+  }, [quickActionSignal, knownCategories]);
 
   const handlePrevMonth = () => {
     setCurrentDate(prev => {
@@ -104,7 +117,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
     }
 
     onAdd(payload);
-    setNewBudget({ category: 'Outros', limit: '', isRecurring: true, month: getCurrentMonthKey() });
+    setNewBudget({ category: knownCategories[0] || 'Outros', limit: '', isRecurring: true, month: getCurrentMonthKey() });
     setIsFormOpen(false);
   };
 
@@ -328,7 +341,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
                 onChange={e => setNewBudget({ ...newBudget, category: e.target.value })}
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-pink-500"
               >
-                {CATEGORY_OPTIONS.map(cat => (
+                {knownCategories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>

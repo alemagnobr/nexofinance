@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, Note } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, Note, Category } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -10,6 +10,7 @@ import {
   addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
   saveKanbanColumnFire, deleteKanbanColumnFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
+  addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire
 } from '../services/storageService';
 
@@ -23,7 +24,8 @@ const DEFAULT_DATA: AppData = {
     kanbanColumns: [],
     notes: [],
     unlockedBadges: [],
-    walletBalance: 0
+    walletBalance: 0,
+    categories: [] // Initial empty, loader fills it
 };
 
 export const useAppData = (user: User | null, isGuest: boolean) => {
@@ -342,6 +344,17 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, notes: prev.notes.filter(n => n.id !== id) }));
   };
 
+  // --- CATEGORY ACTIONS ---
+  const addCategory = async (cat: Category) => {
+      if (user) await addCategoryFire(user.uid, cat);
+      else setData(prev => ({ ...prev, categories: [...(prev.categories || []), cat] }));
+  };
+
+  const deleteCategory = async (id: string) => {
+      if (user) await deleteCategoryFire(user.uid, id);
+      else setData(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+  };
+
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
@@ -384,6 +397,8 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addNote,
         updateNote,
         deleteNote,
+        addCategory,
+        deleteCategory,
         unlockBadge,
         saveWealthProfile
     }

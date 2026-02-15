@@ -1,34 +1,22 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
   transactions: Transaction[];
   budgets: Budget[];
+  categories?: Category[]; // New prop
   onAdd: (t: Omit<Transaction, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (id: string) => void;
-  onNavigate: (view: View) => void; // New prop
+  onNavigate: (view: View) => void;
   privacyMode: boolean;
   hasApiKey: boolean;
   quickActionSignal?: number;
 }
-
-const CATEGORY_STYLES: Record<string, string> = {
-  'Casa': 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
-  'Mobilidade': 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-  'Alimentos': 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
-  'Lazer': 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
-  'Saúde': 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800',
-  'Educação': 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800',
-  'Pets': 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
-  'Salário': 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
-  'Investimentos': 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
-  'Outros': 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
-};
 
 const PAYMENT_LABELS: Record<string, string> = {
   'credit_card': 'Crédito',
@@ -65,17 +53,15 @@ const PaymentIcon = ({ method, className }: { method: string, className?: string
         case 'credit_card': return <CreditCard className={className} />;
         case 'debit_card': return <CreditCard className={className} />;
         case 'cash': return <Banknote className={className} />;
-        case 'pix': return <Smartphone className={className} />; // Represents digital/pix
+        case 'pix': return <Smartphone className={className} />;
         default: return <Landmark className={className} />;
     }
 };
 
-const EXPENSE_CATEGORIES = ['Casa', 'Mobilidade', 'Alimentos', 'Lazer', 'Saúde', 'Educação', 'Pets', 'Outros'];
-const INCOME_CATEGORIES = ['Salário', 'Renda Extra', 'Investimentos', 'Presente', 'Reembolso', 'Outros'];
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
@@ -118,6 +104,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     observation: ''
   });
 
+  // Dynamic Category Options based on Type
+  const currentCategoryOptions = useMemo(() => {
+      if (categories.length === 0) return ['Outros'];
+      return categories
+        .filter(c => c.type === newTransaction.type)
+        .map(c => c.name);
+  }, [categories, newTransaction.type]);
+
+  // Helper to get category style dynamically
+  const getCategoryStyle = (catName: string) => {
+      const cat = categories.find(c => c.name === catName);
+      const color = cat?.color || 'slate';
+      return `bg-${color}-100 text-${color}-700 border-${color}-200 dark:bg-${color}-900/30 dark:text-${color}-300 dark:border-${color}-800`;
+  };
+
   useEffect(() => {
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
@@ -147,10 +148,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           }
       }
   }, [useBusinessDay, businessDayOrdinal, newTransaction.category]); 
-
-  const currentCategoryOptions = useMemo(() => {
-    return newTransaction.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  }, [newTransaction.type]);
 
   const currentPaymentMethods = useMemo(() => {
     return newTransaction.type === 'income' ? INCOME_PAYMENT_METHODS : EXPENSE_PAYMENT_METHODS;
@@ -296,6 +293,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     if (!newTransaction.description) return;
     setLoadingAutoCat(true);
     const suggested = await suggestCategory(newTransaction.description);
+    // TODO: Update suggestCategory to use dynamic categories names if passed
+    // For now, checks if suggested is in current list
     const isValid = currentCategoryOptions.includes(suggested);
     setNewTransaction(prev => ({ ...prev, category: isValid ? suggested : 'Outros' }));
     setLoadingAutoCat(false);
@@ -303,9 +302,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as TransactionType;
-    const newCats = newType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    // Get valid categories for new type
+    const validCats = categories.filter(c => c.type === newType).map(c => c.name);
     const defaultMethod = newType === 'income' ? 'pix' : 'credit_card';
-    setNewTransaction(prev => ({ ...prev, type: newType, category: newCats[0], paymentMethod: defaultMethod as PaymentMethod }));
+    setNewTransaction(prev => ({ ...prev, type: newType, category: validCats[0] || 'Outros', paymentMethod: defaultMethod as PaymentMethod }));
   };
 
   const resetForm = () => {
@@ -531,7 +531,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                       className="p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                       <option value="all">Todas Categorias</option>
-                      {[...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES].map(c => <option key={c} value={c}>{c}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                   </select>
                   <select 
                       value={paymentFilter}
@@ -929,7 +929,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           
                                           <div className="flex justify-between items-center mt-1">
                                               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${CATEGORY_STYLES[t.category]?.replace('bg-', 'border-').split(' ')[2] || 'border-slate-200'}`}>
+                                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(t.category)}`}>
                                                       {t.category}
                                                   </span>
                                                   {t.isRecurring && (
@@ -989,7 +989,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
                                           {/* Category */}
                                           <div className="w-24 shrink-0">
-                                              <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${CATEGORY_STYLES[t.category]?.replace('bg-', 'border-').split(' ')[2] || 'border-slate-200'}`}>
+                                              <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${getCategoryStyle(t.category)}`}>
                                                   {t.category}
                                               </span>
                                           </div>
