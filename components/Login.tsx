@@ -79,6 +79,10 @@ export const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
     setAuthErrorDomain('');
     setLoading(true);
     const provider = new GoogleAuthProvider();
+    
+    // Add Calendar Scope
+    provider.addScope('https://www.googleapis.com/auth/calendar');
+    
     try {
       await signInWithPopup(auth, provider);
     } catch (err: any) {

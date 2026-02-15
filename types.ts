@@ -15,6 +15,7 @@ export interface Transaction {
   paymentMethod?: PaymentMethod;
   debtId?: string; // ID da dívida vinculada (se houver)
   observation?: string; // Notas opcionais do usuário
+  googleEventId?: string; // ID do evento no Google Calendar
 }
 
 export interface Investment {
