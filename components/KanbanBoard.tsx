@@ -146,23 +146,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
                   ...targetCol,
                   cards: [...targetCol.cards, card]
               });
-
-              // 3. TRIGGER TRANSACTION if Target is Conclusion
-              if (targetCol.isConclusion) {
-                  const confirmTrans = window.confirm(`Opa! Você moveu "${card.title}" para conclusão. Deseja registrar isso como uma despesa agora?`);
-                  if (confirmTrans) {
-                      onAddTransaction({
-                          description: card.title,
-                          amount: card.amount,
-                          type: 'expense',
-                          category: 'Outros', // User can change later
-                          date: new Date().toISOString().split('T')[0],
-                          status: 'paid',
-                          paymentMethod: 'credit_card', // Default
-                          isRecurring: false
-                      });
-                  }
-              }
           }
       }
       setDraggedCard(null);
