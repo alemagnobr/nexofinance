@@ -46,6 +46,47 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }
   }, [user, isGuest, data.transactions.length, data.walletBalance]);
 
+  // Processamento de Lançamento Automático (Auto Pay)
+  useEffect(() => {
+      if (user || isGuest) {
+          const processAutoPay = async () => {
+              // Obtém a data local no formato YYYY-MM-DD
+              const d = new Date();
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              const todayLocal = `${year}-${month}-${day}`;
+
+              const toPay = data.transactions.filter(t => 
+                  t.status === 'pending' && 
+                  t.autoPay && 
+                  t.date <= todayLocal
+              );
+
+              if (toPay.length > 0) {
+                  if (user) {
+                      for (const t of toPay) {
+                          await updateTransactionFire(user.uid, t.id, { status: 'paid' });
+                      }
+                  } else {
+                      setData(prev => ({
+                          ...prev,
+                          transactions: prev.transactions.map(t => 
+                              (t.status === 'pending' && t.autoPay && t.date <= todayLocal)
+                              ? { ...t, status: 'paid' }
+                              : t
+                          )
+                      }));
+                  }
+              }
+          };
+          
+          // Delay curto para garantir que os dados iniciais foram carregados
+          const timer = setTimeout(processAutoPay, 2000);
+          return () => clearTimeout(timer);
+      }
+  }, [user, isGuest, data.transactions]);
+
   // Processamento de Transações Recorrentes
   useEffect(() => {
     if (user || isGuest) {
@@ -69,7 +110,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
             recurringTemplates.forEach((template, description) => {
                 // CORREÇÃO: Verifica se a data de início da recorrência é futura em relação ao mês atual
-                // Se eu estou em Fevereiro, mas a conta começa em Março, não deve gerar nada agora.
                 const [tStartYear, tStartMonth] = template.date.split('-').map(Number);
                 
                 // Cria datas comparáveis (Dia 1 de cada mês para ignorar o dia específico)

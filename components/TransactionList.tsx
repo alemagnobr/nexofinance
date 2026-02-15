@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -113,6 +113,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     status: 'paid' as TransactionStatus,
     paymentMethod: 'credit_card' as PaymentMethod,
     isRecurring: false,
+    autoPay: false, // New
     installments: '',
     observation: ''
   });
@@ -145,7 +146,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
               setNewTransaction(prev => ({ ...prev, date: newDate }));
           }
       }
-  }, [useBusinessDay, businessDayOrdinal, newTransaction.category]); // Depend on category to trigger, but be careful with loops
+  }, [useBusinessDay, businessDayOrdinal, newTransaction.category]); 
 
   const currentCategoryOptions = useMemo(() => {
     return newTransaction.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
@@ -167,7 +168,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     const monthStr = today.toISOString().slice(0, 7);
 
     budgets.forEach(budget => {
-        // Find if this budget applies to current real month
         const isRelevant = (budget.isRecurring && !budgets.some(b => b.category === budget.category && b.month === monthStr && !b.isRecurring)) || budget.month === monthStr;
         
         if (!isRelevant) return;
@@ -191,7 +191,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   }, [budgets, transactions]);
 
   // --- DYNAMIC TOTALS (MONTHLY VIEW) ---
-  // Calculates totals based on CURRENT MONTH regardless of search/type filters
   const monthlyTotals = useMemo(() => {
       const currentMonthTransactions = transactions.filter(t => {
           const [year, month] = t.date.split('-');
@@ -310,7 +309,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const resetForm = () => {
-    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, installments: '', observation: '' });
+    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, autoPay: false, installments: '', observation: '' });
     setEditingId(null);
     setRecurrenceMode('monthly');
     setSelectedDays([]);
@@ -330,6 +329,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         status: t.status || 'paid', 
         paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), 
         isRecurring: t.isRecurring || false, 
+        autoPay: t.autoPay || false,
         installments: '',
         observation: t.observation || ''
     });
@@ -374,6 +374,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       status: newTransaction.status, 
       paymentMethod: newTransaction.paymentMethod, 
       isRecurring: newTransaction.isRecurring,
+      autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false, // Reset if changing to paid manually
       observation: finalObservation
     };
 
@@ -415,8 +416,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                      
                      // SPECIAL LOGIC: Business Days for Salary
                      if (useBusinessDay && newTransaction.category === 'Salário' && newTransaction.type === 'income') {
-                         // Calculate Nth business day for the target month (month is 0-indexed in JS Date, but our split gives 1-based)
-                         // (startMonth - 1) is current month index. + i adds months.
                          isoDate = getNthBusinessDay(startYear, (startMonth - 1) + i, businessOrdinal);
                      } else {
                          // Standard: Same calendar day
@@ -720,6 +719,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             <option value="pending">Pendente</option>
           </select>
 
+          {/* Auto Pay Checkbox - Only for pending */}
+          {newTransaction.status === 'pending' && (
+              <div className="flex items-center gap-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/30 animate-fade-in mt-1 md:col-span-2 md:mt-0">
+                  <input 
+                      type="checkbox" 
+                      id="autoPay"
+                      checked={newTransaction.autoPay || false}
+                      onChange={(e) => setNewTransaction({...newTransaction, autoPay: e.target.checked})}
+                      className="w-4 h-4 text-indigo-600 rounded"
+                  />
+                  <label htmlFor="autoPay" className="text-xs font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1 cursor-pointer flex-1">
+                      <Zap className="w-3 h-3" /> Lançamento Automático na Data?
+                  </label>
+              </div>
+          )}
+
           <select
             value={newTransaction.paymentMethod}
             onChange={e => setNewTransaction({ ...newTransaction, paymentMethod: e.target.value as PaymentMethod })}
@@ -923,6 +938,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                           Fixo
                                                       </span>
                                                   )}
+                                                  {t.status === 'pending' && t.autoPay && (
+                                                      <span className="flex items-center gap-0.5 text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" title="Lançamento Automático">
+                                                          <Zap className="w-3 h-3" /> Auto
+                                                      </span>
+                                                  )}
                                               </div>
                                           </div>
                                           
@@ -985,6 +1005,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   {t.isRecurring && (
                                                       <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Recorrência Infinita">
                                                           <Infinity className="w-3 h-3" /> Recorrente
+                                                      </span>
+                                                  )}
+                                                  {t.status === 'pending' && t.autoPay && (
+                                                      <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Lançamento Automático">
+                                                          <Zap className="w-3 h-3" /> Auto
                                                       </span>
                                                   )}
                                               </div>
