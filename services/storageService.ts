@@ -19,7 +19,7 @@ import {
 // --- LOCAL STORAGE (LEGACY / GUEST MODE) ---
 const BASE_STORAGE_KEY = 'finansmart_data_v2';
 
-const DEFAULT_CATEGORIES: Category[] = [
+export const DEFAULT_CATEGORIES: Category[] = [
     { id: 'cat_salario', name: 'Salário', type: 'income', color: 'emerald', isDefault: true },
     { id: 'cat_renda_extra', name: 'Renda Extra', type: 'income', color: 'blue', isDefault: true },
     { id: 'cat_investimentos_in', name: 'Investimentos', type: 'income', color: 'indigo', isDefault: true },
@@ -173,6 +173,9 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
       if (categories.length > 0) {
           onUpdate({ categories });
+      } else {
+          // Auto-seed default categories for new users
+          seedDefaultCategories(uid);
       }
   });
   

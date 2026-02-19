@@ -11,7 +11,8 @@ import {
   saveKanbanColumnFire, deleteKanbanColumnFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
   addCategoryFire, deleteCategoryFire,
-  unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire
+  unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
+  DEFAULT_CATEGORIES
 } from '../services/storageService';
 import { deleteCalendarEvent, updateCalendarEvent } from '../services/calendarService';
 
@@ -26,7 +27,7 @@ const DEFAULT_DATA: AppData = {
     notes: [],
     unlockedBadges: [],
     walletBalance: 0,
-    categories: [] // Initial empty, loader fills it
+    categories: DEFAULT_CATEGORIES // Initial defaults
 };
 
 export const useAppData = (user: User | null, isGuest: boolean) => {
