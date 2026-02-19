@@ -86,6 +86,12 @@ export interface KanbanColumn {
   order: number;
 }
 
+export interface KanbanBoard {
+  id: string;
+  title: string;
+  columns: KanbanColumn[];
+}
+
 // --- NOTES TYPES ---
 export interface Note {
   id: string;
@@ -130,7 +136,8 @@ export interface AppData {
   debts: Debt[];
   shoppingList: ShoppingItem[];
   shoppingBudget?: number; // Novo campo: Teto de gastos da ida ao mercado
-  kanbanColumns: KanbanColumn[]; // Novo campo: Colunas do Kanban
+  kanbanColumns: KanbanColumn[]; // Legacy: Mantido para migração se necessário
+  kanbanBoards: KanbanBoard[]; // Novo campo: Múltiplos Quadros
   notes: Note[]; // Novo campo: Notas
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;

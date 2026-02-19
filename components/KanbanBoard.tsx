@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { KanbanColumn, KanbanCard, Transaction, TransactionType } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles } from 'lucide-react';
+import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard } from '../types';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown } from 'lucide-react';
 
 interface KanbanBoardProps {
-  columns: KanbanColumn[];
-  onSaveColumn: (col: KanbanColumn) => void;
-  onDeleteColumn: (id: string) => void;
+  boards: IKanbanBoard[];
+  onSaveBoard: (board: IKanbanBoard) => void;
+  onDeleteBoard: (id: string) => void;
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
   privacyMode: boolean;
 }
@@ -70,7 +70,11 @@ const COLUMN_THEMES = [
     }
 ];
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn, onDeleteColumn, onAddTransaction, privacyMode }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, onDeleteBoard, onAddTransaction, privacyMode }) => {
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
+  const [newBoardTitle, setNewBoardTitle] = useState('');
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [addingCardToColumn, setAddingCardToColumn] = useState<string | null>(null);
   
@@ -85,31 +89,81 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
   // Drag State
   const [draggedCard, setDraggedCard] = useState<{ cardId: string, sourceColId: string } | null>(null);
 
-  // Initialize Default Columns if Empty
+  // Initialize Active Board
   useEffect(() => {
-      if (columns.length === 0) {
-          const defaultCols: KanbanColumn[] = [
-              { id: 'col-1', title: 'Ideias / Sonhos', order: 0, cards: [] },
-              { id: 'col-2', title: 'Pesquisando Preço', order: 1, cards: [] },
-              { id: 'col-3', title: 'Prioridade / Próxima', order: 2, cards: [] },
-              { id: 'col-4', title: 'Concluído / Pago', order: 3, isConclusion: true, cards: [] },
-          ];
-          defaultCols.forEach(c => onSaveColumn(c));
+      if (boards.length > 0 && !activeBoardId) {
+          setActiveBoardId(boards[0].id);
+      } else if (boards.length === 0 && !activeBoardId) {
+          // No boards exist, maybe prompt to create or create default?
+          // Let's create a default one if none exist
+          const defaultBoard: IKanbanBoard = {
+              id: crypto.randomUUID(),
+              title: 'Meu Projeto',
+              columns: [
+                  { id: 'col-1', title: 'Ideias / Sonhos', order: 0, cards: [] },
+                  { id: 'col-2', title: 'Pesquisando Preço', order: 1, cards: [] },
+                  { id: 'col-3', title: 'Prioridade / Próxima', order: 2, cards: [] },
+                  { id: 'col-4', title: 'Concluído / Pago', order: 3, isConclusion: true, cards: [] },
+              ]
+          };
+          onSaveBoard(defaultBoard);
+          setActiveBoardId(defaultBoard.id);
       }
-  }, [columns.length]); // Only run if empty length changes (initial load)
+  }, [boards, activeBoardId]);
+
+  const activeBoard = boards.find(b => b.id === activeBoardId);
+
+  const handleCreateBoard = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newBoardTitle.trim()) return;
+
+      const newBoard: IKanbanBoard = {
+          id: crypto.randomUUID(),
+          title: newBoardTitle,
+          columns: [
+              { id: crypto.randomUUID(), title: 'A Fazer', order: 0, cards: [] },
+              { id: crypto.randomUUID(), title: 'Em Andamento', order: 1, cards: [] },
+              { id: crypto.randomUUID(), title: 'Concluído', order: 2, isConclusion: true, cards: [] },
+          ]
+      };
+      onSaveBoard(newBoard);
+      setActiveBoardId(newBoard.id);
+      setNewBoardTitle('');
+      setIsCreatingBoard(false);
+  };
+
+  const handleDeleteBoard = () => {
+      if (!activeBoardId) return;
+      if (confirm('Tem certeza que deseja excluir este quadro?')) {
+          onDeleteBoard(activeBoardId);
+          setActiveBoardId(null); // Will trigger useEffect to select another
+      }
+  };
+
+  // --- COLUMN ACTIONS (Proxy to Board Save) ---
+
+  const saveColumns = (newColumns: KanbanColumn[]) => {
+      if (!activeBoard) return;
+      onSaveBoard({ ...activeBoard, columns: newColumns });
+  };
 
   const handleAddColumn = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newColumnTitle.trim()) return;
+      if (!newColumnTitle.trim() || !activeBoard) return;
       
       const newCol: KanbanColumn = {
           id: crypto.randomUUID(),
           title: newColumnTitle,
-          order: columns.length,
+          order: activeBoard.columns.length,
           cards: []
       };
-      onSaveColumn(newCol);
+      saveColumns([...activeBoard.columns, newCol]);
       setNewColumnTitle('');
+  };
+
+  const onDeleteColumn = (colId: string) => {
+      if (!activeBoard) return;
+      saveColumns(activeBoard.columns.filter(c => c.id !== colId));
   };
 
   const startEditingColumn = (col: KanbanColumn) => {
@@ -117,16 +171,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
   };
 
   const saveColumnTitle = () => {
-      if (!editingColumn) return;
-      const col = columns.find(c => c.id === editingColumn.id);
-      if (col && editingColumn.title.trim()) {
-          onSaveColumn({ ...col, title: editingColumn.title });
-      }
+      if (!editingColumn || !activeBoard) return;
+      const newCols = activeBoard.columns.map(c => 
+          c.id === editingColumn.id ? { ...c, title: editingColumn.title } : c
+      );
+      saveColumns(newCols);
       setEditingColumn(null);
   };
 
   const handleAddCard = (columnId: string) => {
-      const col = columns.find(c => c.id === columnId);
+      if (!activeBoard) return;
+      const col = activeBoard.columns.find(c => c.id === columnId);
       if (!col) return;
 
       const newCard: KanbanCard = {
@@ -136,10 +191,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
           color: newCardColor
       };
 
-      onSaveColumn({
-          ...col,
-          cards: [...col.cards, newCard]
-      });
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { ...c, cards: [...c.cards, newCard] } : c
+      );
+      saveColumns(newCols);
 
       setAddingCardToColumn(null);
       setNewCardTitle('');
@@ -148,13 +203,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-      const col = columns.find(c => c.id === columnId);
-      if (!col) return;
-      
-      onSaveColumn({
-          ...col,
-          cards: col.cards.filter(c => c.id !== cardId)
-      });
+      if (!activeBoard) return;
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { ...c, cards: c.cards.filter(card => card.id !== cardId) } : c
+      );
+      saveColumns(newCols);
   };
 
   // --- DRAG AND DROP LOGIC ---
@@ -162,41 +215,39 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
   const handleDragStart = (e: React.DragEvent, cardId: string, sourceColId: string) => {
       setDraggedCard({ cardId, sourceColId });
       e.dataTransfer.effectAllowed = 'move';
-      // Hack to make ghost image look better (optional)
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-      e.preventDefault(); // Necessary to allow dropping
+      e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e: React.DragEvent, targetColId: string) => {
       e.preventDefault();
-      if (!draggedCard) return;
+      if (!draggedCard || !activeBoard) return;
 
       const { cardId, sourceColId } = draggedCard;
       if (sourceColId === targetColId) {
           setDraggedCard(null);
-          return; // Same column reordering not implemented for simplicity, but moving between cols works
+          return; 
       }
 
-      const sourceCol = columns.find(c => c.id === sourceColId);
-      const targetCol = columns.find(c => c.id === targetColId);
+      const sourceCol = activeBoard.columns.find(c => c.id === sourceColId);
+      const targetCol = activeBoard.columns.find(c => c.id === targetColId);
 
       if (sourceCol && targetCol) {
           const card = sourceCol.cards.find(c => c.id === cardId);
           if (card) {
-              // 1. Remove from Source
-              onSaveColumn({
-                  ...sourceCol,
-                  cards: sourceCol.cards.filter(c => c.id !== cardId)
+              const newCols = activeBoard.columns.map(c => {
+                  if (c.id === sourceColId) {
+                      return { ...c, cards: c.cards.filter(x => x.id !== cardId) };
+                  }
+                  if (c.id === targetColId) {
+                      return { ...c, cards: [...c.cards, card] };
+                  }
+                  return c;
               });
-
-              // 2. Add to Target
-              onSaveColumn({
-                  ...targetCol,
-                  cards: [...targetCol.cards, card]
-              });
+              saveColumns(newCols);
           }
       }
       setDraggedCard(null);
@@ -207,31 +258,96 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ columns, onSaveColumn,
     return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
-  const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
+  const sortedColumns = activeBoard ? [...activeBoard.columns].sort((a, b) => a.order - b.order) : [];
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col animate-fade-in">
-      <div className="flex justify-between items-center mb-4 shrink-0">
-          <div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                  <Wallet className="w-7 h-7 text-indigo-600" />
-                  NEXO Flow
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Organize seus planos: Sonhe, Pesquise, Priorize e Compre.</p>
+      
+      {/* HEADER: Title & Board Switcher */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 shrink-0">
+          <div className="flex items-center gap-3">
+              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg">
+                  <Layout className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              
+              <div className="relative group">
+                  <button 
+                      className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-white hover:text-indigo-600 transition-colors"
+                      onClick={() => setIsCreatingBoard(!isCreatingBoard)}
+                  >
+                      {activeBoard?.title || 'Carregando...'}
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </button>
+                  
+                  {/* Board Dropdown */}
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 hidden group-hover:block z-50 animate-fade-in-down">
+                      <p className="text-xs font-bold text-slate-400 uppercase px-2 py-1">Meus Quadros</p>
+                      {boards.map(b => (
+                          <button
+                              key={b.id}
+                              onClick={() => setActiveBoardId(b.id)}
+                              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${activeBoardId === b.id ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                          >
+                              {b.title}
+                              {activeBoardId === b.id && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                          </button>
+                      ))}
+                      <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+                      <button 
+                          onClick={() => setIsCreatingBoard(true)}
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2"
+                      >
+                          <Plus className="w-4 h-4" /> Novo Quadro
+                      </button>
+                  </div>
+              </div>
           </div>
-          
-          <form onSubmit={handleAddColumn} className="flex gap-2">
-              <input 
-                  type="text" 
-                  placeholder="Nova Coluna..." 
-                  value={newColumnTitle}
-                  onChange={(e) => setNewColumnTitle(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-              />
-              <button type="submit" className="bg-slate-800 dark:bg-slate-700 text-white px-3 py-2 rounded-lg hover:bg-slate-900 transition-colors">
-                  <Plus className="w-5 h-5" />
-              </button>
-          </form>
+
+          <div className="flex items-center gap-2 w-full md:w-auto">
+              {isCreatingBoard ? (
+                  <form onSubmit={handleCreateBoard} className="flex gap-2 w-full md:w-auto animate-fade-in">
+                      <input 
+                          autoFocus
+                          type="text" 
+                          placeholder="Nome do Projeto..." 
+                          value={newBoardTitle}
+                          onChange={(e) => setNewBoardTitle(e.target.value)}
+                          className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-48"
+                      />
+                      <button type="submit" className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap text-sm font-bold">
+                          Criar
+                      </button>
+                      <button type="button" onClick={() => setIsCreatingBoard(false)} className="bg-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-300 transition-colors">
+                          <X className="w-4 h-4" />
+                      </button>
+                  </form>
+              ) : (
+                  <>
+                      <form onSubmit={handleAddColumn} className="flex gap-2 flex-1 md:flex-none">
+                          <input 
+                              type="text" 
+                              placeholder="Nova Coluna..." 
+                              value={newColumnTitle}
+                              onChange={(e) => setNewColumnTitle(e.target.value)}
+                              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-40"
+                          />
+                          <button type="submit" className="bg-slate-800 dark:bg-slate-700 text-white px-3 py-2 rounded-lg hover:bg-slate-900 transition-colors">
+                              <Plus className="w-5 h-5" />
+                          </button>
+                      </form>
+                      
+                      {activeBoardId && (
+                          <button 
+                              onClick={handleDeleteBoard}
+                              className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                              title="Excluir Quadro Atual"
+                          >
+                              <Trash2 className="w-5 h-5" />
+                          </button>
+                      )}
+                  </>
+              )}
+          </div>
       </div>
 
       {/* Custom Styles for Scrollbar Visibility */}

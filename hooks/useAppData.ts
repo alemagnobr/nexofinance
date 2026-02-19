@@ -1,14 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, Note, Category } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
   addBudgetFire, deleteBudgetFire, updateBudgetFire,
   addDebtFire, updateDebtFire, deleteDebtFire,
   addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
-  saveKanbanColumnFire, deleteKanbanColumnFire,
+  saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
@@ -24,6 +24,7 @@ const DEFAULT_DATA: AppData = {
     shoppingList: [],
     shoppingBudget: 0,
     kanbanColumns: [],
+    kanbanBoards: [],
     notes: [],
     unlockedBadges: [],
     walletBalance: 0,
@@ -333,7 +334,25 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   // --- KANBAN ACTIONS ---
+  const saveKanbanBoard = async (board: KanbanBoard) => {
+      if (user) await saveKanbanBoardFire(user.uid, board);
+      else setData(prev => {
+          const exists = prev.kanbanBoards.some(b => b.id === board.id);
+          if (exists) {
+              return { ...prev, kanbanBoards: prev.kanbanBoards.map(b => b.id === board.id ? board : b) };
+          }
+          return { ...prev, kanbanBoards: [...prev.kanbanBoards, board] };
+      });
+  };
+
+  const deleteKanbanBoard = async (id: string) => {
+      if (user) await deleteKanbanBoardFire(user.uid, id);
+      else setData(prev => ({ ...prev, kanbanBoards: prev.kanbanBoards.filter(b => b.id !== id) }));
+  };
+
+  // Legacy support for single column actions (optional, or redirect to board logic)
   const saveKanbanColumn = async (column: KanbanColumn) => {
+      // This is now deprecated in favor of board-level saving, but kept for compatibility if needed
       if (user) await saveKanbanColumnFire(user.uid, column);
       else setData(prev => {
           const exists = prev.kanbanColumns.some(c => c.id === column.id);
@@ -416,6 +435,8 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         setShoppingBudget,
         saveKanbanColumn,
         deleteKanbanColumn,
+        saveKanbanBoard,
+        deleteKanbanBoard,
         addNote,
         updateNote,
         deleteNote,

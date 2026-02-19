@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, Note, Category } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -42,6 +42,7 @@ const DEFAULT_DATA: AppData = {
   shoppingList: [],
   shoppingBudget: 0,
   kanbanColumns: [],
+  kanbanBoards: [],
   notes: [],
   unlockedBadges: [],
   walletBalance: 0
@@ -68,6 +69,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.debts) data.debts = [];
     if (!data.shoppingList) data.shoppingList = [];
     if (!data.kanbanColumns) data.kanbanColumns = [];
+    if (!data.kanbanBoards) data.kanbanBoards = [];
     if (!data.notes) data.notes = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
@@ -163,6 +165,11 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ kanbanColumns });
   });
 
+  const unsubKanbanBoards = onSnapshot(collection(db, 'users', uid, 'kanban_boards'), (snapshot) => {
+      const kanbanBoards = snapshot.docs.map(doc => doc.data() as KanbanBoard);
+      onUpdate({ kanbanBoards });
+  });
+
   const unsubNotes = onSnapshot(query(collection(db, 'users', uid, 'notes'), orderBy('date', 'desc')), (snapshot) => {
     const notes = snapshot.docs.map(doc => doc.data() as Note);
     onUpdate({ notes });
@@ -201,6 +208,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubDebts();
     unsubShopping();
     unsubKanban();
+    unsubKanbanBoards();
     unsubNotes();
     unsubCategories();
     unsubUserDoc();
@@ -346,6 +354,14 @@ export const saveKanbanColumnFire = async (uid: string, column: KanbanColumn) =>
 };
 export const deleteKanbanColumnFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'kanban_columns', id));
+};
+
+// KANBAN BOARDS (NEW SYSTEM)
+export const saveKanbanBoardFire = async (uid: string, board: KanbanBoard) => {
+    await setDoc(doc(db, 'users', uid, 'kanban_boards', board.id), board);
+};
+export const deleteKanbanBoardFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'kanban_boards', id));
 };
 
 // NOTES

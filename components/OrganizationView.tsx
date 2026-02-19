@@ -76,9 +76,9 @@ export const OrganizationView: React.FC<OrganizationViewProps> = ({
       <div className="animate-fade-in bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl">
         {currentView === View.KANBAN && (
           <KanbanBoard 
-             columns={data.kanbanColumns || []}
-             onSaveColumn={actions.saveKanbanColumn}
-             onDeleteColumn={actions.deleteKanbanColumn}
+             boards={data.kanbanBoards || []}
+             onSaveBoard={actions.saveKanbanBoard}
+             onDeleteBoard={actions.deleteKanbanBoard}
              onAddTransaction={(t) => {
                  actions.addTransaction(t);
                  alert('Transação criada a partir do card!');
