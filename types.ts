@@ -71,11 +71,33 @@ export interface ShoppingItem {
 }
 
 // --- KANBAN TYPES ---
+export interface KanbanTag {
+  id: string;
+  name: string;
+  color: string; // 'blue' | 'green' | 'yellow' | 'purple' | 'rose' | 'slate'
+}
+
+export interface KanbanComment {
+  id: string;
+  text: string;
+  createdAt: string; // ISO Date
+}
+
+export interface KanbanAttachment {
+  id: string;
+  name: string;
+  url: string;
+}
+
 export interface KanbanCard {
   id: string;
   title: string;
   amount: number;
-  color: string; // 'blue' | 'green' | 'yellow' | 'purple' | 'rose'
+  color: string; // Main card color (border)
+  tags?: KanbanTag[]; // New field for labels
+  dueDate?: string; // ISO Date
+  comments?: KanbanComment[];
+  attachments?: KanbanAttachment[];
 }
 
 export interface KanbanColumn {

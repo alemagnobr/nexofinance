@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown } from 'lucide-react';
+import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard, KanbanTag, KanbanComment, KanbanAttachment } from '../types';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink } from 'lucide-react';
 
 interface KanbanBoardProps {
   boards: IKanbanBoard[];
@@ -17,6 +17,14 @@ const COLORS = [
     { label: 'Roxo', value: 'purple', bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-200 dark:border-purple-800', text: 'text-purple-700 dark:text-purple-300' },
     { label: 'Rosa', value: 'rose', bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-200 dark:border-rose-800', text: 'text-rose-700 dark:text-rose-300' },
     { label: 'Amarelo', value: 'yellow', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-200 dark:border-amber-800', text: 'text-amber-700 dark:text-amber-300' },
+    { label: 'Cinza', value: 'slate', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-200 dark:border-slate-700', text: 'text-slate-700 dark:text-slate-300' },
+];
+
+const AVAILABLE_TAGS: KanbanTag[] = [
+    { id: 'tag-progress', name: 'Em andamento', color: 'blue' },
+    { id: 'tag-done', name: 'Concluído', color: 'green' },
+    { id: 'tag-pending', name: 'Pendente', color: 'slate' },
+    { id: 'tag-urgent', name: 'Urgente', color: 'rose' },
 ];
 
 const COLUMN_THEMES = [
@@ -86,6 +94,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
   // Edit Column Title State
   const [editingColumn, setEditingColumn] = useState<{ id: string, title: string } | null>(null);
 
+  // Edit Card Tags State
+  const [editingCardTags, setEditingCardTags] = useState<string | null>(null);
+
+  // Card Details State (Date/Comments/Attachments)
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
+  const [newAttachmentName, setNewAttachmentName] = useState('');
+
   // Drag State
   const [draggedCard, setDraggedCard] = useState<{ cardId: string, sourceColId: string } | null>(null);
 
@@ -100,10 +117,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
               id: crypto.randomUUID(),
               title: 'Meu Projeto',
               columns: [
-                  { id: 'col-1', title: 'Ideias / Sonhos', order: 0, cards: [] },
-                  { id: 'col-2', title: 'Pesquisando Preço', order: 1, cards: [] },
-                  { id: 'col-3', title: 'Prioridade / Próxima', order: 2, cards: [] },
-                  { id: 'col-4', title: 'Concluído / Pago', order: 3, isConclusion: true, cards: [] },
+                  { id: 'col-1', title: 'Backlog', order: 0, cards: [] },
+                  { id: 'col-2', title: 'Em andamento', order: 1, cards: [] },
+                  { id: 'col-3', title: 'Em revisão', order: 2, cards: [] },
+                  { id: 'col-4', title: 'Concluído', order: 3, isConclusion: true, cards: [] },
               ]
           };
           onSaveBoard(defaultBoard);
@@ -121,9 +138,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
           id: crypto.randomUUID(),
           title: newBoardTitle,
           columns: [
-              { id: crypto.randomUUID(), title: 'A Fazer', order: 0, cards: [] },
-              { id: crypto.randomUUID(), title: 'Em Andamento', order: 1, cards: [] },
-              { id: crypto.randomUUID(), title: 'Concluído', order: 2, isConclusion: true, cards: [] },
+              { id: crypto.randomUUID(), title: 'Backlog', order: 0, cards: [] },
+              { id: crypto.randomUUID(), title: 'Em andamento', order: 1, cards: [] },
+              { id: crypto.randomUUID(), title: 'Em revisão', order: 2, cards: [] },
+              { id: crypto.randomUUID(), title: 'Concluído', order: 3, isConclusion: true, cards: [] },
           ]
       };
       onSaveBoard(newBoard);
@@ -200,6 +218,105 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       setNewCardTitle('');
       setNewCardAmount('');
       setNewCardColor('blue');
+  };
+
+  const handleToggleTag = (columnId: string, cardId: string, tag: KanbanTag) => {
+      if (!activeBoard) return;
+      const col = activeBoard.columns.find(c => c.id === columnId);
+      if (!col) return;
+
+      const card = col.cards.find(c => c.id === cardId);
+      if (!card) return;
+
+      const currentTags = card.tags || [];
+      const hasTag = currentTags.some(t => t.id === tag.id);
+      
+      let newTags;
+      if (hasTag) {
+          newTags = currentTags.filter(t => t.id !== tag.id);
+      } else {
+          newTags = [...currentTags, tag];
+      }
+
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, tags: newTags } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleSetDueDate = (columnId: string, cardId: string, date: string) => {
+      if (!activeBoard) return;
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, dueDate: date } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleAddComment = (columnId: string, cardId: string) => {
+      if (!activeBoard || !newCommentText.trim()) return;
+      
+      const newComment: KanbanComment = {
+          id: crypto.randomUUID(),
+          text: newCommentText,
+          createdAt: new Date().toISOString()
+      };
+
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, comments: [...(x.comments || []), newComment] } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+      setNewCommentText('');
+  };
+
+  const handleDeleteComment = (columnId: string, cardId: string, commentId: string) => {
+      if (!activeBoard) return;
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, comments: (x.comments || []).filter(cm => cm.id !== commentId) } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleAddAttachment = (columnId: string, cardId: string) => {
+      if (!activeBoard || !newAttachmentUrl.trim()) return;
+      
+      const newAttachment: KanbanAttachment = {
+          id: crypto.randomUUID(),
+          url: newAttachmentUrl,
+          name: newAttachmentName || newAttachmentUrl
+      };
+
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, attachments: [...(x.attachments || []), newAttachment] } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+      setNewAttachmentUrl('');
+      setNewAttachmentName('');
+  };
+
+  const handleDeleteAttachment = (columnId: string, cardId: string, attachmentId: string) => {
+      if (!activeBoard) return;
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, attachments: (x.attachments || []).filter(at => at.id !== attachmentId) } : x) 
+          } : c
+      );
+      saveColumns(newCols);
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
@@ -454,6 +571,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
+                                      {/* Tags Display */}
+                                      {card.tags && card.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mb-2">
+                                              {card.tags.map(tag => {
+                                                  const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                                  return (
+                                                      <span key={tag.id} className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${tagColor.bg} ${tagColor.text}`}>
+                                                          {tag.name}
+                                                      </span>
+                                                  );
+                                              })}
+                                          </div>
+                                      )}
+
                                       <div className="flex justify-between items-start">
                                           <p className="font-semibold text-slate-800 dark:text-white text-sm">{card.title}</p>
                                           <button 
@@ -465,11 +596,190 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       </div>
                                       
                                       <div className="mt-2 flex justify-between items-center">
-                                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${colorTheme.bg} ${colorTheme.text}`}>
-                                              {card.amount > 0 ? formatValue(card.amount) : 'R$ -'}
-                                          </span>
-                                          <GripVertical className="w-3 h-3 text-slate-300" />
+                                          <div className="flex items-center gap-2">
+                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${colorTheme.bg} ${colorTheme.text}`}>
+                                                  {card.amount > 0 ? formatValue(card.amount) : 'R$ -'}
+                                              </span>
+                                              
+                                              <button 
+                                                  onClick={(e) => { e.stopPropagation(); setEditingCardTags(editingCardTags === card.id ? null : card.id); }}
+                                                  className={`p-1 rounded transition-colors ${editingCardTags === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                  title="Adicionar Etiqueta"
+                                              >
+                                                  <Tag className="w-3 h-3" />
+                                              </button>
+
+                                              <button 
+                                                  onClick={(e) => { e.stopPropagation(); setExpandedCardId(expandedCardId === card.id ? null : card.id); }}
+                                                  className={`p-1 rounded transition-colors ${expandedCardId === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                  title="Detalhes (Data e Comentários)"
+                                              >
+                                                  <MoreHorizontal className="w-3 h-3" />
+                                              </button>
+                                          </div>
+                                          
+                                          <div className="flex items-center gap-2">
+                                              {card.dueDate && (
+                                                  <div className={`flex items-center gap-1 text-[10px] font-medium ${new Date(card.dueDate) < new Date() ? 'text-rose-500' : 'text-slate-400'}`} title="Data de Vencimento">
+                                                      <Clock className="w-3 h-3" />
+                                                      {new Date(card.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                  </div>
+                                              )}
+                                              {card.comments && card.comments.length > 0 && (
+                                                  <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Comentários">
+                                                      <MessageSquare className="w-3 h-3" />
+                                                      {card.comments.length}
+                                                  </div>
+                                              )}
+                                              {card.attachments && card.attachments.length > 0 && (
+                                                  <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Anexos">
+                                                      <LinkIcon className="w-3 h-3" />
+                                                      {card.attachments.length}
+                                                  </div>
+                                              )}
+                                          </div>
                                       </div>
+
+                                      {/* Inline Tag Selector */}
+                                      {editingCardTags === card.id && (
+                                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in">
+                                              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Adicionar Etiqueta:</p>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                  {AVAILABLE_TAGS.map(tag => {
+                                                      const isSelected = card.tags?.some(t => t.id === tag.id);
+                                                      const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                                      return (
+                                                          <button
+                                                              key={tag.id}
+                                                              onClick={() => handleToggleTag(col.id, card.id, tag)}
+                                                              className={`text-[10px] px-2 py-1 rounded border transition-all flex items-center gap-1 ${isSelected ? `${tagColor.bg} ${tagColor.text} ${tagColor.border}` : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-300'}`}
+                                                          >
+                                                              {tag.name}
+                                                              {isSelected && <CheckCircle2 className="w-2.5 h-2.5" />}
+                                                          </button>
+                                                      );
+                                                  })}
+                                              </div>
+                                          </div>
+                                      )}
+
+                                      {/* Expanded Details (Date & Comments & Attachments) */}
+                                      {expandedCardId === card.id && (
+                                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in space-y-3">
+                                              
+                                              {/* Date Picker */}
+                                              <div>
+                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                      <Calendar className="w-3 h-3" /> Data de Vencimento
+                                                  </label>
+                                                  <input 
+                                                      type="date" 
+                                                      value={card.dueDate || ''}
+                                                      onChange={(e) => handleSetDueDate(col.id, card.id, e.target.value)}
+                                                      className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                                  />
+                                              </div>
+
+                                              {/* Attachments Section */}
+                                              <div>
+                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                      <LinkIcon className="w-3 h-3" /> Anexos ({card.attachments?.length || 0})
+                                                  </label>
+                                                  
+                                                  {/* Attachment List */}
+                                                  <div className="space-y-1 mb-2">
+                                                      {card.attachments?.map(att => (
+                                                          <div key={att.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-1.5 rounded text-xs group/att">
+                                                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1">
+                                                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                                  <span className="truncate">{att.name}</span>
+                                                              </a>
+                                                              <button 
+                                                                  onClick={() => handleDeleteAttachment(col.id, card.id, att.id)}
+                                                                  className="text-slate-300 hover:text-rose-500 opacity-0 group-hover/att:opacity-100 transition-opacity p-0.5"
+                                                              >
+                                                                  <X className="w-3 h-3" />
+                                                              </button>
+                                                          </div>
+                                                      ))}
+                                                  </div>
+
+                                                  {/* Add Attachment Inputs */}
+                                                  <div className="space-y-1">
+                                                      <input 
+                                                          type="text" 
+                                                          placeholder="Nome do arquivo (opcional)" 
+                                                          value={newAttachmentName}
+                                                          onChange={(e) => setNewAttachmentName(e.target.value)}
+                                                          className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                      />
+                                                      <div className="flex gap-1">
+                                                          <input 
+                                                              type="text" 
+                                                              placeholder="https://..." 
+                                                              value={newAttachmentUrl}
+                                                              onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                                                              className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                          />
+                                                          <button 
+                                                              onClick={() => handleAddAttachment(col.id, card.id)}
+                                                              disabled={!newAttachmentUrl.trim()}
+                                                              className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                          >
+                                                              <Plus className="w-3 h-3" />
+                                                          </button>
+                                                      </div>
+                                                  </div>
+                                              </div>
+
+                                              {/* Comments Section */}
+                                              <div>
+                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                      <MessageSquare className="w-3 h-3" /> Comentários ({card.comments?.length || 0})
+                                                  </label>
+                                                  
+                                                  {/* Comment List */}
+                                                  <div className="space-y-2 mb-2 max-h-32 overflow-y-auto">
+                                                      {card.comments?.map(comment => (
+                                                          <div key={comment.id} className="bg-slate-50 dark:bg-slate-800 p-2 rounded text-xs relative group/comment">
+                                                              <p className="text-slate-700 dark:text-slate-300 pr-4 break-words">{comment.text}</p>
+                                                              <span className="text-[9px] text-slate-400 mt-1 block">
+                                                                  {new Date(comment.createdAt).toLocaleString('pt-BR')}
+                                                              </span>
+                                                              <button 
+                                                                  onClick={() => handleDeleteComment(col.id, card.id, comment.id)}
+                                                                  className="absolute top-1 right-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                                                              >
+                                                                  <X className="w-3 h-3" />
+                                                              </button>
+                                                          </div>
+                                                      ))}
+                                                      {(!card.comments || card.comments.length === 0) && (
+                                                          <p className="text-xs text-slate-400 italic">Nenhum comentário ainda.</p>
+                                                      )}
+                                                  </div>
+
+                                                  {/* Add Comment Input */}
+                                                  <div className="flex gap-1">
+                                                      <input 
+                                                          type="text" 
+                                                          placeholder="Escreva um comentário..." 
+                                                          value={newCommentText}
+                                                          onChange={(e) => setNewCommentText(e.target.value)}
+                                                          onKeyDown={(e) => e.key === 'Enter' && handleAddComment(col.id, card.id)}
+                                                          className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                      />
+                                                      <button 
+                                                          onClick={() => handleAddComment(col.id, card.id)}
+                                                          disabled={!newCommentText.trim()}
+                                                          className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                      >
+                                                          <Send className="w-3 h-3" />
+                                                      </button>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )}
                                   </div>
                               );
                           })}
