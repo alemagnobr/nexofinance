@@ -263,91 +263,86 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col animate-fade-in">
       
-      {/* HEADER: Title & Board Switcher */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 shrink-0">
-          <div className="flex items-center gap-3">
-              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg">
-                  <Layout className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              
-              <div className="relative group">
-                  <button 
-                      className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-white hover:text-indigo-600 transition-colors"
-                      onClick={() => setIsCreatingBoard(!isCreatingBoard)}
-                  >
-                      {activeBoard?.title || 'Carregando...'}
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
-                  </button>
-                  
-                  {/* Board Dropdown */}
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-2 hidden group-hover:block z-50 animate-fade-in-down">
-                      <p className="text-xs font-bold text-slate-400 uppercase px-2 py-1">Meus Quadros</p>
-                      {boards.map(b => (
-                          <button
-                              key={b.id}
-                              onClick={() => setActiveBoardId(b.id)}
-                              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${activeBoardId === b.id ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                          >
-                              {b.title}
-                              {activeBoardId === b.id && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
-                          </button>
-                      ))}
-                      <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-                      <button 
-                          onClick={() => setIsCreatingBoard(true)}
-                          className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2"
-                      >
-                          <Plus className="w-4 h-4" /> Novo Quadro
-                      </button>
-                  </div>
-              </div>
+      {/* HEADER: Title & Global Actions */}
+      <div className="flex justify-between items-center mb-4 shrink-0">
+          <div>
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                  <Wallet className="w-7 h-7 text-indigo-600" />
+                  NEXO Flow
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Organize seus planos: Sonhe, Pesquise, Priorize e Compre.</p>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
-              {isCreatingBoard ? (
-                  <form onSubmit={handleCreateBoard} className="flex gap-2 w-full md:w-auto animate-fade-in">
-                      <input 
-                          autoFocus
-                          type="text" 
-                          placeholder="Nome do Projeto..." 
-                          value={newBoardTitle}
-                          onChange={(e) => setNewBoardTitle(e.target.value)}
-                          className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-48"
-                      />
-                      <button type="submit" className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors whitespace-nowrap text-sm font-bold">
-                          Criar
-                      </button>
-                      <button type="button" onClick={() => setIsCreatingBoard(false)} className="bg-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-300 transition-colors">
-                          <X className="w-4 h-4" />
-                      </button>
-                  </form>
-              ) : (
-                  <>
-                      <form onSubmit={handleAddColumn} className="flex gap-2 flex-1 md:flex-none">
-                          <input 
-                              type="text" 
-                              placeholder="Nova Coluna..." 
-                              value={newColumnTitle}
-                              onChange={(e) => setNewColumnTitle(e.target.value)}
-                              className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-40"
-                          />
-                          <button type="submit" className="bg-slate-800 dark:bg-slate-700 text-white px-3 py-2 rounded-lg hover:bg-slate-900 transition-colors">
-                              <Plus className="w-5 h-5" />
-                          </button>
-                      </form>
-                      
-                      {activeBoardId && (
-                          <button 
-                              onClick={handleDeleteBoard}
-                              className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                              title="Excluir Quadro Atual"
-                          >
-                              <Trash2 className="w-5 h-5" />
-                          </button>
-                      )}
-                  </>
-              )}
-          </div>
+          {activeBoardId && (
+              <button 
+                  onClick={handleDeleteBoard}
+                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                  title="Excluir Quadro Atual"
+              >
+                  <Trash2 className="w-5 h-5" />
+              </button>
+          )}
+      </div>
+
+      {/* TABS BAR: Projects */}
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2 kanban-scroll">
+          {boards.map(b => (
+              <button
+                  key={b.id}
+                  onClick={() => setActiveBoardId(b.id)}
+                  className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex items-center gap-2 ${
+                      activeBoardId === b.id
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20 scale-105'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                  }`}
+              >
+                  <Layout className="w-4 h-4" />
+                  {b.title}
+              </button>
+          ))}
+
+          {/* NEW BOARD BUTTON / FORM */}
+          {isCreatingBoard ? (
+              <form onSubmit={handleCreateBoard} className="flex items-center gap-2 animate-fade-in bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                  <input 
+                      autoFocus
+                      type="text" 
+                      placeholder="Nome do Projeto..." 
+                      value={newBoardTitle}
+                      onChange={(e) => setNewBoardTitle(e.target.value)}
+                      className="w-40 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                  <button type="submit" className="bg-indigo-600 text-white p-1.5 rounded-lg hover:bg-indigo-700 transition-colors">
+                      <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                  <button type="button" onClick={() => setIsCreatingBoard(false)} className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 p-1.5 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                      <X className="w-4 h-4" />
+                  </button>
+              </form>
+          ) : (
+              <button 
+                  onClick={() => setIsCreatingBoard(true)}
+                  className="px-3 py-2 rounded-xl font-bold text-sm whitespace-nowrap bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 transition-colors"
+              >
+                  <Plus className="w-4 h-4" /> Novo Quadro
+              </button>
+          )}
+      </div>
+
+      {/* TOOLBAR: Add Column */}
+      <div className="mb-4">
+          <form onSubmit={handleAddColumn} className="flex gap-2">
+              <input 
+                  type="text" 
+                  placeholder="Nova Coluna..." 
+                  value={newColumnTitle}
+                  onChange={(e) => setNewColumnTitle(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm w-full md:w-64 shadow-sm"
+              />
+              <button type="submit" className="bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-2 text-sm font-bold shadow-sm">
+                  <Plus className="w-4 h-4" /> Adicionar Coluna
+              </button>
+          </form>
       </div>
 
       {/* Custom Styles for Scrollbar Visibility */}
