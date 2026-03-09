@@ -20,6 +20,7 @@ const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'
 
 export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onAdd, onUpdate, onDelete, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formStep, setFormStep] = useState<'select' | 'form'>('select');
   
   // AI Consultant State
   const [aiAdvice, setAiAdvice] = useState<InvestmentAdviceResult | null>(null);
@@ -41,14 +42,16 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     investedAmount: '', // Novo campo: Custo
     targetAmount: '',
     type: 'Renda Fixa',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    assetCategory: 'market' as 'market' | 'fund'
   });
 
   // Effect to listen for Quick Action triggers
   useEffect(() => {
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
-        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0] });
+        setFormStep('select');
+        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     }
   }, [quickActionSignal]);
 
@@ -75,10 +78,12 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       investedAmount: investedVal,
       targetAmount: parseFloat(newInvest.targetAmount) || 0,
       type: newInvest.type,
-      date: newInvest.date
+      date: newInvest.date,
+      assetCategory: newInvest.assetCategory
     });
-    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0] });
+    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     setIsFormOpen(false);
+    setFormStep('select');
   };
 
   const handleContributionSubmit = (e: React.FormEvent) => {
@@ -175,11 +180,15 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                 Consultor IA {!hasApiKey && <span className="text-[10px] ml-1">(Req. Chave)</span>}
             </button>
             <button
-            onClick={() => setIsFormOpen(!isFormOpen)}
+            onClick={() => {
+                setIsFormOpen(!isFormOpen);
+                setFormStep('select');
+                setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
+            }}
             className="flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors shadow-sm text-sm font-medium"
             >
             <Plus className="w-4 h-4" />
-            Novo Ativo
+            Novo Investimento
             </button>
         </div>
       </div>
@@ -323,10 +332,50 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       )}
 
       {/* NEW ASSET FORM */}
-      {isFormOpen && (
+      {isFormOpen && formStep === 'select' && (
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 animate-fade-in-down">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">O que você deseja adicionar?</h3>
+                <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                    onClick={() => {
+                        setNewInvest({...newInvest, assetCategory: 'fund', type: 'Reserva de Emergência'});
+                        setFormStep('form');
+                    }}
+                    className="flex flex-col items-center text-center p-6 border-2 border-slate-100 dark:border-slate-700 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all group"
+                >
+                    <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <DollarSign className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-1">Caixinha / Fundo</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Poupança, CDB, Tesouro, Caixinhas. Focado em saldo e aportes.</p>
+                </button>
+                <button 
+                    onClick={() => {
+                        setNewInvest({...newInvest, assetCategory: 'market', type: 'Ações'});
+                        setFormStep('form');
+                    }}
+                    className="flex flex-col items-center text-center p-6 border-2 border-slate-100 dark:border-slate-700 rounded-xl hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all group"
+                >
+                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <TrendingUp className="w-6 h-6" />
+                    </div>
+                    <h4 className="font-bold text-slate-800 dark:text-white mb-1">Ativo de Mercado</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Ações, FIIs, Criptomoedas. Focado em preço de compra e cotação.</p>
+                </button>
+            </div>
+        </div>
+      )}
+
+      {isFormOpen && formStep === 'form' && (
         <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
-           <div className="col-span-1 md:col-span-2">
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">Adicionar Novo Ativo</h3>
+           <div className="col-span-1 md:col-span-2 flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
+                {newInvest.assetCategory === 'fund' ? 'Adicionar Nova Caixinha/Fundo' : 'Adicionar Novo Ativo de Mercado'}
+            </h3>
+            <button type="button" onClick={() => setFormStep('select')} className="text-xs text-indigo-600 hover:underline">Voltar</button>
           </div>
           
           <div className="md:col-span-2">
@@ -334,35 +383,62 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
               <input
                 required
                 type="text"
-                placeholder="Ex: CDB Banco X, PETR4"
+                placeholder={newInvest.assetCategory === 'fund' ? "Ex: Caixinha Itaú - Reserva" : "Ex: PETR4, Bitcoin"}
                 value={newInvest.name}
                 onChange={e => setNewInvest({ ...newInvest, name: e.target.value })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
               />
           </div>
           
-          <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Valor Atual (Mercado)</label>
-              <input
-                required
-                type="number"
-                placeholder="R$"
-                value={newInvest.amount}
-                onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
-              />
-          </div>
-
-          <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Valor Investido (Custo)</label>
-              <input
-                type="number"
-                placeholder="Igual ao atual se vazio"
-                value={newInvest.investedAmount}
-                onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-          </div>
+          {newInvest.assetCategory === 'fund' ? (
+              <>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Total Depositado (Aportes)</label>
+                      <input
+                        type="number"
+                        placeholder="R$ (Opcional)"
+                        value={newInvest.investedAmount}
+                        onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Saldo Atual</label>
+                      <input
+                        required
+                        type="number"
+                        placeholder="R$"
+                        value={newInvest.amount}
+                        onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+                      />
+                  </div>
+              </>
+          ) : (
+              <>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Valor Atual (Mercado)</label>
+                      <input
+                        required
+                        type="number"
+                        placeholder="R$"
+                        value={newInvest.amount}
+                        onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+                      />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Valor Investido (Custo)</label>
+                      <input
+                        type="number"
+                        placeholder="Igual ao atual se vazio"
+                        value={newInvest.investedAmount}
+                        onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                  </div>
+              </>
+          )}
 
           <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Objetivo Final (Meta)</label>
@@ -382,25 +458,38 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                 onChange={e => setNewInvest({ ...newInvest, type: e.target.value })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
               >
-                <option value="Renda Fixa">Renda Fixa</option>
-                <option value="Ações">Ações</option>
-                <option value="FIIs">FIIs</option>
-                <option value="Cripto">Criptomoedas</option>
-                <option value="Reserva">Reserva de Emergência</option>
-                <option value="Outros">Outros</option>
+                {newInvest.assetCategory === 'fund' ? (
+                    <>
+                        <option value="Reserva de Emergência">Reserva de Emergência</option>
+                        <option value="Renda Fixa">Renda Fixa (CDB, Tesouro, LCI)</option>
+                        <option value="Fundos">Fundos de Investimento</option>
+                        <option value="Poupança">Poupança</option>
+                        <option value="Outros">Outros</option>
+                    </>
+                ) : (
+                    <>
+                        <option value="Ações">Ações</option>
+                        <option value="FIIs">FIIs</option>
+                        <option value="Cripto">Criptomoedas</option>
+                        <option value="BDRs">BDRs / Exterior</option>
+                        <option value="Outros">Outros</option>
+                    </>
+                )}
               </select>
           </div>
 
-          <div className="md:col-span-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">Data da Compra</label>
-              <input
-                required
-                type="date"
-                value={newInvest.date}
-                onChange={e => setNewInvest({ ...newInvest, date: e.target.value })}
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
-              />
-          </div>
+          {newInvest.assetCategory === 'market' && (
+              <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Data da Compra</label>
+                  <input
+                    required
+                    type="date"
+                    value={newInvest.date}
+                    onChange={e => setNewInvest({ ...newInvest, date: e.target.value })}
+                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
+                  />
+              </div>
+          )}
 
            <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-2">
             <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">Cancelar</button>

@@ -36,6 +36,7 @@ export interface Investment {
   targetAmount: number;
   type: string;
   date: string;
+  assetCategory?: 'market' | 'fund';
 }
 
 export interface Budget {
