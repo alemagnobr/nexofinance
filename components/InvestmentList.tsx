@@ -36,6 +36,10 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPriceValue, setEditingPriceValue] = useState('');
 
+  // State for inline editing (Target Amount)
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
+  const [editingTargetValue, setEditingTargetValue] = useState('');
+
   const [newInvest, setNewInvest] = useState({
     name: '',
     amount: '',
@@ -79,7 +83,8 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       targetAmount: parseFloat(newInvest.targetAmount) || 0,
       type: newInvest.type,
       date: newInvest.date,
-      assetCategory: newInvest.assetCategory
+      assetCategory: newInvest.assetCategory,
+      lastContribution: investedVal
     });
     setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     setIsFormOpen(false);
@@ -99,7 +104,8 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
         
         onUpdate(contributionId, {
             amount: investment.amount + addedValue,
-            investedAmount: currentCost + addedValue
+            investedAmount: currentCost + addedValue,
+            lastContribution: addedValue
         });
       }
     }
@@ -114,6 +120,14 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
           onUpdate(id, { amount: val });
       }
       setEditingPriceId(null);
+  };
+
+  const handleSaveTargetEdit = (id: string) => {
+      const val = parseFloat(editingTargetValue);
+      if (!isNaN(val) && val >= 0) {
+          onUpdate(id, { targetAmount: val });
+      }
+      setEditingTargetId(null);
   };
 
   const handleConsultAi = async () => {
@@ -607,7 +621,11 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                         )}
 
                         <div className="text-xs text-slate-400 mt-1">
-                            Investido: {formatValue(cost)}
+                            {inv.assetCategory === 'fund' ? (
+                                `Último investimento: ${formatValue(inv.lastContribution || cost)}`
+                            ) : (
+                                `Investido: ${formatValue(cost)}`
+                            )}
                         </div>
                     </div>
                     
@@ -636,7 +654,26 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                     <div className="flex-1">
                         <div className="flex justify-between items-end mb-1">
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
-                                <Target className="w-3 h-3" /> Meta: {formatValue(inv.targetAmount)}
+                                <Target className="w-3 h-3" /> Meta: 
+                                {editingTargetId === inv.id ? (
+                                    <input 
+                                        autoFocus
+                                        type="number"
+                                        className="w-20 p-0.5 text-[10px] border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
+                                        value={editingTargetValue}
+                                        onChange={(e) => setEditingTargetValue(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveTargetEdit(inv.id)}
+                                        onBlur={() => handleSaveTargetEdit(inv.id)}
+                                    />
+                                ) : (
+                                    <span 
+                                        className="cursor-pointer hover:text-indigo-500 border-b border-dashed border-transparent hover:border-indigo-400 transition-all"
+                                        onClick={() => { setEditingTargetId(inv.id); setEditingTargetValue(inv.targetAmount.toString()); }}
+                                        title="Clique para alterar a meta"
+                                    >
+                                        {formatValue(inv.targetAmount)}
+                                    </span>
+                                )}
                             </span>
                             <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{percentage.toFixed(0)}%</span>
                         </div>
@@ -651,11 +688,26 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                 ) : (
                     <div className="mt-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                        <button 
-                          onClick={() => setIsFormOpen(true)} 
+                          onClick={() => { setEditingTargetId(inv.id); setEditingTargetValue(''); }} 
                           className="text-[10px] text-slate-400 hover:text-indigo-500 flex items-center gap-1 uppercase font-bold tracking-wider"
                        >
                           <Compass className="w-3 h-3" /> Definir Meta
                        </button>
+                    </div>
+                )}
+                {/* Inline Edit for New Target when no target exists */}
+                {editingTargetId === inv.id && inv.targetAmount === 0 && (
+                    <div className="mt-2 flex justify-end items-center gap-2">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold">Nova Meta:</span>
+                        <input 
+                            autoFocus
+                            type="number"
+                            className="w-24 p-1 text-sm border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
+                            value={editingTargetValue}
+                            onChange={(e) => setEditingTargetValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveTargetEdit(inv.id)}
+                            onBlur={() => handleSaveTargetEdit(inv.id)}
+                        />
                     </div>
                 )}
               </div>
