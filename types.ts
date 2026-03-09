@@ -28,6 +28,13 @@ export interface Transaction {
   autoPay?: boolean; // Lançamento automático na data
 }
 
+export interface InvestmentHistory {
+  id: string;
+  date: string;
+  amount: number;
+  type: 'contribution' | 'withdrawal' | 'yield';
+}
+
 export interface Investment {
   id: string;
   name: string;
@@ -38,6 +45,8 @@ export interface Investment {
   date: string;
   assetCategory?: 'market' | 'fund';
   lastContribution?: number; // Valor do último aporte/investimento (adicionado para caixinhas)
+  lastContributionDate?: string; // Data do último aporte
+  history?: InvestmentHistory[];
 }
 
 export interface Budget {

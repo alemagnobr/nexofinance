@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Investment, View } from '../types';
-import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen, Compass, TrendingDown, PieChart as PieChartIcon, Edit2, Save } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen, Compass, TrendingDown, PieChart as PieChartIcon, Edit2, Save, History } from 'lucide-react';
 import { getInvestmentAdvice, InvestmentAdviceResult } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import ReactMarkdown from 'react-markdown';
 
 interface InvestmentListProps {
   investments: Investment[];
@@ -31,6 +32,10 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
   // State for adding contribution (Top-up)
   const [contributionId, setContributionId] = useState<string | null>(null);
   const [contributionAmount, setContributionAmount] = useState('');
+  const [contributionDate, setContributionDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // State for expanding history on card
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   // State for inline editing (Current Price)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -39,6 +44,10 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
   // State for inline editing (Target Amount)
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
   const [editingTargetValue, setEditingTargetValue] = useState('');
+
+  // State for full investment editing modal
+  const [editingFullInvestment, setEditingFullInvestment] = useState<Investment | null>(null);
+  const [editTab, setEditTab] = useState<'details' | 'history'>('details');
 
   const [newInvest, setNewInvest] = useState({
     name: '',
@@ -84,7 +93,13 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       type: newInvest.type,
       date: newInvest.date,
       assetCategory: newInvest.assetCategory,
-      lastContribution: investedVal
+      lastContribution: investedVal,
+      history: [{
+        id: crypto.randomUUID(),
+        date: newInvest.date,
+        amount: investedVal,
+        type: 'contribution'
+      }]
     });
     setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     setIsFormOpen(false);
@@ -102,15 +117,25 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
         // Aporte: Aumenta tanto o Valor de Mercado (amount) quanto o Custo (investedAmount)
         const currentCost = investment.investedAmount || investment.amount;
         
+        const newHistory = [...(investment.history || []), {
+          id: crypto.randomUUID(),
+          date: contributionDate,
+          amount: addedValue,
+          type: 'contribution' as const
+        }];
+
         onUpdate(contributionId, {
             amount: investment.amount + addedValue,
             investedAmount: currentCost + addedValue,
-            lastContribution: addedValue
+            lastContribution: addedValue,
+            lastContributionDate: contributionDate,
+            history: newHistory
         });
       }
     }
     setContributionId(null);
     setContributionAmount('');
+    setContributionDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleSavePriceEdit = (id: string) => {
@@ -291,7 +316,9 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                   ) : aiAdvice ? (
                       <div className="space-y-6">
                           <div className="prose prose-sm prose-purple dark:prose-invert max-w-none text-slate-700 dark:text-slate-300">
-                              <div dangerouslySetInnerHTML={{ __html: recommendations.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
+                              <div className="markdown-body">
+                                  <ReactMarkdown>{recommendations}</ReactMarkdown>
+                              </div>
                           </div>
                           
                           {technical && (
@@ -308,7 +335,9 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                               {showTechnical && (
                                 <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-fade-in">
                                    <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-400">
-                                      <div dangerouslySetInnerHTML={{ __html: technical.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
+                                      <div className="markdown-body">
+                                          <ReactMarkdown>{technical}</ReactMarkdown>
+                                      </div>
                                    </div>
                                 </div>
                               )}
@@ -541,6 +570,16 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                   />
                 </div>
               </div>
+              <div className="mb-6">
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">DATA DO APORTE</label>
+                <input
+                  required
+                  type="date"
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                  value={contributionDate}
+                  onChange={(e) => setContributionDate(e.target.value)}
+                />
+              </div>
               <button
                 type="submit"
                 className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
@@ -622,7 +661,10 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
 
                         <div className="text-xs text-slate-400 mt-1">
                             {inv.assetCategory === 'fund' ? (
-                                `Último investimento: ${formatValue(inv.lastContribution || cost)}`
+                                <span>
+                                  Último investimento: <span className="font-medium text-slate-600 dark:text-slate-300">{formatValue(inv.lastContribution || cost)}</span>
+                                  {inv.lastContributionDate && ` em ${new Date(inv.lastContributionDate).toLocaleDateString('pt-BR')}`}
+                                </span>
                             ) : (
                                 `Investido: ${formatValue(cost)}`
                             )}
@@ -638,6 +680,20 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                         <PlusCircle className="w-4 h-4" />
                       </button>
                       <button
+                        onClick={() => setExpandedHistoryId(expandedHistoryId === inv.id ? null : inv.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${expandedHistoryId === inv.id ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/30' : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'}`}
+                        title="Ver Histórico"
+                      >
+                        <History className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setEditingFullInvestment(inv)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                        title="Editar Detalhes"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => onDelete(inv.id)}
                         className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
                         title="Excluir"
@@ -647,6 +703,29 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                     </div>
                   </div>
                 </div>
+
+                {/* History Section (Expandable) */}
+                {expandedHistoryId === inv.id && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 animate-fade-in">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                      <History className="w-3 h-3" /> Histórico de Aportes
+                    </h4>
+                    {(!inv.history || inv.history.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic">Nenhum histórico registrado.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                        {inv.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(h => (
+                          <div key={h.id} className="flex justify-between items-center text-xs p-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/30 rounded">
+                            <span className="text-slate-500 dark:text-slate-400">{new Date(h.date).toLocaleDateString('pt-BR')}</span>
+                            <span className={`font-medium ${h.type === 'withdrawal' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                              {h.type === 'withdrawal' ? '-' : '+'} {formatValue(h.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Progress Section */}
                 {inv.targetAmount > 0 ? (
@@ -716,6 +795,201 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
           })
         )}
       </div>
+
+      {/* FULL EDIT MODAL */}
+      {editingFullInvestment && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-indigo-500" />
+                Editar Investimento
+              </h3>
+              <button onClick={() => setEditingFullInvestment(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="flex border-b border-slate-100 dark:border-slate-700">
+              <button 
+                className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${editTab === 'details' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                onClick={() => setEditTab('details')}
+              >
+                Detalhes
+              </button>
+              <button 
+                className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${editTab === 'history' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                onClick={() => setEditTab('history')}
+              >
+                Histórico
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1">
+              {editTab === 'details' ? (
+                <form id="edit-investment-form" onSubmit={(e) => {
+                  e.preventDefault();
+                  onUpdate(editingFullInvestment.id, {
+                    name: editingFullInvestment.name,
+                    type: editingFullInvestment.type,
+                    assetCategory: editingFullInvestment.assetCategory,
+                    amount: editingFullInvestment.amount,
+                    investedAmount: editingFullInvestment.investedAmount,
+                    targetAmount: editingFullInvestment.targetAmount,
+                    date: editingFullInvestment.date
+                  });
+                  setEditingFullInvestment(null);
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label>
+                    <input 
+                      type="text" required
+                      className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                      value={editingFullInvestment.name}
+                      onChange={e => setEditingFullInvestment({...editingFullInvestment, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+                      <select 
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.assetCategory || 'market'}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, assetCategory: e.target.value as 'market'|'fund'})}
+                      >
+                        <option value="market">Mercado (Ações, FIIs)</option>
+                        <option value="fund">Caixinha / Fundo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
+                      <input 
+                        type="text" required
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.type}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, type: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Atual (R$)</label>
+                      <input 
+                        type="number" step="0.01" required
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.amount}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, amount: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Investido (R$)</label>
+                      <input 
+                        type="number" step="0.01" required
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.investedAmount || editingFullInvestment.amount}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, investedAmount: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Meta (R$)</label>
+                      <input 
+                        type="number" step="0.01"
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.targetAmount}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, targetAmount: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data Inicial</label>
+                      <input 
+                        type="date" required
+                        className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                        value={editingFullInvestment.date}
+                        onChange={e => setEditingFullInvestment({...editingFullInvestment, date: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-3">
+                  {(!editingFullInvestment.history || editingFullInvestment.history.length === 0) ? (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      <p className="text-sm">Nenhum histórico de aportes registrado.</p>
+                      <p className="text-xs mt-1">Os novos aportes aparecerão aqui.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {editingFullInvestment.history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(h => (
+                        <div key={h.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                              {h.type === 'contribution' ? 'Aporte' : h.type === 'withdrawal' ? 'Resgate' : 'Rendimento'}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {new Date(h.date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-bold ${h.type === 'withdrawal' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                              {h.type === 'withdrawal' ? '-' : '+'} {formatValue(h.amount)}
+                            </span>
+                            <button 
+                              onClick={() => {
+                                const newHistory = editingFullInvestment.history!.filter(item => item.id !== h.id);
+                                const newInvested = (editingFullInvestment.investedAmount || editingFullInvestment.amount) - (h.type === 'contribution' ? h.amount : 0);
+                                const newAmount = editingFullInvestment.amount - (h.type === 'contribution' ? h.amount : 0);
+                                
+                                const updatedInv = {
+                                  ...editingFullInvestment,
+                                  history: newHistory,
+                                  investedAmount: newInvested,
+                                  amount: newAmount
+                                };
+                                setEditingFullInvestment(updatedInv);
+                                onUpdate(updatedInv.id, {
+                                  history: newHistory,
+                                  investedAmount: newInvested,
+                                  amount: newAmount
+                                });
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors"
+                              title="Excluir aporte"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-2">
+              <button 
+                type="button" 
+                onClick={() => setEditingFullInvestment(null)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg font-medium transition-colors text-sm"
+              >
+                Cancelar
+              </button>
+              {editTab === 'details' && (
+                <button 
+                  type="submit"
+                  form="edit-investment-form"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors text-sm flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Salvar Alterações
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
