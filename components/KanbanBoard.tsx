@@ -627,7 +627,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       draggable
                                       onDragStart={(e) => handleDragStart(e, card.id, col.id)}
                                       onDragEnd={handleDragEnd}
-                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 ${colorTheme.border.replace('border', 'border-l')}`}
+                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
                                       {editingCard?.id === card.id ? (
