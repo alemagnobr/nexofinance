@@ -37,6 +37,7 @@ export interface Investment {
   type: string;
   date: string;
   assetCategory?: 'market' | 'fund';
+  lastContribution?: number; // Valor do último aporte/investimento (adicionado para caixinhas)
 }
 
 export interface Budget {
