@@ -667,11 +667,12 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                                     />
                                 ) : (
                                     <span 
-                                        className="cursor-pointer hover:text-indigo-500 border-b border-dashed border-transparent hover:border-indigo-400 transition-all"
+                                        className="cursor-pointer hover:text-indigo-500 border-b border-dashed border-transparent hover:border-indigo-400 transition-all flex items-center gap-1 group/meta"
                                         onClick={() => { setEditingTargetId(inv.id); setEditingTargetValue(inv.targetAmount.toString()); }}
                                         title="Clique para alterar a meta"
                                     >
                                         {formatValue(inv.targetAmount)}
+                                        <Edit2 className="w-3 h-3 opacity-40 group-hover/meta:opacity-100 transition-opacity" />
                                     </span>
                                 )}
                             </span>
