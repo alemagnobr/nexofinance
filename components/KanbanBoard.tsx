@@ -378,6 +378,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleDragEnd = (e: React.DragEvent) => {
+      setDraggedCard(null);
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -622,6 +626,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       key={card.id}
                                       draggable
                                       onDragStart={(e) => handleDragStart(e, card.id, col.id)}
+                                      onDragEnd={handleDragEnd}
                                       className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
@@ -738,6 +743,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                   </div>
                                               </div>
 
+                                              {/* Move to Column (Always Visible) */}
+                                              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600">
+                                                  <select 
+                                                      value={col.id}
+                                                      onChange={(e) => handleMoveCardFallback(col.id, e.target.value, card.id)}
+                                                      className="w-full text-[10px] p-1 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 outline-none focus:border-indigo-500 cursor-pointer"
+                                                  >
+                                                      {activeBoard?.columns.map(c => (
+                                                          <option key={c.id} value={c.id} disabled={c.id === col.id}>
+                                                              {c.id === col.id ? `Mover para...` : c.title}
+                                                          </option>
+                                                      ))}
+                                                  </select>
+                                              </div>
+
                                               {/* Inline Tag Selector */}
                                               {editingCardTags === card.id && (
                                                   <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in">
@@ -765,24 +785,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                               {expandedCardId === card.id && (
                                                   <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in space-y-3">
                                                       
-                                                      {/* Move to Column (Mobile Fallback) */}
-                                                      <div className="md:hidden">
-                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                              Mover Para
-                                                          </label>
-                                                          <select 
-                                                              value={col.id}
-                                                              onChange={(e) => handleMoveCardFallback(col.id, e.target.value, card.id)}
-                                                              className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
-                                                          >
-                                                              {activeBoard?.columns.map(c => (
-                                                                  <option key={c.id} value={c.id} disabled={c.id === col.id}>
-                                                                      {c.id === col.id ? `Atual: ${c.title}` : c.title}
-                                                                  </option>
-                                                              ))}
-                                                          </select>
-                                                      </div>
-
                                                       {/* Date Picker */}
                                                       <div>
                                                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
