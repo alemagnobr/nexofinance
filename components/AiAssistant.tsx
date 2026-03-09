@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { AppData, ChatMessage } from '../types';
 import { Send, Mic, Sparkles, Bot, User, StopCircle } from 'lucide-react';
 import { chatWithAdvisorStream } from '../services/geminiService';
-import ReactMarkdown from 'react-markdown';
 
 interface AiAssistantProps {
   data: AppData;
@@ -156,19 +155,13 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ data, privacyMode }) =
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-slate-200 dark:bg-slate-700' : 'bg-indigo-600'}`}>
                       {msg.role === 'user' ? <User className="w-5 h-5 text-slate-600 dark:text-slate-300" /> : <Bot className="w-5 h-5 text-white" />}
                   </div>
-                  <div className={`p-4 rounded-2xl shadow-sm text-sm leading-relaxed
+                  <div className={`p-4 rounded-2xl shadow-sm text-sm whitespace-pre-line leading-relaxed
                       ${msg.role === 'user' 
-                        ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-tr-none whitespace-pre-line' 
+                        ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-tr-none' 
                         : 'bg-indigo-600 text-white rounded-tl-none prose prose-invert max-w-none'
                       }`}
                   >
-                      {msg.role === 'user' ? (
-                          msg.content
-                      ) : (
-                          <div className="markdown-body">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          </div>
-                      )}
+                      {msg.content}
                       {isLoading && msg.content === '' && (
                          <span className="inline-flex gap-1">
                             <span className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce"></span>

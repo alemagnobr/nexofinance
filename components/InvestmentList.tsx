@@ -4,7 +4,6 @@ import { Investment, View } from '../types';
 import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen, Compass, TrendingDown, PieChart as PieChartIcon, Edit2, Save, History } from 'lucide-react';
 import { getInvestmentAdvice, InvestmentAdviceResult } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import ReactMarkdown from 'react-markdown';
 
 interface InvestmentListProps {
   investments: Investment[];
@@ -316,9 +315,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                   ) : aiAdvice ? (
                       <div className="space-y-6">
                           <div className="prose prose-sm prose-purple dark:prose-invert max-w-none text-slate-700 dark:text-slate-300">
-                              <div className="markdown-body">
-                                  <ReactMarkdown>{recommendations}</ReactMarkdown>
-                              </div>
+                              <div dangerouslySetInnerHTML={{ __html: recommendations.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
                           </div>
                           
                           {technical && (
@@ -335,9 +332,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                               {showTechnical && (
                                 <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-fade-in">
                                    <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-400">
-                                      <div className="markdown-body">
-                                          <ReactMarkdown>{technical}</ReactMarkdown>
-                                      </div>
+                                      <div dangerouslySetInnerHTML={{ __html: technical.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
                                    </div>
                                 </div>
                               )}
