@@ -108,9 +108,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
 
   // Drag State
   const [draggedCard, setDraggedCard] = useState<{ cardId: string, sourceColId: string } | null>(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   // Initialize Active Board
   useEffect(() => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      
       if (boards.length > 0 && !activeBoardId) {
           setActiveBoardId(boards[0].id);
       } else if (boards.length === 0 && !activeBoardId) {
@@ -624,10 +627,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                               return (
                                   <div 
                                       key={card.id}
-                                      draggable
+                                      draggable={!isTouchDevice}
                                       onDragStart={(e) => handleDragStart(e, card.id, col.id)}
                                       onDragEnd={handleDragEnd}
-                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] ${colorTheme.border.replace('border', 'border-l')}`}
+                                      onContextMenu={(e) => e.preventDefault()}
+                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : ''} hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
                                       {editingCard?.id === card.id ? (
