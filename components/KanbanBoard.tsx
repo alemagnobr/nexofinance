@@ -97,6 +97,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
   // Edit Card Tags State
   const [editingCardTags, setEditingCardTags] = useState<string | null>(null);
 
+  // Edit Card Details State (Title/Amount)
+  const [editingCard, setEditingCard] = useState<{ id: string, title: string, amount: string } | null>(null);
+
   // Card Details State (Date/Comments/Attachments)
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
@@ -327,6 +330,47 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       saveColumns(newCols);
   };
 
+  const handleSaveCardEdit = (columnId: string) => {
+      if (!activeBoard || !editingCard) return;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === editingCard.id ? { 
+                  ...x, 
+                  title: editingCard.title, 
+                  amount: parseFloat(editingCard.amount.replace(',', '.')) || 0 
+              } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+      setEditingCard(null);
+  };
+
+  const handleMoveCardFallback = (sourceColId: string, targetColId: string, cardId: string) => {
+      if (!activeBoard || sourceColId === targetColId) return;
+
+      const sourceCol = activeBoard.columns.find(c => c.id === sourceColId);
+      const targetCol = activeBoard.columns.find(c => c.id === targetColId);
+      if (!sourceCol || !targetCol) return;
+
+      const cardToMove = sourceCol.cards.find(c => c.id === cardId);
+      if (!cardToMove) return;
+
+      const newCols = activeBoard.columns.map(c => {
+          if (c.id === sourceColId) {
+              return { ...c, cards: c.cards.filter(card => card.id !== cardId) };
+          }
+          if (c.id === targetColId) {
+              return { ...c, cards: [...c.cards, cardToMove] };
+          }
+          return c;
+      });
+
+      saveColumns(newCols);
+      setExpandedCardId(null); // Close details after moving
+  };
+
   // --- DRAG AND DROP LOGIC ---
 
   const handleDragStart = (e: React.DragEvent, cardId: string, sourceColId: string) => {
@@ -534,24 +578,34 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       </h3>
                                       <button 
                                           onClick={() => startEditingColumn(col)}
-                                          className="opacity-0 group-hover/header:opacity-100 transition-opacity p-1 text-slate-400 hover:text-indigo-500"
+                                          className="opacity-100 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity p-1 text-slate-400 hover:text-indigo-500"
                                       >
                                           <Edit2 className="w-3 h-3" />
                                       </button>
                                   </div>
                               )}
 
-                              {editingColumn?.id !== col.id && (
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${theme.count}`}>
-                                    {col.cards.length}
-                                </span>
-                              )}
+                              {editingColumn?.id !== col.id && (() => {
+                                  const columnTotal = col.cards.reduce((sum, card) => sum + (card.amount || 0), 0);
+                                  return (
+                                      <div className="flex items-center gap-1 flex-shrink-0">
+                                          {columnTotal > 0 && (
+                                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.count}`}>
+                                                  {formatValue(columnTotal)}
+                                              </span>
+                                          )}
+                                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${theme.count}`} title="Quantidade de cards">
+                                              {col.cards.length}
+                                          </span>
+                                      </div>
+                                  );
+                              })()}
                           </div>
                           
                           {!col.isConclusion && (
                               <button 
                                   onClick={() => { if(confirm('Excluir coluna?')) onDeleteColumn(col.id) }} 
-                                  className="text-slate-400 hover:text-rose-500 ml-2"
+                                  className="text-slate-400 hover:text-rose-500 ml-2 opacity-100 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity"
                                   title="Excluir Coluna"
                               >
                                   <X className="w-4 h-4" />
@@ -571,214 +625,278 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md transition-all group relative border-l-4 ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
-                                      {/* Tags Display */}
-                                      {card.tags && card.tags.length > 0 && (
-                                          <div className="flex flex-wrap gap-1 mb-2">
-                                              {card.tags.map(tag => {
-                                                  const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
-                                                  return (
-                                                      <span key={tag.id} className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${tagColor.bg} ${tagColor.text}`}>
-                                                          {tag.name}
-                                                      </span>
-                                                  );
-                                              })}
-                                          </div>
-                                      )}
-
-                                      <div className="flex justify-between items-start">
-                                          <p className="font-semibold text-slate-800 dark:text-white text-sm">{card.title}</p>
-                                          <button 
-                                              onClick={() => handleDeleteCard(col.id, card.id)}
-                                              className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          >
-                                              <X className="w-3 h-3" />
-                                          </button>
-                                      </div>
-                                      
-                                      <div className="mt-2 flex justify-between items-center">
-                                          <div className="flex items-center gap-2">
-                                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${colorTheme.bg} ${colorTheme.text}`}>
-                                                  {card.amount > 0 ? formatValue(card.amount) : 'R$ -'}
-                                              </span>
-                                              
-                                              <button 
-                                                  onClick={(e) => { e.stopPropagation(); setEditingCardTags(editingCardTags === card.id ? null : card.id); }}
-                                                  className={`p-1 rounded transition-colors ${editingCardTags === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
-                                                  title="Adicionar Etiqueta"
-                                              >
-                                                  <Tag className="w-3 h-3" />
-                                              </button>
-
-                                              <button 
-                                                  onClick={(e) => { e.stopPropagation(); setExpandedCardId(expandedCardId === card.id ? null : card.id); }}
-                                                  className={`p-1 rounded transition-colors ${expandedCardId === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
-                                                  title="Detalhes (Data e Comentários)"
-                                              >
-                                                  <MoreHorizontal className="w-3 h-3" />
-                                              </button>
-                                          </div>
-                                          
-                                          <div className="flex items-center gap-2">
-                                              {card.dueDate && (
-                                                  <div className={`flex items-center gap-1 text-[10px] font-medium ${new Date(card.dueDate) < new Date() ? 'text-rose-500' : 'text-slate-400'}`} title="Data de Vencimento">
-                                                      <Clock className="w-3 h-3" />
-                                                      {new Date(card.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                                                  </div>
-                                              )}
-                                              {card.comments && card.comments.length > 0 && (
-                                                  <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Comentários">
-                                                      <MessageSquare className="w-3 h-3" />
-                                                      {card.comments.length}
-                                                  </div>
-                                              )}
-                                              {card.attachments && card.attachments.length > 0 && (
-                                                  <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Anexos">
-                                                      <LinkIcon className="w-3 h-3" />
-                                                      {card.attachments.length}
-                                                  </div>
-                                              )}
-                                          </div>
-                                      </div>
-
-                                      {/* Inline Tag Selector */}
-                                      {editingCardTags === card.id && (
-                                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in">
-                                              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Adicionar Etiqueta:</p>
-                                              <div className="flex flex-wrap gap-1.5">
-                                                  {AVAILABLE_TAGS.map(tag => {
-                                                      const isSelected = card.tags?.some(t => t.id === tag.id);
-                                                      const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
-                                                      return (
-                                                          <button
-                                                              key={tag.id}
-                                                              onClick={() => handleToggleTag(col.id, card.id, tag)}
-                                                              className={`text-[10px] px-2 py-1 rounded border transition-all flex items-center gap-1 ${isSelected ? `${tagColor.bg} ${tagColor.text} ${tagColor.border}` : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-300'}`}
-                                                          >
-                                                              {tag.name}
-                                                              {isSelected && <CheckCircle2 className="w-2.5 h-2.5" />}
-                                                          </button>
-                                                      );
-                                                  })}
+                                      {editingCard?.id === card.id ? (
+                                          <div className="space-y-2">
+                                              <input 
+                                                  autoFocus
+                                                  type="text" 
+                                                  value={editingCard.title}
+                                                  onChange={(e) => setEditingCard({ ...editingCard, title: e.target.value })}
+                                                  className="w-full text-sm p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                                  placeholder="Título"
+                                              />
+                                              <input 
+                                                  type="number" 
+                                                  value={editingCard.amount}
+                                                  onChange={(e) => setEditingCard({ ...editingCard, amount: e.target.value })}
+                                                  className="w-full text-sm p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                                  placeholder="Valor (R$)"
+                                              />
+                                              <div className="flex justify-end gap-2 mt-2">
+                                                  <button 
+                                                      onClick={() => setEditingCard(null)}
+                                                      className="text-xs px-2 py-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                  >
+                                                      Cancelar
+                                                  </button>
+                                                  <button 
+                                                      onClick={() => handleSaveCardEdit(col.id)}
+                                                      className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium"
+                                                  >
+                                                      Salvar
+                                                  </button>
                                               </div>
                                           </div>
-                                      )}
-
-                                      {/* Expanded Details (Date & Comments & Attachments) */}
-                                      {expandedCardId === card.id && (
-                                          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in space-y-3">
-                                              
-                                              {/* Date Picker */}
-                                              <div>
-                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                      <Calendar className="w-3 h-3" /> Data de Vencimento
-                                                  </label>
-                                                  <input 
-                                                      type="date" 
-                                                      value={card.dueDate || ''}
-                                                      onChange={(e) => handleSetDueDate(col.id, card.id, e.target.value)}
-                                                      className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
-                                                  />
-                                              </div>
-
-                                              {/* Attachments Section */}
-                                              <div>
-                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                      <LinkIcon className="w-3 h-3" /> Anexos ({card.attachments?.length || 0})
-                                                  </label>
-                                                  
-                                                  {/* Attachment List */}
-                                                  <div className="space-y-1 mb-2">
-                                                      {card.attachments?.map(att => (
-                                                          <div key={att.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-1.5 rounded text-xs group/att">
-                                                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1">
-                                                                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                                                                  <span className="truncate">{att.name}</span>
-                                                              </a>
-                                                              <button 
-                                                                  onClick={() => handleDeleteAttachment(col.id, card.id, att.id)}
-                                                                  className="text-slate-300 hover:text-rose-500 opacity-0 group-hover/att:opacity-100 transition-opacity p-0.5"
-                                                              >
-                                                                  <X className="w-3 h-3" />
-                                                              </button>
-                                                          </div>
-                                                      ))}
-                                                  </div>
-
-                                                  {/* Add Attachment Inputs */}
-                                                  <div className="space-y-1">
-                                                      <input 
-                                                          type="text" 
-                                                          placeholder="Nome do arquivo (opcional)" 
-                                                          value={newAttachmentName}
-                                                          onChange={(e) => setNewAttachmentName(e.target.value)}
-                                                          className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                      />
-                                                      <div className="flex gap-1">
-                                                          <input 
-                                                              type="text" 
-                                                              placeholder="https://..." 
-                                                              value={newAttachmentUrl}
-                                                              onChange={(e) => setNewAttachmentUrl(e.target.value)}
-                                                              className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                          />
-                                                          <button 
-                                                              onClick={() => handleAddAttachment(col.id, card.id)}
-                                                              disabled={!newAttachmentUrl.trim()}
-                                                              className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                          >
-                                                              <Plus className="w-3 h-3" />
-                                                          </button>
-                                                      </div>
-                                                  </div>
-                                              </div>
-
-                                              {/* Comments Section */}
-                                              <div>
-                                                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                      <MessageSquare className="w-3 h-3" /> Comentários ({card.comments?.length || 0})
-                                                  </label>
-                                                  
-                                                  {/* Comment List */}
-                                                  <div className="space-y-2 mb-2 max-h-32 overflow-y-auto">
-                                                      {card.comments?.map(comment => (
-                                                          <div key={comment.id} className="bg-slate-50 dark:bg-slate-800 p-2 rounded text-xs relative group/comment">
-                                                              <p className="text-slate-700 dark:text-slate-300 pr-4 break-words">{comment.text}</p>
-                                                              <span className="text-[9px] text-slate-400 mt-1 block">
-                                                                  {new Date(comment.createdAt).toLocaleString('pt-BR')}
+                                      ) : (
+                                          <>
+                                              {/* Tags Display */}
+                                              {card.tags && card.tags.length > 0 && (
+                                                  <div className="flex flex-wrap gap-1 mb-2">
+                                                      {card.tags.map(tag => {
+                                                          const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                                          return (
+                                                              <span key={tag.id} className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${tagColor.bg} ${tagColor.text}`}>
+                                                                  {tag.name}
                                                               </span>
-                                                              <button 
-                                                                  onClick={() => handleDeleteComment(col.id, card.id, comment.id)}
-                                                                  className="absolute top-1 right-1 text-slate-300 hover:text-rose-500 opacity-0 group-hover/comment:opacity-100 transition-opacity"
-                                                              >
-                                                                  <X className="w-3 h-3" />
-                                                              </button>
-                                                          </div>
-                                                      ))}
-                                                      {(!card.comments || card.comments.length === 0) && (
-                                                          <p className="text-xs text-slate-400 italic">Nenhum comentário ainda.</p>
-                                                      )}
+                                                          );
+                                                      })}
                                                   </div>
+                                              )}
 
-                                                  {/* Add Comment Input */}
-                                                  <div className="flex gap-1">
-                                                      <input 
-                                                          type="text" 
-                                                          placeholder="Escreva um comentário..." 
-                                                          value={newCommentText}
-                                                          onChange={(e) => setNewCommentText(e.target.value)}
-                                                          onKeyDown={(e) => e.key === 'Enter' && handleAddComment(col.id, card.id)}
-                                                          className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                      />
+                                              <div className="flex justify-between items-start">
+                                                  <p className="font-semibold text-slate-800 dark:text-white text-sm">{card.title}</p>
+                                                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                       <button 
-                                                          onClick={() => handleAddComment(col.id, card.id)}
-                                                          disabled={!newCommentText.trim()}
-                                                          className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                          onClick={() => setEditingCard({ id: card.id, title: card.title, amount: card.amount.toString() })}
+                                                          className="text-slate-400 hover:text-indigo-500 p-0.5"
+                                                          title="Editar Card"
                                                       >
-                                                          <Send className="w-3 h-3" />
+                                                          <Edit2 className="w-3 h-3" />
+                                                      </button>
+                                                      <button 
+                                                          onClick={() => handleDeleteCard(col.id, card.id)}
+                                                          className="text-slate-400 hover:text-rose-500 p-0.5"
+                                                          title="Excluir Card"
+                                                      >
+                                                          <X className="w-3 h-3" />
                                                       </button>
                                                   </div>
                                               </div>
-                                          </div>
+                                              
+                                              <div className="mt-2 flex justify-between items-center">
+                                                  <div className="flex items-center gap-2">
+                                                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${colorTheme.bg} ${colorTheme.text}`}>
+                                                          {card.amount > 0 ? formatValue(card.amount) : 'R$ -'}
+                                                      </span>
+                                                      
+                                                      <button 
+                                                          onClick={(e) => { e.stopPropagation(); setEditingCardTags(editingCardTags === card.id ? null : card.id); }}
+                                                          className={`p-1 rounded transition-colors ${editingCardTags === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                          title="Adicionar Etiqueta"
+                                                      >
+                                                          <Tag className="w-3 h-3" />
+                                                      </button>
+
+                                                      <button 
+                                                          onClick={(e) => { e.stopPropagation(); setExpandedCardId(expandedCardId === card.id ? null : card.id); }}
+                                                          className={`p-1 rounded transition-colors ${expandedCardId === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                          title="Detalhes (Data e Comentários)"
+                                                      >
+                                                          <MoreHorizontal className="w-3 h-3" />
+                                                      </button>
+                                                  </div>
+                                                  
+                                                  <div className="flex items-center gap-2">
+                                                      {card.dueDate && (
+                                                          <div className={`flex items-center gap-1 text-[10px] font-medium ${new Date(card.dueDate) < new Date() ? 'text-rose-500' : 'text-slate-400'}`} title="Data de Vencimento">
+                                                              <Clock className="w-3 h-3" />
+                                                              {new Date(card.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                                          </div>
+                                                      )}
+                                                      {card.comments && card.comments.length > 0 && (
+                                                          <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Comentários">
+                                                              <MessageSquare className="w-3 h-3" />
+                                                              {card.comments.length}
+                                                          </div>
+                                                      )}
+                                                      {card.attachments && card.attachments.length > 0 && (
+                                                          <div className="flex items-center gap-1 text-[10px] font-medium text-slate-400" title="Anexos">
+                                                              <LinkIcon className="w-3 h-3" />
+                                                              {card.attachments.length}
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              </div>
+
+                                              {/* Inline Tag Selector */}
+                                              {editingCardTags === card.id && (
+                                                  <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in">
+                                                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Adicionar Etiqueta:</p>
+                                                      <div className="flex flex-wrap gap-1.5">
+                                                          {AVAILABLE_TAGS.map(tag => {
+                                                              const isSelected = card.tags?.some(t => t.id === tag.id);
+                                                              const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                                              return (
+                                                                  <button
+                                                                      key={tag.id}
+                                                                      onClick={() => handleToggleTag(col.id, card.id, tag)}
+                                                                      className={`text-[10px] px-2 py-1 rounded border transition-all flex items-center gap-1 ${isSelected ? `${tagColor.bg} ${tagColor.text} ${tagColor.border}` : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-300'}`}
+                                                                  >
+                                                                      {tag.name}
+                                                                      {isSelected && <CheckCircle2 className="w-2.5 h-2.5" />}
+                                                                  </button>
+                                                              );
+                                                          })}
+                                                      </div>
+                                                  </div>
+                                              )}
+
+                                              {/* Expanded Details (Date & Comments & Attachments) */}
+                                              {expandedCardId === card.id && (
+                                                  <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in space-y-3">
+                                                      
+                                                      {/* Move to Column (Mobile Fallback) */}
+                                                      <div className="md:hidden">
+                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                              Mover Para
+                                                          </label>
+                                                          <select 
+                                                              value={col.id}
+                                                              onChange={(e) => handleMoveCardFallback(col.id, e.target.value, card.id)}
+                                                              className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                                          >
+                                                              {activeBoard?.columns.map(c => (
+                                                                  <option key={c.id} value={c.id} disabled={c.id === col.id}>
+                                                                      {c.id === col.id ? `Atual: ${c.title}` : c.title}
+                                                                  </option>
+                                                              ))}
+                                                          </select>
+                                                      </div>
+
+                                                      {/* Date Picker */}
+                                                      <div>
+                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                              <Calendar className="w-3 h-3" /> Data de Vencimento
+                                                          </label>
+                                                          <input 
+                                                              type="date" 
+                                                              value={card.dueDate || ''}
+                                                              onChange={(e) => handleSetDueDate(col.id, card.id, e.target.value)}
+                                                              className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                                                          />
+                                                      </div>
+
+                                                      {/* Attachments Section */}
+                                                      <div>
+                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                              <LinkIcon className="w-3 h-3" /> Anexos ({card.attachments?.length || 0})
+                                                          </label>
+                                                          
+                                                          {/* Attachment List */}
+                                                          <div className="space-y-1 mb-2">
+                                                              {card.attachments?.map(att => (
+                                                                  <div key={att.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-1.5 rounded text-xs group/att">
+                                                                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1">
+                                                                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                                          <span className="truncate">{att.name}</span>
+                                                                      </a>
+                                                                      <button 
+                                                                          onClick={() => handleDeleteAttachment(col.id, card.id, att.id)}
+                                                                          className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/att:opacity-100 transition-opacity p-0.5"
+                                                                      >
+                                                                          <X className="w-3 h-3" />
+                                                                      </button>
+                                                                  </div>
+                                                              ))}
+                                                          </div>
+
+                                                          {/* Add Attachment Inputs */}
+                                                          <div className="space-y-1">
+                                                              <input 
+                                                                  type="text" 
+                                                                  placeholder="Nome do arquivo (opcional)" 
+                                                                  value={newAttachmentName}
+                                                                  onChange={(e) => setNewAttachmentName(e.target.value)}
+                                                                  className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                              />
+                                                              <div className="flex gap-1">
+                                                                  <input 
+                                                                      type="text" 
+                                                                      placeholder="https://..." 
+                                                                      value={newAttachmentUrl}
+                                                                      onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                                                                      className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                                  />
+                                                                  <button 
+                                                                      onClick={() => handleAddAttachment(col.id, card.id)}
+                                                                      disabled={!newAttachmentUrl.trim()}
+                                                                      className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                  >
+                                                                      <Plus className="w-3 h-3" />
+                                                                  </button>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+
+                                                      {/* Comments Section */}
+                                                      <div>
+                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                                              <MessageSquare className="w-3 h-3" /> Comentários ({card.comments?.length || 0})
+                                                          </label>
+                                                          
+                                                          {/* Comment List */}
+                                                          <div className="space-y-2 mb-2 max-h-32 overflow-y-auto">
+                                                              {card.comments?.map(comment => (
+                                                                  <div key={comment.id} className="bg-slate-50 dark:bg-slate-800 p-2 rounded text-xs relative group/comment">
+                                                                      <p className="text-slate-700 dark:text-slate-300 pr-4 break-words">{comment.text}</p>
+                                                                      <span className="text-[9px] text-slate-400 mt-1 block">
+                                                                          {new Date(comment.createdAt).toLocaleString('pt-BR')}
+                                                                      </span>
+                                                                      <button 
+                                                                          onClick={() => handleDeleteComment(col.id, card.id, comment.id)}
+                                                                          className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/comment:opacity-100 transition-opacity"
+                                                                      >
+                                                                          <X className="w-3 h-3" />
+                                                                      </button>
+                                                                  </div>
+                                                              ))}
+                                                              {(!card.comments || card.comments.length === 0) && (
+                                                                  <p className="text-xs text-slate-400 italic">Nenhum comentário ainda.</p>
+                                                              )}
+                                                          </div>
+
+                                                          {/* Add Comment Input */}
+                                                          <div className="flex gap-1">
+                                                              <input 
+                                                                  type="text" 
+                                                                  placeholder="Escreva um comentário..." 
+                                                                  value={newCommentText}
+                                                                  onChange={(e) => setNewCommentText(e.target.value)}
+                                                                  onKeyDown={(e) => e.key === 'Enter' && handleAddComment(col.id, card.id)}
+                                                                  className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                                                              />
+                                                              <button 
+                                                                  onClick={() => handleAddComment(col.id, card.id)}
+                                                                  disabled={!newCommentText.trim()}
+                                                                  className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                              >
+                                                                  <Send className="w-3 h-3" />
+                                                              </button>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              )}
+                                          </>
                                       )}
                                   </div>
                               );

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink } from 'lucide-react';
 import { syncTransactionsToCalendar } from '../services/calendarService';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
@@ -20,7 +20,8 @@ const PAYMENT_METHODS = [
     { value: 'debit_card', label: 'Débito' },
     { value: 'pix', label: 'PIX' },
     { value: 'cash', label: 'Dinheiro' },
-    { value: 'direct_debit', label: 'Débito Auto.' }
+    { value: 'direct_debit', label: 'Débito Auto.' },
+    { value: 'boleto', label: 'Boleto' }
 ];
 
 type ViewFilter = 'all' | 'income' | 'expense' | 'pending';
@@ -520,6 +521,17 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                 {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda'}
             </button>
+
+            <a 
+                href="https://calendar.google.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm border bg-white hover:bg-slate-50 text-blue-600 border-blue-100 hover:border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-slate-700"
+                title="Acessar Google Agenda"
+            >
+                <ExternalLink className="w-4 h-4" />
+                Acessar Google Agenda
+            </a>
 
             <button 
                 onClick={() => exportToICS(displayedTransactions)}

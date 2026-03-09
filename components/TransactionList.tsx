@@ -26,6 +26,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   'direct_debit': 'Déb. Auto',
   'bank_transfer': 'TED/DOC',
   'deposit': 'Depósito',
+  'boleto': 'Boleto',
 };
 
 // Helper: Calculate Nth Business Day of a month
@@ -54,11 +55,12 @@ const PaymentIcon = ({ method, className }: { method: string, className?: string
         case 'debit_card': return <CreditCard className={className} />;
         case 'cash': return <Banknote className={className} />;
         case 'pix': return <Smartphone className={className} />;
+        case 'boleto': return <Landmark className={className} />;
         default: return <Landmark className={className} />;
     }
 };
 
-const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash'];
+const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash', 'boleto'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
 export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {

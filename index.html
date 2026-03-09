@@ -14,6 +14,19 @@
     <!-- PWA Manifest - Caminho Relativo -->
     <link rel="manifest" href="./manifest.json" />
     
+    <!-- Mobile Drag and Drop Polyfill -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/scroll-behaviour.min.js"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        MobileDragDrop.polyfill({
+          holdToDrag: 300, // Segurar por 300ms para arrastar no celular
+          dragImageTranslateOverride: MobileDragDrop.scrollBehaviourDragImageTranslateOverride
+        });
+      });
+    </script>
+
     <!-- Styles - Caminho Relativo -->
     <link rel="stylesheet" href="./index.css" />
     

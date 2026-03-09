@@ -1,7 +1,7 @@
 
 export type TransactionType = 'income' | 'expense';
 export type TransactionStatus = 'paid' | 'pending';
-export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'pix' | 'direct_debit' | 'bank_transfer' | 'deposit';
+export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'pix' | 'direct_debit' | 'bank_transfer' | 'deposit' | 'boleto';
 
 export interface Category {
   id: string;

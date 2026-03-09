@@ -230,7 +230,21 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
                           />
                       </div>
 
-                      <div className="p-4 flex justify-end border-t border-black/5 dark:border-white/5">
+                      <div className="p-4 flex justify-between items-center border-t border-black/5 dark:border-white/5">
+                          {editingId ? (
+                              <button
+                                  type="button"
+                                  onClick={() => {
+                                      onDelete(editingId);
+                                      setIsModalOpen(false);
+                                  }}
+                                  className="flex items-center gap-2 px-4 py-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors"
+                              >
+                                  <Trash2 className="w-4 h-4" /> Excluir
+                              </button>
+                          ) : (
+                              <div></div>
+                          )}
                           <button 
                               type="submit"
                               className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold shadow-md hover:opacity-90 transition-opacity"
