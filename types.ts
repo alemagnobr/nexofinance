@@ -44,6 +44,8 @@ export interface Investment {
   type: string;
   date: string;
   assetCategory?: 'market' | 'fund';
+  bank?: string; // Instituição financeira
+  fund?: string; // Fundo do banco
   lastContribution?: number; // Valor do último aporte/investimento (adicionado para caixinhas)
   lastContributionDate?: string; // Data do último aporte
   history?: InvestmentHistory[];
@@ -133,6 +135,7 @@ export interface Note {
   date: string; // ISO Date
   color: 'slate' | 'yellow' | 'green' | 'blue' | 'rose' | 'purple';
   isPinned: boolean;
+  category?: string;
 }
 
 export interface Badge {

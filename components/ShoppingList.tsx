@@ -359,6 +359,54 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           </div>
       </div>
 
+      {/* BULK ACTIONS */}
+      {items.length > 0 && (
+          <div className="flex flex-wrap justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <button 
+                  onClick={() => {
+                      const allChecked = items.every(i => i.isChecked);
+                      items.forEach(item => {
+                          if (item.isChecked === allChecked) {
+                              onUpdate(item.id, { isChecked: !allChecked });
+                          }
+                      });
+                  }}
+                  className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+              >
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${items.length > 0 && items.every(i => i.isChecked) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 dark:border-slate-500 text-transparent'}`}>
+                      <Check className="w-3 h-3" />
+                  </div>
+                  Selecionar Tudo
+              </button>
+              
+              <div className="flex items-center gap-2">
+                  {items.some(i => i.isChecked) && (
+                      <button 
+                          onClick={() => {
+                              const selectedItems = items.filter(i => i.isChecked);
+                              if (selectedItems.length === items.length) {
+                                  onClearList();
+                              } else {
+                                  selectedItems.forEach(item => onDelete(item.id));
+                              }
+                          }}
+                          className="flex items-center gap-1 text-sm font-medium text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-900/20 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir Selecionados
+                      </button>
+                  )}
+                  <button 
+                      onClick={() => onClearList()}
+                      className="flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-rose-600 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                      <Trash2 className="w-4 h-4" />
+                      Limpar Lista
+                  </button>
+              </div>
+          </div>
+      )}
+
       {/* LIST (GROUPED BY CATEGORY) */}
       <div className="space-y-6">
          {items.length === 0 ? (
