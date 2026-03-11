@@ -44,6 +44,8 @@ export interface Investment {
   type: string;
   date: string;
   assetCategory?: 'market' | 'fund';
+  institution?: string; // Banco ou Instituição Financeira
+  fundProduct?: string; // Fundo de Investimento ou Produto
   lastContribution?: number; // Valor do último aporte/investimento (adicionado para caixinhas)
   lastContributionDate?: string; // Data do último aporte
   history?: InvestmentHistory[];
@@ -133,6 +135,7 @@ export interface Note {
   date: string; // ISO Date
   color: 'slate' | 'yellow' | 'green' | 'blue' | 'rose' | 'purple';
   isPinned: boolean;
+  category?: string; // Faixa/Categoria da nota
 }
 
 export interface Badge {
@@ -161,6 +164,18 @@ export interface WealthProfile {
   monthlyContributionOverride?: number; // Se o usuário quiser simular aportar diferente do real
 }
 
+export interface PasswordEntry {
+  id: string;
+  title: string;
+  username: string;
+  encryptedPassword: string;
+  url?: string;
+  notes?: string;
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppData {
   transactions: Transaction[];
   categories: Category[]; // New field
@@ -172,6 +187,7 @@ export interface AppData {
   kanbanColumns: KanbanColumn[]; // Legacy: Mantido para migração se necessário
   kanbanBoards: KanbanBoard[]; // Novo campo: Múltiplos Quadros
   notes: Note[]; // Novo campo: Notas
+  passwords: PasswordEntry[]; // Novo campo: Senhas
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
@@ -190,5 +206,6 @@ export enum View {
   WEALTH_PLANNER = 'WEALTH_PLANNER',
   KANBAN = 'KANBAN',
   NOTES = 'NOTES',
+  PASSWORDS = 'PASSWORDS',
   SETTINGS = 'SETTINGS'
 }

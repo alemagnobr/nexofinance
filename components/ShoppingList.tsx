@@ -74,6 +74,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     }
   }, [quickActionSignal]);
 
+  const handleSelectAll = () => {
+    const allChecked = items.length > 0 && items.every(item => item.isChecked);
+    items.forEach(item => {
+      if (item.isChecked === allChecked) {
+        onUpdate(item.id, { isChecked: !allChecked });
+      }
+    });
+  };
+
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
@@ -241,7 +250,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* HEADER & BUDGET BAR */}
       <div>
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-4">
              <div>
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                     <ShoppingCart className="w-7 h-7 text-indigo-600" />
@@ -249,13 +258,29 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 </h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm">Organize sua ida ao mercado.</p>
              </div>
-             <button 
-                onClick={() => setIsAiModalOpen(true)}
-                disabled={!hasApiKey}
-                className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
-             >
-                <Sparkles className="w-4 h-4" /> Gerar com IA
-             </button>
+             <div className="flex flex-wrap items-center gap-2">
+                 <button 
+                    onClick={handleSelectAll}
+                    disabled={items.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 disabled:opacity-50"
+                 >
+                    <Check className="w-4 h-4" /> {items.length > 0 && items.every(i => i.isChecked) ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+                 </button>
+                 <button 
+                    onClick={() => onClearList()}
+                    disabled={items.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 disabled:opacity-50"
+                 >
+                    <Trash2 className="w-4 h-4" /> Limpar Lista
+                 </button>
+                 <button 
+                    onClick={() => setIsAiModalOpen(true)}
+                    disabled={!hasApiKey}
+                    className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
+                 >
+                    <Sparkles className="w-4 h-4" /> Gerar com IA
+                 </button>
+             </div>
         </div>
         
         {/* Budget Control Bar */}

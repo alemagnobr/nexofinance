@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -10,6 +10,7 @@ import {
   addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
   saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
+  addPasswordFire, updatePasswordFire, deletePasswordFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
@@ -26,6 +27,7 @@ const DEFAULT_DATA: AppData = {
     kanbanColumns: [],
     kanbanBoards: [],
     notes: [],
+    passwords: [],
     unlockedBadges: [],
     walletBalance: 0,
     categories: DEFAULT_CATEGORIES // Initial defaults
@@ -385,6 +387,29 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, notes: prev.notes.filter(n => n.id !== id) }));
   };
 
+  // --- PASSWORDS ACTIONS ---
+  const addPassword = async (entry: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const newPassword: PasswordEntry = { 
+          ...entry, 
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+      if (user) await addPasswordFire(user.uid, newPassword);
+      else setData(prev => ({ ...prev, passwords: [newPassword, ...prev.passwords] }));
+  };
+
+  const updatePassword = async (id: string, updates: Partial<PasswordEntry>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      if (user) await updatePasswordFire(user.uid, id, finalUpdates);
+      else setData(prev => ({ ...prev, passwords: prev.passwords.map(p => p.id === id ? { ...p, ...finalUpdates } : p) }));
+  };
+
+  const deletePassword = async (id: string) => {
+      if (user) await deletePasswordFire(user.uid, id);
+      else setData(prev => ({ ...prev, passwords: prev.passwords.filter(p => p.id !== id) }));
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -440,6 +465,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addNote,
         updateNote,
         deleteNote,
+        addPassword,
+        updatePassword,
+        deletePassword,
         addCategory,
         deleteCategory,
         unlockBadge,

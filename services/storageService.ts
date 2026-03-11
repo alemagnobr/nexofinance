@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -44,6 +44,7 @@ const DEFAULT_DATA: AppData = {
   kanbanColumns: [],
   kanbanBoards: [],
   notes: [],
+  passwords: [],
   unlockedBadges: [],
   walletBalance: 0
 };
@@ -71,6 +72,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.kanbanColumns) data.kanbanColumns = [];
     if (!data.kanbanBoards) data.kanbanBoards = [];
     if (!data.notes) data.notes = [];
+    if (!data.passwords) data.passwords = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
@@ -175,6 +177,11 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ notes });
   });
 
+  const unsubPasswords = onSnapshot(query(collection(db, 'users', uid, 'passwords'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const passwords = snapshot.docs.map(doc => doc.data() as PasswordEntry);
+    onUpdate({ passwords });
+  });
+
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -210,6 +217,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubKanban();
     unsubKanbanBoards();
     unsubNotes();
+    unsubPasswords();
     unsubCategories();
     unsubUserDoc();
   };
@@ -375,6 +383,17 @@ export const deleteNoteFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'notes', id));
 };
 
+// PASSWORDS
+export const addPasswordFire = async (uid: string, entry: PasswordEntry) => {
+    await setDoc(doc(db, 'users', uid, 'passwords', entry.id), entry);
+};
+export const updatePasswordFire = async (uid: string, id: string, data: Partial<PasswordEntry>) => {
+    await updateDoc(doc(db, 'users', uid, 'passwords', id), data);
+};
+export const deletePasswordFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'passwords', id));
+};
+
 // CATEGORIES
 export const addCategoryFire = async (uid: string, category: Category) => {
     await setDoc(doc(db, 'users', uid, 'categories', category.id), category);
@@ -446,6 +465,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     localData.notes.forEach(n => {
         const ref = doc(db, 'users', uid, 'notes', n.id);
         batch.set(ref, n);
+    });
+
+    localData.passwords?.forEach(p => {
+        const ref = doc(db, 'users', uid, 'passwords', p.id);
+        batch.set(ref, p);
     });
 
     // Migrating categories

@@ -20,6 +20,8 @@ const COLORS = [
     { value: 'purple', bg: 'bg-purple-100 dark:bg-purple-900/40', border: 'border-purple-200 dark:border-purple-800' },
 ];
 
+const NOTE_CATEGORIES = ['Sem Categoria', 'Trabalho', 'Pessoal', 'Ideias', 'Importante', 'Estudos', 'Finanças'];
+
 export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, privacyMode }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,7 +31,8 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
       title: '',
       content: '',
       color: 'slate' as Note['color'],
-      isPinned: false
+      isPinned: false,
+      category: 'Sem Categoria'
   });
 
   const filteredNotes = notes.filter(note => 
@@ -48,7 +51,8 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: note.title,
               content: note.content,
               color: note.color,
-              isPinned: note.isPinned
+              isPinned: note.isPinned,
+              category: note.category || 'Sem Categoria'
           });
       } else {
           setEditingId(null);
@@ -56,7 +60,8 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: '',
               content: '',
               color: 'slate',
-              isPinned: false
+              isPinned: false,
+              category: 'Sem Categoria'
           });
       }
       setIsModalOpen(true);
@@ -71,7 +76,8 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: formData.title,
               content: formData.content,
               color: formData.color,
-              isPinned: formData.isPinned
+              isPinned: formData.isPinned,
+              category: formData.category === 'Sem Categoria' ? undefined : formData.category
           });
       } else {
           onAdd({
@@ -79,6 +85,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               content: formData.content,
               color: formData.color,
               isPinned: formData.isPinned,
+              category: formData.category === 'Sem Categoria' ? undefined : formData.category,
               date: new Date().toISOString()
           });
       }
@@ -151,6 +158,14 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
 
                           {note.title && <h3 className="font-bold text-slate-800 dark:text-white mb-2 pr-6">{note.title}</h3>}
                           
+                          {note.category && (
+                              <div className="mb-3">
+                                  <span className="inline-block px-2 py-0.5 bg-black/5 dark:bg-white/10 rounded text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                                      {note.category}
+                                  </span>
+                              </div>
+                          )}
+
                           <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                               {note.content}
                           </p>
@@ -217,8 +232,17 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
                               placeholder="Título"
                               value={formData.title}
                               onChange={(e) => setFormData({...formData, title: e.target.value})}
-                              className="w-full text-xl font-bold bg-transparent border-none outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-white"
+                              className="w-full text-xl font-bold bg-transparent border-none outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-white mb-2"
                           />
+                          <select
+                              value={formData.category}
+                              onChange={(e) => setFormData({...formData, category: e.target.value})}
+                              className="w-full md:w-auto p-1.5 text-xs font-bold uppercase tracking-wider bg-black/5 dark:bg-white/10 border-none rounded outline-none text-slate-600 dark:text-slate-300 focus:ring-2 focus:ring-indigo-500/50"
+                          >
+                              {NOTE_CATEGORIES.map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                          </select>
                       </div>
                       
                       <div className="px-6 pb-6 flex-1 overflow-y-auto">

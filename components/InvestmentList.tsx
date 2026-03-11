@@ -55,7 +55,9 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     targetAmount: '',
     type: 'Renda Fixa',
     date: new Date().toISOString().split('T')[0],
-    assetCategory: 'market' as 'market' | 'fund'
+    assetCategory: 'market' as 'market' | 'fund',
+    institution: '',
+    fundProduct: ''
   });
 
   // Effect to listen for Quick Action triggers
@@ -63,7 +65,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
         setFormStep('select');
-        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
+        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', institution: '', fundProduct: '' });
     }
   }, [quickActionSignal]);
 
@@ -80,9 +82,15 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentVal = parseFloat(newInvest.amount);
+    let currentVal = parseFloat(newInvest.amount) || 0;
     // Se o valor investido (custo) não for preenchido, assume igual ao atual
-    const investedVal = newInvest.investedAmount ? parseFloat(newInvest.investedAmount) : currentVal;
+    let investedVal = newInvest.investedAmount ? parseFloat(newInvest.investedAmount) : currentVal;
+
+    // Se for caixinha/fundo, o saldo inicial é 0. O usuário fará aportes depois.
+    if (newInvest.assetCategory === 'fund') {
+        currentVal = 0;
+        investedVal = 0;
+    }
 
     onAdd({
       name: newInvest.name,
@@ -92,15 +100,17 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       type: newInvest.type,
       date: newInvest.date,
       assetCategory: newInvest.assetCategory,
+      institution: newInvest.institution,
+      fundProduct: newInvest.fundProduct,
       lastContribution: investedVal,
-      history: [{
+      history: investedVal > 0 ? [{
         id: crypto.randomUUID(),
         date: newInvest.date,
         amount: investedVal,
         type: 'contribution'
-      }]
+      }] : []
     });
-    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
+    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', institution: '', fundProduct: '' });
     setIsFormOpen(false);
     setFormStep('select');
   };
@@ -221,7 +231,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
             onClick={() => {
                 setIsFormOpen(!isFormOpen);
                 setFormStep('select');
-                setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
+                setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', institution: '', fundProduct: '' });
             }}
             className="flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors shadow-sm text-sm font-medium"
             >
@@ -431,24 +441,25 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
           {newInvest.assetCategory === 'fund' ? (
               <>
                   <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase">Total Depositado (Aportes)</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Banco / Instituição Financeira</label>
                       <input
-                        type="number"
-                        placeholder="R$ (Opcional)"
-                        value={newInvest.investedAmount}
-                        onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
+                        required
+                        type="text"
+                        placeholder="Ex: Itaú, Nubank, XP"
+                        value={newInvest.institution || ''}
+                        onChange={e => setNewInvest({ ...newInvest, institution: e.target.value })}
                         className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                   </div>
                   <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase">Saldo Atual</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Fundo / Produto</label>
                       <input
                         required
-                        type="number"
-                        placeholder="R$"
-                        value={newInvest.amount}
-                        onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
-                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+                        type="text"
+                        placeholder="Ex: CDB 100% CDI, Tesouro Selic"
+                        value={newInvest.fundProduct || ''}
+                        onChange={e => setNewInvest({ ...newInvest, fundProduct: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                   </div>
               </>
@@ -615,6 +626,12 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                       <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{inv.name}</h4>
                       <div className="flex flex-wrap gap-2 text-xs mt-1">
                         <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{inv.type}</span>
+                        {inv.institution && (
+                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded">{inv.institution}</span>
+                        )}
+                        {inv.fundProduct && (
+                            <span className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded">{inv.fundProduct}</span>
+                        )}
                         {roi !== 0 && (
                             <span className={`px-2 py-0.5 rounded font-bold flex items-center gap-1 ${roi > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
                                 {roi > 0 ? <TrendingUp className="w-3 h-3"/> : <TrendingDown className="w-3 h-3"/>}
@@ -831,7 +848,9 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                     amount: editingFullInvestment.amount,
                     investedAmount: editingFullInvestment.investedAmount,
                     targetAmount: editingFullInvestment.targetAmount,
-                    date: editingFullInvestment.date
+                    date: editingFullInvestment.date,
+                    institution: editingFullInvestment.institution,
+                    fundProduct: editingFullInvestment.fundProduct
                   });
                   setEditingFullInvestment(null);
                 }} className="space-y-4">
@@ -844,6 +863,28 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                       onChange={e => setEditingFullInvestment({...editingFullInvestment, name: e.target.value})}
                     />
                   </div>
+                  {editingFullInvestment.assetCategory === 'fund' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Banco / Instituição</label>
+                        <input 
+                          type="text"
+                          className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                          value={editingFullInvestment.institution || ''}
+                          onChange={e => setEditingFullInvestment({...editingFullInvestment, institution: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fundo / Produto</label>
+                        <input 
+                          type="text"
+                          className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
+                          value={editingFullInvestment.fundProduct || ''}
+                          onChange={e => setEditingFullInvestment({...editingFullInvestment, fundProduct: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>

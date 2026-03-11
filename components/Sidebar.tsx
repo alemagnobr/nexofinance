@@ -5,7 +5,7 @@ import {
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
   HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote,
-  ArrowLeftRight, Layout, Settings
+  ArrowLeftRight, Layout, Settings, Wrench
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -71,7 +71,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Group Logic Helpers to determine active state
   const isMovementsActive = [View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
   const isAssetsActive = [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView);
-  const isOrgActive = [View.KANBAN, View.NOTES, View.SHOPPING_LIST].includes(currentView);
+  const isProductivityActive = [View.KANBAN, View.NOTES].includes(currentView);
+  const isUtilitiesActive = [View.SHOPPING_LIST, View.PASSWORDS].includes(currentView);
 
   return (
     <nav 
@@ -148,10 +149,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
         
         <NavItem 
-            active={isOrgActive} 
+            active={isProductivityActive} 
             onClick={() => handleNavClick(View.KANBAN)} 
             icon={Layout} 
-            label="Organização" 
+            label="Produtividade" 
+        />
+        
+        <NavItem 
+            active={isUtilitiesActive} 
+            onClick={() => handleNavClick(View.SHOPPING_LIST)} 
+            icon={Wrench} 
+            label="Utilidades" 
         />
 
         {/* NEXO AI */}

@@ -18,7 +18,8 @@ import { SettingsView } from './components/SettingsView';
 // New Wrapper Views
 import { MovementsView } from './components/MovementsView';
 import { AssetsView } from './components/AssetsView';
-import { OrganizationView } from './components/OrganizationView';
+import { ProductivityView } from './components/ProductivityView';
+import { UtilitiesView } from './components/UtilitiesView';
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -108,7 +109,7 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], kanbanBoards: [], notes: [], categories: []
+            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], kanbanBoards: [], notes: [], passwords: [], categories: []
         });
     } else {
         await signOut(auth);
@@ -285,10 +286,23 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Organization (Kanban, Notes, Shopping)
-    if ([View.KANBAN, View.NOTES, View.SHOPPING_LIST].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes)
+    if ([View.KANBAN, View.NOTES].includes(currentView)) {
         return (
-            <OrganizationView 
+            <ProductivityView 
+                currentView={currentView}
+                onNavigate={setCurrentView}
+                data={data}
+                actions={actions}
+                privacyMode={privacyMode}
+            />
+        );
+    }
+
+    // 5. Group: Utilities (Shopping, Passwords)
+    if ([View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
+        return (
+            <UtilitiesView 
                 currentView={currentView}
                 onNavigate={setCurrentView}
                 data={data}
