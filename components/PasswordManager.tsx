@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PasswordEntry } from '../types';
 import { Key, Lock, Unlock, Copy, Eye, EyeOff, Plus, Trash2, Edit2, ExternalLink, ShieldCheck, X } from 'lucide-react';
-import CryptoJS from 'crypto-js';
+import * as CryptoJS from 'crypto-js';
 
 interface PasswordManagerProps {
   passwords: PasswordEntry[];
