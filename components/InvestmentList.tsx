@@ -4,7 +4,6 @@ import { Investment, View } from '../types';
 import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen, Compass, TrendingDown, PieChart as PieChartIcon, Edit2, Save, History } from 'lucide-react';
 import { getInvestmentAdvice, InvestmentAdviceResult } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import ReactMarkdown from 'react-markdown';
 
 interface InvestmentListProps {
   investments: Investment[];
@@ -56,9 +55,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     targetAmount: '',
     type: 'Renda Fixa',
     date: new Date().toISOString().split('T')[0],
-    assetCategory: 'market' as 'market' | 'fund',
-    bank: '',
-    fund: ''
+    assetCategory: 'market' as 'market' | 'fund'
   });
 
   // Effect to listen for Quick Action triggers
@@ -66,7 +63,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
         setFormStep('select');
-        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', bank: '', fund: '' });
+        setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     }
   }, [quickActionSignal]);
 
@@ -83,11 +80,9 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Para caixinhas/fundos, o valor inicial é 0
-    const currentVal = newInvest.assetCategory === 'fund' ? 0 : (parseFloat(newInvest.amount) || 0);
+    const currentVal = parseFloat(newInvest.amount);
     // Se o valor investido (custo) não for preenchido, assume igual ao atual
-    const investedVal = newInvest.assetCategory === 'fund' ? 0 : (newInvest.investedAmount ? parseFloat(newInvest.investedAmount) : currentVal);
+    const investedVal = newInvest.investedAmount ? parseFloat(newInvest.investedAmount) : currentVal;
 
     onAdd({
       name: newInvest.name,
@@ -97,17 +92,15 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       type: newInvest.type,
       date: newInvest.date,
       assetCategory: newInvest.assetCategory,
-      bank: newInvest.bank,
-      fund: newInvest.fund,
       lastContribution: investedVal,
-      history: investedVal > 0 ? [{
+      history: [{
         id: crypto.randomUUID(),
         date: newInvest.date,
         amount: investedVal,
         type: 'contribution'
-      }] : []
+      }]
     });
-    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', bank: '', fund: '' });
+    setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
     setIsFormOpen(false);
     setFormStep('select');
   };
@@ -121,7 +114,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
       const addedValue = parseFloat(contributionAmount);
       if (!isNaN(addedValue) && addedValue > 0) {
         // Aporte: Aumenta tanto o Valor de Mercado (amount) quanto o Custo (investedAmount)
-        const currentCost = investment.investedAmount ?? investment.amount;
+        const currentCost = investment.investedAmount || investment.amount;
         
         const newHistory = [...(investment.history || []), {
           id: crypto.randomUUID(),
@@ -184,7 +177,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
   const { recommendations, technical } = getParsedAdvice();
 
   const totalCurrent = investments.reduce((sum, item) => sum + item.amount, 0);
-  const totalCost = investments.reduce((sum, item) => sum + (item.investedAmount ?? item.amount), 0);
+  const totalCost = investments.reduce((sum, item) => sum + (item.investedAmount || item.amount), 0);
   const totalProfit = totalCurrent - totalCost;
   const totalRoi = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
   
@@ -228,7 +221,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
             onClick={() => {
                 setIsFormOpen(!isFormOpen);
                 setFormStep('select');
-                setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market', bank: '', fund: '' });
+                setNewInvest({ name: '', amount: '', investedAmount: '', targetAmount: '', type: 'Renda Fixa', date: new Date().toISOString().split('T')[0], assetCategory: 'market' });
             }}
             className="flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors shadow-sm text-sm font-medium"
             >
@@ -322,9 +315,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                   ) : aiAdvice ? (
                       <div className="space-y-6">
                           <div className="prose prose-sm prose-purple dark:prose-invert max-w-none text-slate-700 dark:text-slate-300">
-                              <div className="markdown-body">
-                                  <ReactMarkdown>{recommendations}</ReactMarkdown>
-                              </div>
+                              <div dangerouslySetInnerHTML={{ __html: recommendations.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
                           </div>
                           
                           {technical && (
@@ -341,9 +332,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                               {showTechnical && (
                                 <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-fade-in">
                                    <div className="prose prose-sm prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-400">
-                                      <div className="markdown-body">
-                                          <ReactMarkdown>{technical}</ReactMarkdown>
-                                      </div>
+                                      <div dangerouslySetInnerHTML={{ __html: technical.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- /g, '• ') }} />
                                    </div>
                                 </div>
                               )}
@@ -442,23 +431,24 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
           {newInvest.assetCategory === 'fund' ? (
               <>
                   <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase">Banco / Instituição</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Total Depositado (Aportes)</label>
                       <input
-                        type="text"
-                        placeholder="Ex: Itaú, Nubank, XP"
-                        value={newInvest.bank}
-                        onChange={e => setNewInvest({ ...newInvest, bank: e.target.value })}
+                        type="number"
+                        placeholder="R$ (Opcional)"
+                        value={newInvest.investedAmount}
+                        onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
                         className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                   </div>
                   <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase">Fundo do Banco</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Saldo Atual</label>
                       <input
-                        type="text"
-                        placeholder="Ex: Fundo DI, CDB 100% CDI"
-                        value={newInvest.fund}
-                        onChange={e => setNewInvest({ ...newInvest, fund: e.target.value })}
-                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        required
+                        type="number"
+                        placeholder="R$"
+                        value={newInvest.amount}
+                        onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
                       />
                   </div>
               </>
@@ -605,7 +595,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
            </div>
         ) : (
           investments.map(inv => {
-            const cost = inv.investedAmount ?? inv.amount;
+            const cost = inv.investedAmount || inv.amount;
             const current = inv.amount;
             const profit = current - cost;
             const roi = cost > 0 ? (profit / cost) * 100 : 0;
@@ -625,16 +615,6 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                       <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{inv.name}</h4>
                       <div className="flex flex-wrap gap-2 text-xs mt-1">
                         <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{inv.type}</span>
-                        {inv.bank && (
-                            <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">
-                                {inv.bank}
-                            </span>
-                        )}
-                        {inv.fund && (
-                            <span className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">
-                                {inv.fund}
-                            </span>
-                        )}
                         {roi !== 0 && (
                             <span className={`px-2 py-0.5 rounded font-bold flex items-center gap-1 ${roi > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
                                 {roi > 0 ? <TrendingUp className="w-3 h-3"/> : <TrendingDown className="w-3 h-3"/>}
@@ -677,7 +657,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                         <div className="text-xs text-slate-400 mt-1">
                             {inv.assetCategory === 'fund' ? (
                                 <span>
-                                  Último investimento: <span className="font-medium text-slate-600 dark:text-slate-300">{formatValue(inv.lastContribution ?? cost)}</span>
+                                  Último investimento: <span className="font-medium text-slate-600 dark:text-slate-300">{formatValue(inv.lastContribution || cost)}</span>
                                   {inv.lastContributionDate && ` em ${new Date(inv.lastContributionDate).toLocaleDateString('pt-BR')}`}
                                 </span>
                             ) : (
@@ -851,9 +831,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                     amount: editingFullInvestment.amount,
                     investedAmount: editingFullInvestment.investedAmount,
                     targetAmount: editingFullInvestment.targetAmount,
-                    date: editingFullInvestment.date,
-                    bank: editingFullInvestment.bank,
-                    fund: editingFullInvestment.fund
+                    date: editingFullInvestment.date
                   });
                   setEditingFullInvestment(null);
                 }} className="space-y-4">
@@ -903,7 +881,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                       <input 
                         type="number" step="0.01" required
                         className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                        value={editingFullInvestment.investedAmount ?? editingFullInvestment.amount}
+                        value={editingFullInvestment.investedAmount || editingFullInvestment.amount}
                         onChange={e => setEditingFullInvestment({...editingFullInvestment, investedAmount: parseFloat(e.target.value) || 0})}
                       />
                     </div>
@@ -928,28 +906,6 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                       />
                     </div>
                   </div>
-                  {editingFullInvestment.assetCategory === 'fund' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Banco / Instituição</label>
-                        <input 
-                          type="text"
-                          className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                          value={editingFullInvestment.bank || ''}
-                          onChange={e => setEditingFullInvestment({...editingFullInvestment, bank: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fundo do Banco</label>
-                        <input 
-                          type="text"
-                          className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                          value={editingFullInvestment.fund || ''}
-                          onChange={e => setEditingFullInvestment({...editingFullInvestment, fund: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </form>
               ) : (
                 <div className="space-y-3">
@@ -977,7 +933,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                             <button 
                               onClick={() => {
                                 const newHistory = editingFullInvestment.history!.filter(item => item.id !== h.id);
-                                const newInvested = (editingFullInvestment.investedAmount ?? editingFullInvestment.amount) - (h.type === 'contribution' ? h.amount : 0);
+                                const newInvested = (editingFullInvestment.investedAmount || editingFullInvestment.amount) - (h.type === 'contribution' ? h.amount : 0);
                                 const newAmount = editingFullInvestment.amount - (h.type === 'contribution' ? h.amount : 0);
                                 
                                 const updatedInv = {

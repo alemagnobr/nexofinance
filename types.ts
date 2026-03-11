@@ -44,8 +44,6 @@ export interface Investment {
   type: string;
   date: string;
   assetCategory?: 'market' | 'fund';
-  bank?: string; // Instituição financeira
-  fund?: string; // Fundo do banco
   lastContribution?: number; // Valor do último aporte/investimento (adicionado para caixinhas)
   lastContributionDate?: string; // Data do último aporte
   history?: InvestmentHistory[];
