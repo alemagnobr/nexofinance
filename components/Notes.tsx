@@ -29,14 +29,12 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
       title: '',
       content: '',
       color: 'slate' as Note['color'],
-      isPinned: false,
-      category: ''
+      isPinned: false
   });
 
   const filteredNotes = notes.filter(note => 
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (note.category && note.category.toLowerCase().includes(searchQuery.toLowerCase()))
+      note.content.toLowerCase().includes(searchQuery.toLowerCase())
   ).sort((a, b) => {
       // Sort by Pinned then Date Descending
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -50,8 +48,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: note.title,
               content: note.content,
               color: note.color,
-              isPinned: note.isPinned,
-              category: note.category || ''
+              isPinned: note.isPinned
           });
       } else {
           setEditingId(null);
@@ -59,8 +56,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: '',
               content: '',
               color: 'slate',
-              isPinned: false,
-              category: ''
+              isPinned: false
           });
       }
       setIsModalOpen(true);
@@ -75,8 +71,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               title: formData.title,
               content: formData.content,
               color: formData.color,
-              isPinned: formData.isPinned,
-              category: formData.category.trim()
+              isPinned: formData.isPinned
           });
       } else {
           onAdd({
@@ -84,7 +79,6 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
               content: formData.content,
               color: formData.color,
               isPinned: formData.isPinned,
-              category: formData.category.trim(),
               date: new Date().toISOString()
           });
       }
@@ -155,14 +149,6 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
                               {note.isPinned ? <Pin className="w-3 h-3 fill-current" /> : <Pin className="w-3 h-3" />}
                           </button>
 
-                          {note.category && (
-                              <div className="mb-2">
-                                  <span className="inline-block px-2 py-0.5 bg-black/5 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase tracking-wider rounded-md">
-                                      {note.category}
-                                  </span>
-                              </div>
-                          )}
-
                           {note.title && <h3 className="font-bold text-slate-800 dark:text-white mb-2 pr-6">{note.title}</h3>}
                           
                           <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -231,14 +217,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
                               placeholder="Título"
                               value={formData.title}
                               onChange={(e) => setFormData({...formData, title: e.target.value})}
-                              className="w-full text-xl font-bold bg-transparent border-none outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-white mb-2"
-                          />
-                          <input 
-                              type="text" 
-                              placeholder="Categoria (ex: Trabalho, Pessoal)"
-                              value={formData.category}
-                              onChange={(e) => setFormData({...formData, category: e.target.value})}
-                              className="w-full text-xs font-bold uppercase tracking-wider bg-black/5 dark:bg-white/10 border-none outline-none placeholder:text-slate-400/70 dark:placeholder:text-slate-500/70 text-slate-600 dark:text-slate-300 rounded-md px-2 py-1"
+                              className="w-full text-xl font-bold bg-transparent border-none outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-white"
                           />
                       </div>
                       

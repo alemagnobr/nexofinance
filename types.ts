@@ -135,7 +135,6 @@ export interface Note {
   date: string; // ISO Date
   color: 'slate' | 'yellow' | 'green' | 'blue' | 'rose' | 'purple';
   isPinned: boolean;
-  category?: string;
 }
 
 export interface Badge {
