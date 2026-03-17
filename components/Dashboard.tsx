@@ -202,7 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             return new Date(b.date).getTime() - new Date(a.date).getTime();
         })
-        .slice(0, 3);
+        .slice(0, 3); // Increased from 2 to 3 to fill space
   }, [data.notes]);
 
   // Helper to mask values
@@ -634,8 +634,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                   <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
                </div>
                <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
+               
+               {/* NEW: Health Score Progress Bar */}
+               <div className="mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                  <div 
+                    className={`h-full transition-all duration-1000 ease-out ${
+                        healthScore >= 700 ? 'bg-emerald-500' : 
+                        healthScore >= 500 ? 'bg-amber-400' : 
+                        healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${(healthScore / 1000) * 100}%` }}
+                  />
+               </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50 space-y-1">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 space-y-1.5">
                 {factors.slice(0, 2).map((factor, idx) => (
                     <div key={idx} className="flex items-center gap-1.5 text-[10px]">
                         {factor.type === 'good' && <CheckCheck className="w-3 h-3 text-emerald-500" />}
@@ -774,18 +786,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
         {/* Card 4: Investments (Top Assets) */}
         <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-3">
-             <div>
-               <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Total Investido</h3>
-               <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatValue(totalInvested)}</p>
-             </div>
-             <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-indigo-500" />
-             </div>
+          <div>
+              <div className="flex items-center justify-between mb-3">
+                 <div>
+                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Total Investido</h3>
+                   <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatValue(totalInvested)}</p>
+                 </div>
+                 <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-indigo-500" />
+                 </div>
+              </div>
+
+              {/* NEW: Investment Ratio Insight */}
+              {totalInvested > 0 && currentBalance > 0 && (
+                  <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">Patrimônio Alocado</span>
+                          <span className="text-xs font-black text-indigo-700 dark:text-indigo-400">
+                              {((totalInvested / (totalInvested + currentBalance)) * 100).toFixed(0)}%
+                          </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-full overflow-hidden">
+                          <div 
+                              className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full"
+                              style={{ width: `${(totalInvested / (totalInvested + currentBalance)) * 100}%` }}
+                          />
+                      </div>
+                  </div>
+              )}
           </div>
 
-          <div className="flex-1 flex flex-col justify-end space-y-2">
-             <p className="text-[10px] text-slate-400 font-semibold uppercase border-b border-slate-100 dark:border-slate-700/50 pb-1 flex justify-between">
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex-1 flex flex-col justify-end space-y-2">
+             <p className="text-[10px] text-slate-400 font-semibold uppercase pb-1 flex justify-between">
                 <span>Maiores Posições</span>
                 <PieChartIcon className="w-3 h-3" />
              </p>
@@ -821,7 +853,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                     <ArrowRight className="w-4 h-4" />
                 </button>
             </div>
-            <div className="flex-1 space-y-2 overflow-y-auto max-h-[140px] no-scrollbar">
+            <div className="flex-1 space-y-2 overflow-y-auto max-h-[220px] no-scrollbar">
                 {pinnedNotes.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
                         <StickyNote className="w-6 h-6 opacity-30" />
@@ -836,10 +868,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                             <div 
                                 key={note.id} 
                                 onClick={() => onNavigate(View.NOTES)}
-                                className={`text-xs p-2.5 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${borderColor} ${bgColor}`}
+                                className={`text-xs p-3 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${borderColor} ${bgColor}`}
                             >
-                                <span className="font-bold mr-1 block truncate mb-0.5 text-slate-800 dark:text-slate-200">{note.title || 'Sem título'}</span>
-                                <span className="text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{note.content}</span>
+                                <span className="font-bold mr-1 block truncate mb-1 text-slate-800 dark:text-slate-200">{note.title || 'Sem título'}</span>
+                                <span className="text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{note.content}</span>
                             </div>
                         );
                     })
