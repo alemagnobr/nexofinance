@@ -237,6 +237,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       .filter(t => t.status === 'pending' && t.type === 'income')
       .reduce((acc, t) => acc + t.amount, 0);
 
+  const currentMonthPendingIncome = data.transactions
+      .filter(t => {
+          if (t.status !== 'pending' || t.type !== 'income') return false;
+          const tDate = new Date(t.date);
+          const today = new Date();
+          return tDate.getMonth() === today.getMonth() && tDate.getFullYear() === today.getFullYear();
+      })
+      .reduce((acc, t) => acc + t.amount, 0);
+
   // 4. Calcula Total Pago (Total Despesas - Total Pendente)
   const totalPaidExpenses = totalExpense - totalPending;
 
@@ -640,12 +649,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             
             {/* NEW: Only Pending Income (A Receber) */}
             {pendingIncome > 0 && (
-                <div className="flex items-center gap-1 mt-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded w-fit border border-emerald-100 dark:border-emerald-800/30">
-                    <Clock className="w-3 h-3 text-emerald-500" />
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        +{formatValue(pendingIncome)}
-                    </span>
-                    <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-medium">A Receber</span>
+                <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded w-fit border border-emerald-100 dark:border-emerald-800/30">
+                        <Clock className="w-3 h-3 text-emerald-500" />
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                            +{formatValue(pendingIncome)}
+                        </span>
+                        <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-medium">Total a Receber</span>
+                    </div>
+                    {currentMonthPendingIncome > 0 && (
+                        <div className="flex items-center gap-1 bg-emerald-50/50 dark:bg-emerald-900/10 px-2 py-1 rounded w-fit border border-emerald-100/50 dark:border-emerald-800/20 ml-2">
+                            <CalendarClock className="w-3 h-3 text-emerald-400" />
+                            <span className="text-[11px] font-bold text-emerald-500 dark:text-emerald-400/80">
+                                +{formatValue(currentMonthPendingIncome)}
+                            </span>
+                            <span className="text-[9px] text-emerald-500/70 dark:text-emerald-400/60 uppercase font-medium">Neste mês</span>
+                        </div>
+                    )}
                 </div>
             )}
           </div>
