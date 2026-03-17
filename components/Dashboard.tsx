@@ -658,23 +658,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             
             {/* NEW: Only Pending Income (A Receber) */}
             {pendingIncome > 0 && (
-                <div className="flex flex-col gap-2 mt-3">
-                    <div className="flex flex-col bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/30 w-fit">
-                        <div className="flex items-center gap-1 mb-1">
-                            <Clock className="w-3 h-3 text-emerald-500" />
-                            <span className="text-[9px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-bold tracking-wider">Total a Receber</span>
+                <div className="mt-4 flex flex-col bg-emerald-50/80 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800/30 overflow-hidden w-full">
+                    <div className="flex items-center justify-between px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 uppercase font-bold tracking-wider">Total a Receber</span>
                         </div>
-                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 leading-none whitespace-nowrap">
+                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                             +{formatValue(pendingIncome)}
                         </span>
                     </div>
                     {currentMonthPendingIncome > 0 && (
-                        <div className="flex flex-col bg-emerald-50/50 dark:bg-emerald-900/10 px-2.5 py-1.5 rounded-lg border border-emerald-100/50 dark:border-emerald-800/20 w-fit ml-2">
-                            <div className="flex items-center gap-1 mb-1">
-                                <CalendarClock className="w-3 h-3 text-emerald-400" />
-                                <span className="text-[9px] text-emerald-500/70 dark:text-emerald-400/60 uppercase font-bold tracking-wider">Neste mês</span>
+                        <div className="flex items-center justify-between px-3 py-2 bg-emerald-100/30 dark:bg-emerald-800/20 border-t border-emerald-100 dark:border-emerald-800/30">
+                            <div className="flex items-center gap-1.5">
+                                <CalendarClock className="w-3.5 h-3.5 text-emerald-500/80 dark:text-emerald-400/80" />
+                                <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-bold tracking-wider">Neste mês</span>
                             </div>
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400/80 leading-none whitespace-nowrap">
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400/90 whitespace-nowrap">
                                 +{formatValue(currentMonthPendingIncome)}
                             </span>
                         </div>
@@ -714,23 +714,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             
             {/* Secondary Value: Pending Expenses */}
             {totalPending > 0 ? (
-                <div className="flex flex-col gap-2 mt-3">
-                    <div className="flex flex-col bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1.5 rounded-lg border border-amber-100 dark:border-amber-800/30 w-fit">
-                        <div className="flex items-center gap-1 mb-1">
-                            <Clock className="w-3 h-3 text-amber-500" />
-                            <span className="text-[9px] text-amber-600/70 dark:text-amber-400/70 uppercase font-bold tracking-wider">Total a Pagar</span>
+                <div className="mt-4 flex flex-col bg-amber-50/80 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 overflow-hidden w-full">
+                    <div className="flex items-center justify-between px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                            <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 uppercase font-bold tracking-wider">Total a Pagar</span>
                         </div>
-                        <span className="text-sm font-bold text-amber-700 dark:text-amber-400 leading-none whitespace-nowrap">
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap">
                             -{formatValue(totalPending)}
                         </span>
                     </div>
                     {currentMonthPendingExpense > 0 && (
-                        <div className="flex flex-col bg-amber-50/50 dark:bg-amber-900/10 px-2.5 py-1.5 rounded-lg border border-amber-100/50 dark:border-amber-800/20 w-fit ml-2">
-                            <div className="flex items-center gap-1 mb-1">
-                                <CalendarClock className="w-3 h-3 text-amber-400" />
-                                <span className="text-[9px] text-amber-500/70 dark:text-amber-400/60 uppercase font-bold tracking-wider">Neste mês</span>
+                        <div className="flex items-center justify-between px-3 py-2 bg-amber-100/30 dark:bg-amber-800/20 border-t border-amber-100 dark:border-amber-800/30">
+                            <div className="flex items-center gap-1.5">
+                                <CalendarClock className="w-3.5 h-3.5 text-amber-500/80 dark:text-amber-400/80" />
+                                <span className="text-[10px] text-amber-600/70 dark:text-amber-400/70 uppercase font-bold tracking-wider">Neste mês</span>
                             </div>
-                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400/80 leading-none whitespace-nowrap">
+                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400/90 whitespace-nowrap">
                                 -{formatValue(currentMonthPendingExpense)}
                             </span>
                         </div>
