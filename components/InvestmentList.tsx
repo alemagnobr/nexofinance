@@ -778,7 +778,7 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                     </div>
                   </div>
                 ) : (
-                    <div className="mt-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="mt-2 flex justify-end opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                        <button 
                           onClick={() => { setEditingTargetId(inv.id); setEditingTargetValue(''); }} 
                           className="text-[10px] text-slate-400 hover:text-indigo-500 flex items-center gap-1 uppercase font-bold tracking-wider"

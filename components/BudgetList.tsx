@@ -463,7 +463,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
                       )}
                       
                       {/* Actions on Hover */}
-                      <div className="hidden group-hover:flex gap-1 absolute top-4 right-4 bg-white dark:bg-slate-800 pl-2">
+                      <div className="flex md:hidden md:group-hover:flex gap-1 absolute top-4 right-4 bg-white dark:bg-slate-800 pl-2">
                           <button onClick={() => startEditing(budget)} className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded"><Edit2 className="w-4 h-4"/></button>
                           <button onClick={() => onDelete(budget.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-4 h-4"/></button>
                       </div>
@@ -552,7 +552,7 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
                              onClick={() => onNavigate(View.INVESTMENTS)}
                              className="bg-gradient-to-br from-white to-yellow-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-xl shadow-sm border border-yellow-200 dark:border-yellow-900/30 relative overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all group"
                           >
-                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                   <LineChart className="w-4 h-4 text-slate-400" />
                               </div>
 

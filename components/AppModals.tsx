@@ -104,7 +104,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
                  <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-6 relative group cursor-pointer" onClick={copyPix}>
                     <p className="text-xs font-bold text-slate-500 uppercase mb-1">Chave Pix (CPF)</p>
                     <p className="text-sm font-mono font-bold text-slate-700 dark:text-slate-200 break-all select-all">{PIX_KEY}</p>
-                    <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                    <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity rounded-xl">
                        <span className="bg-white dark:bg-slate-800 text-xs font-bold px-2 py-1 rounded shadow flex items-center gap-1">
                           <Copy className="w-3 h-3" /> Copiar
                        </span>

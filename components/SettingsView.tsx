@@ -276,7 +276,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                       {!cat.isDefault && (
                                           <button 
                                               onClick={() => { if(confirm(`Excluir categoria "${cat.name}"?`)) actions.deleteCategory(cat.id); }}
-                                              className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                           >
                                               <Trash2 className="w-4 h-4" />
                                           </button>
@@ -300,7 +300,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                       {!cat.isDefault && (
                                           <button 
                                               onClick={() => { if(confirm(`Excluir categoria "${cat.name}"?`)) actions.deleteCategory(cat.id); }}
-                                              className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                           >
                                               <Trash2 className="w-4 h-4" />
                                           </button>

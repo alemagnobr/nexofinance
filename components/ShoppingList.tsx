@@ -276,7 +276,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                  <button 
                     onClick={() => setIsAiModalOpen(true)}
                     disabled={!hasApiKey}
-                    className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
                  >
                     <Sparkles className="w-4 h-4" /> Gerar com IA
                  </button>
@@ -350,7 +350,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             <select
                 value={newItemCategory}
                 onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                className="hidden md:block w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                className="w-28 md:w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
             >
                 {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>

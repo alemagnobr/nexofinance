@@ -956,7 +956,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                       </div>
 
                                       {/* Actions */}
-                                      <div className="flex items-center gap-3 pl-2">
+                                      <div className="flex items-center gap-2 pl-2">
                                           <button 
                                               onClick={() => onToggleStatus(t.id)}
                                               className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -967,8 +967,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           >
                                               <CheckCircle className="w-3.5 h-3.5" />
                                           </button>
-                                          <button onClick={() => handleEdit(t)} className="p-1 text-slate-400">
-                                                <MoreHorizontal className="w-4 h-4" />
+                                          <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                <Pencil className="w-4 h-4" />
+                                          </button>
+                                          <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                <Trash2 className="w-4 h-4" />
                                           </button>
                                       </div>
                                   </div>
@@ -1048,7 +1051,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           </div>
 
                                           {/* Actions */}
-                                          <div className="w-16 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <div className="w-16 flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                               <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
                                                   <Pencil className="w-4 h-4" />
                                               </button>
