@@ -216,6 +216,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   const totalExpense = data.transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
   const totalPending = data.transactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
   
+  const currentMonthPendingExpense = data.transactions
+      .filter(t => {
+          if (t.status !== 'pending' || t.type !== 'expense') return false;
+          const tDate = new Date(t.date);
+          const today = new Date();
+          return tDate.getMonth() === today.getMonth() && tDate.getFullYear() === today.getFullYear();
+      })
+      .reduce((acc, t) => acc + t.amount, 0);
+  
   // FIX: Lógica de saldo aprimorada
   // 1. Calcula o saldo real baseado puramente nas transações carregadas agora (Pago/Recebido)
   const realTimeBalance = data.transactions
@@ -701,12 +710,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             
             {/* Secondary Value: Pending Expenses */}
             {totalPending > 0 ? (
-                <div className="flex items-center gap-1 mt-1 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit border border-amber-100 dark:border-amber-800/30">
-                    <Clock className="w-3 h-3 text-amber-500" />
-                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                        -{formatValue(totalPending)}
-                    </span>
-                    <span className="text-[10px] text-amber-600/70 dark:text-amber-400/70 uppercase font-medium">A Pagar</span>
+                <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded w-fit border border-amber-100 dark:border-amber-800/30">
+                        <Clock className="w-3 h-3 text-amber-500" />
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                            -{formatValue(totalPending)}
+                        </span>
+                        <span className="text-[10px] text-amber-600/70 dark:text-amber-400/70 uppercase font-medium">Total a Pagar</span>
+                    </div>
+                    {currentMonthPendingExpense > 0 && (
+                        <div className="flex items-center gap-1 bg-amber-50/50 dark:bg-amber-900/10 px-2 py-1 rounded w-fit border border-amber-100/50 dark:border-amber-800/20 ml-2">
+                            <CalendarClock className="w-3 h-3 text-amber-400" />
+                            <span className="text-[11px] font-bold text-amber-500 dark:text-amber-400/80">
+                                -{formatValue(currentMonthPendingExpense)}
+                            </span>
+                            <span className="text-[9px] text-amber-500/70 dark:text-amber-400/60 uppercase font-medium">Neste mês</span>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="flex items-center gap-1 mt-1 px-2 py-1">
