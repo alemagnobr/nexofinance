@@ -109,7 +109,7 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], kanbanBoards: [], notes: [], passwords: [], categories: []
+            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], kanbanBoards: [], notes: [], passwords: [], categories: [], agendaEvents: []
         });
     } else {
         await signOut(auth);

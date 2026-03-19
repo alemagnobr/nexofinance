@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard, KanbanTag, KanbanComment, KanbanAttachment } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface KanbanBoardProps {
   boards: IKanbanBoard[];
@@ -350,6 +350,44 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       setEditingCard(null);
   };
 
+  const handleMoveCardUp = (colId: string, cardId: string) => {
+      if (!activeBoard) return;
+      const col = activeBoard.columns.find(c => c.id === colId);
+      if (!col) return;
+      
+      const cardIndex = col.cards.findIndex(c => c.id === cardId);
+      if (cardIndex <= 0) return; // Already at top
+      
+      const newCards = [...col.cards];
+      const temp = newCards[cardIndex];
+      newCards[cardIndex] = newCards[cardIndex - 1];
+      newCards[cardIndex - 1] = temp;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === colId ? { ...c, cards: newCards } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleMoveCardDown = (colId: string, cardId: string) => {
+      if (!activeBoard) return;
+      const col = activeBoard.columns.find(c => c.id === colId);
+      if (!col) return;
+      
+      const cardIndex = col.cards.findIndex(c => c.id === cardId);
+      if (cardIndex === -1 || cardIndex >= col.cards.length - 1) return; // Already at bottom
+      
+      const newCards = [...col.cards];
+      const temp = newCards[cardIndex];
+      newCards[cardIndex] = newCards[cardIndex + 1];
+      newCards[cardIndex + 1] = temp;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === colId ? { ...c, cards: newCards } : c
+      );
+      saveColumns(newCols);
+  };
+
   const handleMoveCardFallback = (sourceColId: string, targetColId: string, cardId: string) => {
       if (!activeBoard || sourceColId === targetColId) return;
 
@@ -390,14 +428,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e: React.DragEvent, targetColId: string) => {
+  const handleDrop = (e: React.DragEvent, targetColId: string, targetCardId?: string) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!draggedCard || !activeBoard) return;
 
       const { cardId, sourceColId } = draggedCard;
-      if (sourceColId === targetColId) {
+      if (cardId === targetCardId) {
           setDraggedCard(null);
-          return; 
+          return;
       }
 
       const sourceCol = activeBoard.columns.find(c => c.id === sourceColId);
@@ -407,11 +446,49 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
           const card = sourceCol.cards.find(c => c.id === cardId);
           if (card) {
               const newCols = activeBoard.columns.map(c => {
-                  if (c.id === sourceColId) {
+                  if (c.id === sourceColId && sourceColId !== targetColId) {
                       return { ...c, cards: c.cards.filter(x => x.id !== cardId) };
                   }
                   if (c.id === targetColId) {
-                      return { ...c, cards: [...c.cards, card] };
+                      let newCards = [...c.cards];
+                      
+                      if (sourceColId === targetColId) {
+                          // Reordering within the same column
+                          const sourceIndex = newCards.findIndex(x => x.id === cardId);
+                          newCards.splice(sourceIndex, 1);
+                          
+                          if (targetCardId) {
+                              const targetIndex = newCards.findIndex(x => x.id === targetCardId);
+                              // If targetCardId is not found (shouldn't happen), append to end
+                              const insertIndex = targetIndex !== -1 ? targetIndex : newCards.length;
+                              
+                              // Determine if we should insert before or after based on mouse position
+                              // For simplicity, we'll just insert at the target index (which shifts it down)
+                              // A more advanced implementation would check e.clientY vs element bounding box
+                              const rect = (e.target as HTMLElement).closest('.group')?.getBoundingClientRect();
+                              const isAfter = rect ? e.clientY > rect.top + rect.height / 2 : false;
+                              
+                              newCards.splice(isAfter ? insertIndex + 1 : insertIndex, 0, card);
+                          } else {
+                              // Dropped on the column itself, append to end
+                              newCards.push(card);
+                          }
+                      } else {
+                          // Moving to a new column
+                          if (targetCardId) {
+                              const targetIndex = newCards.findIndex(x => x.id === targetCardId);
+                              const insertIndex = targetIndex !== -1 ? targetIndex : newCards.length;
+                              
+                              const rect = (e.target as HTMLElement).closest('.group')?.getBoundingClientRect();
+                              const isAfter = rect ? e.clientY > rect.top + rect.height / 2 : false;
+                              
+                              newCards.splice(isAfter ? insertIndex + 1 : insertIndex, 0, card);
+                          } else {
+                              // Dropped on the column itself, append to end
+                              newCards.push(card);
+                          }
+                      }
+                      return { ...c, cards: newCards };
                   }
                   return c;
               });
@@ -630,6 +707,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       draggable={!isTouchDevice}
                                       onDragStart={(e) => handleDragStart(e, card.id, col.id)}
                                       onDragEnd={handleDragEnd}
+                                      onDragOver={handleDragOver}
+                                      onDrop={(e) => handleDrop(e, col.id, card.id)}
                                       onContextMenu={(e) => e.preventDefault()}
                                       className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : ''} hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
@@ -683,8 +762,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                               )}
 
                                               <div className="flex justify-between items-start">
-                                                  <p className="font-semibold text-slate-800 dark:text-white text-sm">{card.title}</p>
-                                                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                  <p className="font-semibold text-slate-800 dark:text-white text-sm pr-2">{card.title}</p>
+                                                  <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+                                                      <button 
+                                                          onClick={() => handleMoveCardUp(col.id, card.id)}
+                                                          className="text-slate-400 hover:text-indigo-500 p-0.5"
+                                                          title="Mover para cima"
+                                                      >
+                                                          <ArrowUp className="w-3 h-3" />
+                                                      </button>
+                                                      <button 
+                                                          onClick={() => handleMoveCardDown(col.id, card.id)}
+                                                          className="text-slate-400 hover:text-indigo-500 p-0.5"
+                                                          title="Mover para baixo"
+                                                      >
+                                                          <ArrowDown className="w-3 h-3" />
+                                                      </button>
                                                       <button 
                                                           onClick={() => setEditingCard({ id: card.id, title: card.title, amount: card.amount.toString() })}
                                                           className="text-slate-400 hover:text-indigo-500 p-0.5"

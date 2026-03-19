@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { syncTransactionsToCalendar } from '../services/calendarService';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
@@ -9,7 +9,12 @@ import { auth } from '../services/firebase';
 interface FinancialCalendarProps {
   transactions: Transaction[];
   budgets: Budget[]; // Added budget prop
+  agendaEvents?: AgendaEvent[];
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
+  onAddAgendaEvent?: (e: Omit<AgendaEvent, 'id' | 'updatedAt'>) => void;
+  onUpdateAgendaEvent?: (id: string, updates: Partial<AgendaEvent>) => void;
+  onDeleteAgendaEvent?: (id: string) => void;
+  onSyncAgendaEvents?: (timeMin: Date, timeMax: Date) => void;
   privacyMode: boolean;
 }
 
@@ -51,11 +56,30 @@ const exportToICS = (events: any[]) => {
     document.body.removeChild(link);
 };
 
-export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactions, budgets, onAddTransaction, privacyMode }) => {
+export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ 
+  transactions, 
+  budgets, 
+  agendaEvents = [],
+  onAddTransaction, 
+  onAddAgendaEvent,
+  onUpdateAgendaEvent,
+  onDeleteAgendaEvent,
+  onSyncAgendaEvents,
+  privacyMode 
+}) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
   const [filterType, setFilterType] = useState<ViewFilter>('all');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [agendaFormData, setAgendaFormData] = useState({
+      id: '',
+      title: '',
+      description: '',
+      startTime: '',
+      endTime: '',
+      allDay: true
+  });
 
   // Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -78,6 +102,15 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
+
+  // Sync Agenda Events when month changes
+  useEffect(() => {
+      if (onSyncAgendaEvents) {
+          const timeMin = new Date(year, month, 1);
+          const timeMax = new Date(year, month + 1, 0, 23, 59, 59);
+          onSyncAgendaEvents(timeMin, timeMax);
+      }
+  }, [year, month, onSyncAgendaEvents]);
 
   // --- ALERTS LOGIC (Copied from Dashboard but focused on Exceeded) ---
   const budgetAlerts = useMemo(() => {
@@ -171,8 +204,19 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
 
   }, [transactions, year, month, daysInMonth, filterType]);
 
+  // Agenda Events for this month
+  const displayedAgendaEvents = useMemo(() => {
+      return agendaEvents.filter(e => {
+          const eStart = new Date(e.startDate);
+          const eEnd = new Date(e.endDate);
+          const monthStart = new Date(year, month, 1);
+          const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+          
+          return eStart <= monthEnd && eEnd >= monthStart;
+      });
+  }, [agendaEvents, year, month]);
 
-  // Selected Day Transactions
+  // Selected Day Transactions and Events
   const selectedTransactions = useMemo(() => {
     if (selectedDay === null) return [];
     return displayedTransactions.filter(t => {
@@ -180,6 +224,21 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
        return day === selectedDay;
     });
   }, [displayedTransactions, selectedDay]);
+
+  const selectedAgendaEvents = useMemo(() => {
+      if (selectedDay === null) return [];
+      const targetDate = new Date(year, month, selectedDay);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      return displayedAgendaEvents.filter(e => {
+          const eStart = new Date(e.startDate);
+          eStart.setHours(0, 0, 0, 0);
+          const eEnd = new Date(e.endDate);
+          eEnd.setHours(23, 59, 59, 999);
+          
+          return targetDate >= eStart && targetDate <= eEnd;
+      });
+  }, [displayedAgendaEvents, selectedDay, year, month]);
 
   // Heatmap Calculation
   const maxDailyExpense = useMemo(() => {
@@ -217,6 +276,80 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
           observation: ''
       });
       setIsModalOpen(true);
+  };
+
+  const handleOpenAgendaModal = () => {
+      if (!selectedDay) return;
+      setAgendaFormData({
+          id: '',
+          title: '',
+          description: '',
+          startTime: '09:00',
+          endTime: '10:00',
+          allDay: true
+      });
+      setIsAgendaModalOpen(true);
+  };
+
+  const handleEditAgendaEvent = (event: AgendaEvent) => {
+      const start = new Date(event.startDate);
+      const end = new Date(event.endDate);
+      setAgendaFormData({
+          id: event.id,
+          title: event.title,
+          description: event.description || '',
+          startTime: start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          endTime: end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          allDay: event.allDay
+      });
+      setIsAgendaModalOpen(true);
+  };
+
+  const handleDeleteAgendaEvent = async (id: string) => {
+      if (window.confirm('Tem certeza que deseja excluir este evento?')) {
+          if (onDeleteAgendaEvent) {
+              await onDeleteAgendaEvent(id);
+          }
+      }
+  };
+
+  const handleAgendaSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedDay || !onAddAgendaEvent || !onUpdateAgendaEvent) return;
+
+      const baseDate = new Date(year, month, selectedDay);
+      let startDate = new Date(baseDate);
+      let endDate = new Date(baseDate);
+
+      if (!agendaFormData.allDay) {
+          const [startHour, startMin] = agendaFormData.startTime.split(':').map(Number);
+          const [endHour, endMin] = agendaFormData.endTime.split(':').map(Number);
+          startDate.setHours(startHour, startMin, 0, 0);
+          endDate.setHours(endHour, endMin, 0, 0);
+      } else {
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+      }
+
+      if (agendaFormData.id) {
+          await onUpdateAgendaEvent(agendaFormData.id, {
+              title: agendaFormData.title,
+              description: agendaFormData.description,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              allDay: agendaFormData.allDay
+          });
+      } else {
+          await onAddAgendaEvent({
+              title: agendaFormData.title,
+              description: agendaFormData.description,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              allDay: agendaFormData.allDay
+          });
+      }
+
+      setIsAgendaModalOpen(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -283,6 +416,18 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
   
   for (let day = 1; day <= daysInMonth; day++) {
     const dayTrans = displayedTransactions.filter(t => parseInt(t.date.split('-')[2]) === day);
+    
+    // Find agenda events for this day
+    const targetDate = new Date(year, month, day);
+    targetDate.setHours(0, 0, 0, 0);
+    const dayAgendaEvents = displayedAgendaEvents.filter(e => {
+        const eStart = new Date(e.startDate);
+        eStart.setHours(0, 0, 0, 0);
+        const eEnd = new Date(e.endDate);
+        eEnd.setHours(23, 59, 59, 999);
+        return targetDate >= eStart && targetDate <= eEnd;
+    });
+
     const incomeSum = dayTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const expenseSum = dayTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     
@@ -311,9 +456,14 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
             <span className={`text-xs font-bold inline-flex w-6 h-6 items-center justify-center rounded-full ${isToday ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 dark:text-slate-400'}`}>
             {day}
             </span>
-            {dayTrans.some(t => t.status === 'pending') && (
-                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" title="Pagamentos Pendentes"></div>
-            )}
+            <div className="flex gap-1">
+                {dayAgendaEvents.length > 0 && (
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${dayAgendaEvents.length} Eventos`}></div>
+                )}
+                {dayTrans.some(t => t.status === 'pending') && (
+                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" title="Pagamentos Pendentes"></div>
+                )}
+            </div>
         </div>
         
         <div className="mt-2 flex flex-col gap-0.5">
@@ -325,6 +475,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
            {expenseSum > 0 && (
               <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 px-1 rounded truncate">
                  -{formatValue(expenseSum)}
+              </div>
+           )}
+           {dayAgendaEvents.length > 0 && (
+              <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-900/30 px-1 rounded truncate">
+                 {dayAgendaEvents.length} Evento{dayAgendaEvents.length > 1 ? 's' : ''}
               </div>
            )}
            {dayTrans.some((t: any) => t.isGhost) && (
@@ -495,6 +650,96 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
            </div>
        )}
 
+       {/* ADD AGENDA EVENT MODAL */}
+       {isAgendaModalOpen && (
+           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                       <div>
+                           <h3 className="text-lg font-bold text-slate-800 dark:text-white">{agendaFormData.id ? 'Editar Evento' : 'Novo Evento'}</h3>
+                           <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                               <CalendarClock className="w-3 h-3" />
+                               {selectedDay} de {currentDate.toLocaleDateString('pt-BR', { month: 'long' })}
+                           </p>
+                       </div>
+                       <button onClick={() => setIsAgendaModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                           <X className="w-5 h-5" />
+                       </button>
+                   </div>
+                   
+                   <form onSubmit={handleAgendaSubmit} className="p-6 space-y-4">
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Título</label>
+                           <input 
+                               autoFocus
+                               required
+                               type="text" 
+                               placeholder="Ex: Reunião, Consulta..."
+                               value={agendaFormData.title}
+                               onChange={(e) => setAgendaFormData({...agendaFormData, title: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                           />
+                       </div>
+
+                       <div>
+                           <label className="flex items-center gap-2 cursor-pointer">
+                               <input 
+                                   type="checkbox" 
+                                   checked={agendaFormData.allDay}
+                                   onChange={(e) => setAgendaFormData({...agendaFormData, allDay: e.target.checked})}
+                                   className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                               />
+                               <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dia inteiro</span>
+                           </label>
+                       </div>
+
+                       {!agendaFormData.allDay && (
+                           <div className="grid grid-cols-2 gap-4">
+                               <div>
+                                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Início</label>
+                                   <input 
+                                       required
+                                       type="time"
+                                       value={agendaFormData.startTime}
+                                       onChange={(e) => setAgendaFormData({...agendaFormData, startTime: e.target.value})}
+                                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                   />
+                               </div>
+                               <div>
+                                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Fim</label>
+                                   <input 
+                                       required
+                                       type="time"
+                                       value={agendaFormData.endTime}
+                                       onChange={(e) => setAgendaFormData({...agendaFormData, endTime: e.target.value})}
+                                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                   />
+                               </div>
+                           </div>
+                       )}
+
+                        <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Descrição (Opcional)</label>
+                           <textarea 
+                               placeholder="Detalhes adicionais..."
+                               value={agendaFormData.description}
+                               onChange={(e) => setAgendaFormData({...agendaFormData, description: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none"
+                           />
+                       </div>
+
+                       <button 
+                           type="submit"
+                           className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 mt-4"
+                       >
+                           {agendaFormData.id ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />} 
+                           {agendaFormData.id ? 'Atualizar Evento' : 'Salvar Evento'}
+                       </button>
+                   </form>
+               </div>
+           </div>
+       )}
+
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -598,20 +843,28 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
                 {selectedDay ? `${selectedDay} de ${currentDate.toLocaleDateString('pt-BR', { month: 'long' })}` : 'Resumo do Mês'}
                 </h3>
                 {selectedDay && (
-                    <button 
-                        onClick={handleOpenModal}
-                        className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-                    >
-                        <Plus className="w-4 h-4" /> Adicionar neste dia
-                    </button>
+                    <div className="flex gap-2 mt-3">
+                        <button 
+                            onClick={handleOpenModal}
+                            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                        >
+                            <Plus className="w-3 h-3" /> Transação
+                        </button>
+                        <button 
+                            onClick={handleOpenAgendaModal}
+                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                        >
+                            <CalendarClock className="w-3 h-3" /> Evento
+                        </button>
+                    </div>
                 )}
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-               {selectedDay && selectedTransactions.length === 0 && (
+               {selectedDay && selectedTransactions.length === 0 && selectedAgendaEvents.length === 0 && (
                   <div className="text-center py-10">
                       <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">Nenhuma movimentação.</p>
+                      <p className="text-slate-400 text-sm">Nenhuma movimentação ou evento.</p>
                   </div>
                )}
                {!selectedDay && (
@@ -620,10 +873,48 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({ transactio
                           <CalendarIcon className="w-8 h-8 text-indigo-500" />
                       </div>
                       <p className="text-slate-500 font-medium">Selecione um dia</p>
-                      <p className="text-slate-400 text-xs mt-1">Clique no calendário para ver detalhes ou adicionar contas.</p>
+                      <p className="text-slate-400 text-xs mt-1">Clique no calendário para ver detalhes ou adicionar contas e eventos.</p>
                   </div>
                )}
                
+               {/* Render Agenda Events */}
+               {selectedAgendaEvents.map((event) => (
+                 <div key={event.id} className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                       <div className="p-2 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 mt-0.5">
+                          <CalendarIcon className="w-4 h-4" />
+                       </div>
+                       <div>
+                          <p className="font-semibold text-slate-800 dark:text-white text-sm">{event.title}</p>
+                          {event.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">{event.description}</p>}
+                          <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {event.allDay ? 'Dia Inteiro' : `${new Date(event.startDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})} - ${new Date(event.endDate).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`}
+                              </span>
+                          </div>
+                       </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <button 
+                            onClick={() => handleEditAgendaEvent(event)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                            title="Editar Evento"
+                        >
+                            <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                            onClick={() => handleDeleteAgendaEvent(event.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
+                            title="Excluir Evento"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                 </div>
+               ))}
+
+               {/* Render Transactions */}
                {selectedTransactions.map((t, idx) => (
                  <div key={t.id || idx} className={`flex items-center justify-between p-3 rounded-lg border ${
                      (t as any).isGhost 

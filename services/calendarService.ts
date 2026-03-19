@@ -1,7 +1,7 @@
 
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { Transaction } from '../types';
+import { Transaction, AgendaEvent } from '../types';
 
 const CALENDAR_NAME = "NEXO Finanças";
 
@@ -155,6 +155,106 @@ export const syncTransactionsToCalendar = async (
             console.error(`Failed to sync transaction ${t.description}`, e);
         }
     }
-
     return syncedCount;
+};
+
+// 6. Fetch Events from Google Calendar
+export const fetchGoogleEvents = async (timeMin: Date, timeMax: Date): Promise<any[]> => {
+    const token = await getAccessToken();
+    if (!token) return [];
+
+    try {
+        // Fetch from primary calendar
+        const primaryUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
+        const primaryData = await fetchGoogleApi(primaryUrl, 'GET', token);
+        let allEvents = primaryData?.items || [];
+
+        // Fetch from NEXO calendar if it exists
+        try {
+            const calendarId = await getOrCreateCalendar(token);
+            if (calendarId && calendarId !== 'primary') {
+                const nexoUrl = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}&singleEvents=true&orderBy=startTime`;
+                const nexoData = await fetchGoogleApi(nexoUrl, 'GET', token);
+                if (nexoData?.items) {
+                    allEvents = [...allEvents, ...nexoData.items];
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching NEXO calendar events", e);
+        }
+
+        return allEvents;
+    } catch (error) {
+        console.error("Error fetching Google events:", error);
+        return [];
+    }
+};
+
+// 7. Create General Event
+export const createGeneralCalendarEvent = async (event: AgendaEvent): Promise<string | null> => {
+    const token = await getAccessToken();
+    if (!token) return null;
+
+    // Save to primary calendar so it's a "real" agenda event
+    const calendarId = 'primary'; 
+
+    const gEvent: any = {
+        summary: event.title,
+        description: event.description || '',
+    };
+
+    if (event.allDay) {
+        gEvent.start = { date: event.startDate.split('T')[0] };
+        gEvent.end = { date: event.endDate.split('T')[0] };
+    } else {
+        gEvent.start = { dateTime: event.startDate };
+        gEvent.end = { dateTime: event.endDate };
+    }
+
+    const data = await fetchGoogleApi(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`, 'POST', token, gEvent);
+    return data?.id || null;
+};
+
+// 8. Update General Event
+export const updateGeneralCalendarEvent = async (event: AgendaEvent, eventId: string): Promise<void> => {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    // Try to update in primary first, if not found, try NEXO
+    const gEvent: any = {
+        summary: event.title,
+        description: event.description || '',
+    };
+
+    if (event.allDay) {
+        gEvent.start = { date: event.startDate.split('T')[0] };
+        gEvent.end = { date: event.endDate.split('T')[0] };
+    } else {
+        gEvent.start = { dateTime: event.startDate };
+        gEvent.end = { dateTime: event.endDate };
+    }
+
+    try {
+        await fetchGoogleApi(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, 'PATCH', token, gEvent);
+    } catch (e: any) {
+        if (e.message?.includes('Not Found')) {
+            const calendarId = await getOrCreateCalendar(token);
+            await fetchGoogleApi(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`, 'PATCH', token, gEvent);
+        }
+    }
+};
+
+// 9. Delete General Event
+export const deleteGeneralCalendarEvent = async (eventId: string): Promise<void> => {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    try {
+        await fetchGoogleApi(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, 'DELETE', token);
+    } catch (e: any) {
+        if (e.message?.includes('Not Found')) {
+            const calendarId = await getOrCreateCalendar(token);
+            await fetchGoogleApi(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${eventId}`, 'DELETE', token);
+        }
+    }
 };

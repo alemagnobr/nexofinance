@@ -176,6 +176,17 @@ export interface PasswordEntry {
   updatedAt: string;
 }
 
+export interface AgendaEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string; // ISO datetime or YYYY-MM-DD
+  endDate: string; // ISO datetime or YYYY-MM-DD
+  allDay: boolean;
+  googleEventId?: string;
+  updatedAt?: string;
+}
+
 export interface AppData {
   transactions: Transaction[];
   categories: Category[]; // New field
@@ -188,6 +199,7 @@ export interface AppData {
   kanbanBoards: KanbanBoard[]; // Novo campo: Múltiplos Quadros
   notes: Note[]; // Novo campo: Notas
   passwords: PasswordEntry[]; // Novo campo: Senhas
+  agendaEvents: AgendaEvent[]; // Novo campo: Agenda Geral
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance

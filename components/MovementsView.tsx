@@ -97,7 +97,12 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
           <FinancialCalendar 
             transactions={data.transactions} 
             budgets={data.budgets}
+            agendaEvents={data.agendaEvents}
             onAddTransaction={actions.addTransaction}
+            onAddAgendaEvent={actions.addAgendaEvent}
+            onUpdateAgendaEvent={actions.updateAgendaEvent}
+            onDeleteAgendaEvent={actions.deleteAgendaEvent}
+            onSyncAgendaEvents={actions.syncAgendaEvents}
             privacyMode={privacyMode} 
           />
         )}

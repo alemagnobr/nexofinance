@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -11,11 +11,12 @@ import {
   saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
+  addAgendaEventFire, updateAgendaEventFire, deleteAgendaEventFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
 } from '../services/storageService';
-import { deleteCalendarEvent, updateCalendarEvent } from '../services/calendarService';
+import { deleteCalendarEvent, updateCalendarEvent, createGeneralCalendarEvent, updateGeneralCalendarEvent, deleteGeneralCalendarEvent, fetchGoogleEvents } from '../services/calendarService';
 
 const DEFAULT_DATA: AppData = {
     transactions: [],
@@ -28,6 +29,7 @@ const DEFAULT_DATA: AppData = {
     kanbanBoards: [],
     notes: [],
     passwords: [],
+    agendaEvents: [],
     unlockedBadges: [],
     walletBalance: 0,
     categories: DEFAULT_CATEGORIES // Initial defaults
@@ -201,16 +203,78 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const deleteTransaction = async (id: string) => {
-    // 1. Google Calendar Integration: Delete event if connected
     const transactionToDelete = data.transactions.find(t => t.id === id);
-    if (transactionToDelete && transactionToDelete.googleEventId && user) {
-        // Fire and forget
-        deleteCalendarEvent(transactionToDelete.googleEventId)
-            .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
-    }
+    if (!transactionToDelete) return;
 
-    if (user) await deleteTransactionFire(user.uid, id);
-    else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+    // Check for installments or daily recurrence
+    const installmentMatch = transactionToDelete.description.match(/^(.*) \(\d+\/\d+\)$/);
+    const dailyMatch = transactionToDelete.description.match(/^(.*) \(Dia \d+\)$/);
+
+    if (transactionToDelete.isRecurring || installmentMatch || dailyMatch) {
+        let baseDescription = transactionToDelete.description;
+        if (installmentMatch) baseDescription = installmentMatch[1];
+        if (dailyMatch) baseDescription = dailyMatch[1];
+
+        // Find all related recurring transactions (same description)
+        const relatedTransactions = data.transactions.filter(t => {
+            if (transactionToDelete.isRecurring) {
+                return t.description === baseDescription && t.isRecurring;
+            } else if (installmentMatch) {
+                return t.description.startsWith(baseDescription + ' (') && t.description.match(/ \(\d+\/\d+\)$/);
+            } else if (dailyMatch) {
+                return t.description.startsWith(baseDescription + ' (') && t.description.match(/ \(Dia \d+\)$/);
+            }
+            return false;
+        });
+
+        const toDelete: string[] = [];
+        const toUpdate: string[] = [];
+
+        const deletedDate = new Date(transactionToDelete.date);
+
+        relatedTransactions.forEach(t => {
+            const tDate = new Date(t.date);
+            if (tDate >= deletedDate) {
+                toDelete.push(t.id);
+                // 1. Google Calendar Integration: Delete event if connected
+                if (t.googleEventId && user) {
+                    deleteCalendarEvent(t.googleEventId)
+                        .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
+                }
+            } else {
+                if (transactionToDelete.isRecurring) {
+                    toUpdate.push(t.id);
+                }
+            }
+        });
+
+        if (user) {
+            // Delete future ones
+            await Promise.all(toDelete.map(delId => deleteTransactionFire(user.uid, delId)));
+            // Update past ones to stop recurring
+            if (toUpdate.length > 0) {
+                await Promise.all(toUpdate.map(updateId => updateTransactionFire(user.uid, updateId, { isRecurring: false })));
+            }
+        } else {
+            setData(prev => {
+                let newTransactions = prev.transactions.filter(t => !toDelete.includes(t.id));
+                if (toUpdate.length > 0) {
+                    newTransactions = newTransactions.map(t => 
+                        toUpdate.includes(t.id) ? { ...t, isRecurring: false } : t
+                    );
+                }
+                return { ...prev, transactions: newTransactions };
+            });
+        }
+    } else {
+        // Normal deletion
+        if (transactionToDelete.googleEventId && user) {
+            deleteCalendarEvent(transactionToDelete.googleEventId)
+                .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
+        }
+        if (user) await deleteTransactionFire(user.uid, id);
+        else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+    }
   };
 
   const toggleTransactionStatus = async (id: string) => {
@@ -410,6 +474,128 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, passwords: prev.passwords.filter(p => p.id !== id) }));
   };
 
+  // --- AGENDA ACTIONS ---
+  const addAgendaEvent = async (event: Omit<AgendaEvent, 'id' | 'updatedAt'>) => {
+      const newEvent: AgendaEvent = {
+          ...event,
+          id: crypto.randomUUID(),
+          updatedAt: new Date().toISOString()
+      };
+      
+      if (user) {
+          // Sync to Google Calendar first
+          try {
+              const googleEventId = await createGeneralCalendarEvent(newEvent);
+              if (googleEventId) newEvent.googleEventId = googleEventId;
+          } catch (e) {
+              console.error("Failed to sync new event to Google Calendar", e);
+          }
+          await addAgendaEventFire(user.uid, newEvent);
+      } else {
+          setData(prev => ({ ...prev, agendaEvents: [...prev.agendaEvents, newEvent] }));
+      }
+  };
+
+  const updateAgendaEvent = async (id: string, updates: Partial<AgendaEvent>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      
+      if (user) {
+          const existingEvent = data.agendaEvents.find(e => e.id === id);
+          if (existingEvent?.googleEventId) {
+              try {
+                  await updateGeneralCalendarEvent({ ...existingEvent, ...updates } as AgendaEvent, existingEvent.googleEventId);
+              } catch (e) {
+                  console.error("Failed to update event in Google Calendar", e);
+              }
+          }
+          await updateAgendaEventFire(user.uid, id, finalUpdates);
+      } else {
+          setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.map(e => e.id === id ? { ...e, ...finalUpdates } : e) }));
+      }
+  };
+
+  const deleteAgendaEvent = async (id: string) => {
+      if (user) {
+          const existingEvent = data.agendaEvents.find(e => e.id === id);
+          if (existingEvent?.googleEventId) {
+              try {
+                  await deleteGeneralCalendarEvent(existingEvent.googleEventId);
+              } catch (e) {
+                  console.error("Failed to delete event from Google Calendar", e);
+              }
+          }
+          await deleteAgendaEventFire(user.uid, id);
+      } else {
+          setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.filter(e => e.id !== id) }));
+      }
+  };
+
+  const syncAgendaEvents = async (timeMin: Date, timeMax: Date) => {
+      if (!user) return;
+      try {
+          const googleEvents = await fetchGoogleEvents(timeMin, timeMax);
+          
+          // Track IDs of events fetched from Google
+          const fetchedGoogleIds = new Set<string>();
+
+          for (const gEvent of googleEvents) {
+              fetchedGoogleIds.add(gEvent.id);
+
+              // Skip if this event is already a transaction
+              if (data.transactions.some(t => t.googleEventId === gEvent.id)) {
+                  continue;
+              }
+
+              // Check if we already have it
+              const exists = data.agendaEvents.find(e => e.googleEventId === gEvent.id);
+              if (!exists) {
+                  // Create it locally
+                  const newEvent: AgendaEvent = {
+                      id: crypto.randomUUID(),
+                      title: gEvent.summary || 'Evento sem título',
+                      description: gEvent.description || '',
+                      startDate: gEvent.start?.dateTime || gEvent.start?.date || new Date().toISOString(),
+                      endDate: gEvent.end?.dateTime || gEvent.end?.date || new Date().toISOString(),
+                      allDay: !!gEvent.start?.date,
+                      googleEventId: gEvent.id,
+                      updatedAt: new Date().toISOString()
+                  };
+                  await addAgendaEventFire(user.uid, newEvent);
+              } else {
+                  // Update locally if Google event is newer (simplified: just update)
+                  // In a real app, compare updated timestamps
+                  const updates: Partial<AgendaEvent> = {
+                      title: gEvent.summary || 'Evento sem título',
+                      description: gEvent.description || '',
+                      startDate: gEvent.start?.dateTime || gEvent.start?.date || exists.startDate,
+                      endDate: gEvent.end?.dateTime || gEvent.end?.date || exists.endDate,
+                      allDay: !!gEvent.start?.date,
+                      updatedAt: new Date().toISOString()
+                  };
+                  await updateAgendaEventFire(user.uid, exists.id, updates);
+              }
+          }
+
+          // Delete local events that were removed from Google Calendar
+          // Only process events that have a googleEventId and fall within the synced time range
+          const eventsToDelete = data.agendaEvents.filter(e => {
+              if (!e.googleEventId) return false;
+              
+              const eventDate = new Date(e.startDate);
+              const isInRange = eventDate >= timeMin && eventDate <= timeMax;
+              
+              return isInRange && !fetchedGoogleIds.has(e.googleEventId);
+          });
+
+          for (const e of eventsToDelete) {
+              await deleteAgendaEventFire(user.uid, e.id);
+          }
+
+      } catch (e) {
+          console.error("Error syncing agenda events", e);
+      }
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -468,6 +654,10 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addPassword,
         updatePassword,
         deletePassword,
+        addAgendaEvent,
+        updateAgendaEvent,
+        deleteAgendaEvent,
+        syncAgendaEvents,
         addCategory,
         deleteCategory,
         unlockBadge,
