@@ -81,6 +81,7 @@ export interface ShoppingItem {
   actualPrice: number; // O valor que o usuário digita no mercado (calculadora)
   isChecked: boolean; // Se já pegou o item
   category?: ShoppingCategory; // Novo campo
+  observation?: string; // Observação opcional
 }
 
 // --- KANBAN TYPES ---

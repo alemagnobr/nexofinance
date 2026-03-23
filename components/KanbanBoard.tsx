@@ -403,7 +403,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
               return { ...c, cards: c.cards.filter(card => card.id !== cardId) };
           }
           if (c.id === targetColId) {
-              return { ...c, cards: [...c.cards, cardToMove] };
+              return { ...c, cards: [cardToMove, ...c.cards] };
           }
           return c;
       });
@@ -484,8 +484,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                               
                               newCards.splice(isAfter ? insertIndex + 1 : insertIndex, 0, card);
                           } else {
-                              // Dropped on the column itself, append to end
-                              newCards.push(card);
+                              // Dropped on the column itself, prepend to top
+                              newCards.unshift(card);
                           }
                       }
                       return { ...c, cards: newCards };

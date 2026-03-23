@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, ShoppingCategory } from '../types';
-import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2 } from 'lucide-react';
 import { generateShoppingListFromRecipe } from '../services/geminiService';
 
 interface ShoppingListProps {
@@ -32,6 +32,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 }) => {
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<ShoppingCategory>('Outros');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemObservation, setNewItemObservation] = useState('');
+  
+  // Edit Item Modal
+  const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   
   const [isFinishing, setIsFinishing] = useState(false);
   
@@ -90,12 +95,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     onAdd({
       name: newItemName.trim(),
       quantity: 1,
-      actualPrice: 0,
+      actualPrice: parseFloat(newItemPrice.replace(',', '.')) || 0,
       isChecked: false,
-      category: newItemCategory
+      category: newItemCategory,
+      observation: newItemObservation.trim() || undefined
     });
     setNewItemName('');
     setNewItemCategory('Outros'); // Reset to default
+    setNewItemPrice('');
+    setNewItemObservation('');
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingItem || !editingItem.name.trim()) return;
+      onUpdate(editingItem.id, {
+          name: editingItem.name.trim(),
+          category: editingItem.category,
+          actualPrice: editingItem.actualPrice,
+          observation: editingItem.observation
+      });
+      setEditingItem(null);
   };
 
   const handleAiGenerate = async (e: React.FormEvent) => {
@@ -248,6 +268,78 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         </div>
       )}
 
+      {/* Edit Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-700 animate-scale-in">
+               <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                      <Edit2 className="w-5 h-5 text-indigo-600" /> Editar Item
+                  </h3>
+                  <button onClick={() => setEditingItem(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+               </div>
+               
+               <form onSubmit={handleSaveEdit} className="space-y-4">
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome do Item</label>
+                       <input 
+                          autoFocus
+                          type="text"
+                          value={editingItem.name}
+                          onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                          className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                       />
+                   </div>
+                   
+                   <div className="flex gap-4">
+                       <div className="flex-1">
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Categoria</label>
+                           <select 
+                              value={editingItem.category}
+                              onChange={(e) => setEditingItem({...editingItem, category: e.target.value as ShoppingCategory})}
+                              className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           >
+                              {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                           </select>
+                       </div>
+                       <div className="flex-1">
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço (Unidade)</label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                               <input 
+                                  type="number" 
+                                  step="0.01"
+                                  value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice}
+                                  onChange={(e) => setEditingItem({...editingItem, actualPrice: parseFloat(e.target.value) || 0})}
+                                  className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold"
+                               />
+                           </div>
+                       </div>
+                   </div>
+
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Observação</label>
+                       <input 
+                          type="text"
+                          value={editingItem.observation || ''}
+                          onChange={(e) => setEditingItem({...editingItem, observation: e.target.value})}
+                          placeholder="Ex: Marca específica, quantidade em gramas..."
+                          className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                       />
+                   </div>
+
+                   <button 
+                      type="submit"
+                      disabled={!editingItem.name.trim()}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                   >
+                      <Check className="w-5 h-5" /> Salvar Alterações
+                   </button>
+               </form>
+           </div>
+        </div>
+      )}
+
       {/* HEADER & BUDGET BAR */}
       <div>
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-4">
@@ -336,32 +428,56 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </div>
 
       {/* ADD ITEM INPUT */}
-      <form onSubmit={handleAddItem} className="flex gap-2">
-         <div className="relative flex-1 flex gap-2">
+      <form onSubmit={handleAddItem} className="flex flex-col gap-2">
+         <div className="flex flex-col md:flex-row gap-2">
+            <div className="relative flex-1 flex gap-2">
+               <input 
+                  id="new-item-input"
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="Adicionar item..."
+                  className="flex-1 p-3 pl-4 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  autoComplete="off"
+               />
+               <div className="relative w-28 md:w-32">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                  <input 
+                     type="number" 
+                     step="0.01"
+                     placeholder="0,00"
+                     value={newItemPrice}
+                     onChange={(e) => setNewItemPrice(e.target.value)}
+                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  />
+               </div>
+               <select
+                   value={newItemCategory}
+                   onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
+                   className="hidden md:block w-28 md:w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+               >
+                   {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+            </div>
+            <button 
+               type="submit" 
+               disabled={!newItemName.trim()}
+               className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            >
+               <Plus className="w-6 h-6" />
+            </button>
+         </div>
+         {/* Observation input */}
+         <div className="flex">
             <input 
-               id="new-item-input"
                type="text"
-               value={newItemName}
-               onChange={(e) => setNewItemName(e.target.value)}
-               placeholder="Adicionar item..."
-               className="flex-1 p-3 pl-4 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+               value={newItemObservation}
+               onChange={(e) => setNewItemObservation(e.target.value)}
+               placeholder="Observação (opcional)"
+               className="w-full p-2 pl-4 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                autoComplete="off"
             />
-            <select
-                value={newItemCategory}
-                onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                className="w-28 md:w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
-            >
-                {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
          </div>
-         <button 
-            type="submit" 
-            disabled={!newItemName.trim()}
-            className="px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-         >
-            <Plus className="w-6 h-6" />
-         </button>
       </form>
       
       {/* Mobile Category Select fallback if user types on mobile */}
@@ -424,9 +540,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                     >
                                        <Check className="w-4 h-4" />
                                     </button>
-                                    <span className={`font-medium text-lg truncate ${item.isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
-                                       {item.name}
-                                    </span>
+                                    <div className="flex flex-col min-w-0">
+                                       <span className={`font-medium text-lg truncate ${item.isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                                          {item.name}
+                                       </span>
+                                       {item.observation && (
+                                          <span className={`text-xs truncate ${item.isChecked ? 'text-slate-400/70' : 'text-slate-500 dark:text-slate-400'}`}>
+                                             {item.observation}
+                                          </span>
+                                       )}
+                                    </div>
                                  </div>
 
                                  {/* Controls (Qty & Price) */}
@@ -455,6 +578,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                           }`}
                                        />
                                     </div>
+
+                                    {/* Edit */}
+                                    <button 
+                                       onClick={() => setEditingItem(item)}
+                                       className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                                    >
+                                       <Edit2 className="w-5 h-5" />
+                                    </button>
 
                                     {/* Delete */}
                                     <button 

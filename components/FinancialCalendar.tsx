@@ -14,7 +14,7 @@ interface FinancialCalendarProps {
   onAddAgendaEvent?: (e: Omit<AgendaEvent, 'id' | 'updatedAt'>) => void;
   onUpdateAgendaEvent?: (id: string, updates: Partial<AgendaEvent>) => void;
   onDeleteAgendaEvent?: (id: string) => void;
-  onSyncAgendaEvents?: (timeMin: Date, timeMax: Date) => void;
+  onSyncAgendaEvents?: (timeMin: Date, timeMax: Date) => Promise<void> | void;
   privacyMode: boolean;
 }
 
@@ -387,8 +387,14 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               updateTransactionFire(auth.currentUser!.uid, id, updates);
           });
           
-          if (count > 0) alert(`${count} eventos criados na sua Google Agenda!`);
-          else alert('Tudo sincronizado! Nenhuma nova conta pendente encontrada.');
+          if (onSyncAgendaEvents) {
+              const timeMin = new Date(year, month, 1);
+              const timeMax = new Date(year, month + 1, 0);
+              await onSyncAgendaEvents(timeMin, timeMax);
+          }
+          
+          if (count > 0) alert(`${count} eventos criados na sua Google Agenda e eventos importados com sucesso!`);
+          else alert('Tudo sincronizado! Eventos importados e nenhuma nova conta pendente encontrada.');
       } catch (error: any) {
           console.error(error);
           alert('Erro ao sincronizar: ' + error.message);
