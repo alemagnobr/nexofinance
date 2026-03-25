@@ -25,6 +25,8 @@ import { UtilitiesView } from './components/UtilitiesView';
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
 
+import { Toaster } from 'sonner';
+
 const App: React.FC = () => {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
@@ -281,8 +283,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 2. Group: Movements (Transactions, Calendar, Subscriptions, Debts)
-    if ([View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)) {
+    // 2. Group: Movements (Transactions, Subscriptions, Debts)
+    if ([View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)) {
         return (
             <MovementsView 
                 currentView={currentView}
@@ -311,8 +313,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Productivity (Kanban, Notes)
-    if ([View.KANBAN, View.NOTES].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes, Calendar)
+    if ([View.KANBAN, View.NOTES, View.CALENDAR].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -494,6 +496,7 @@ const App: React.FC = () => {
         handleFinishWelcome={handleFinishWelcome}
         copyPix={copyPix}
       />
+      <Toaster position="top-right" richColors />
     </div>
   );
 };
