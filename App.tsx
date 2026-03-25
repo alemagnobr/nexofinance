@@ -21,6 +21,7 @@ import { MovementsView } from './components/MovementsView';
 import { AssetsView } from './components/AssetsView';
 import { ProductivityView } from './components/ProductivityView';
 import { UtilitiesView } from './components/UtilitiesView';
+import { FinancialCalendar } from './components/FinancialCalendar';
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -313,8 +314,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Productivity (Kanban, Notes, Calendar)
-    if ([View.KANBAN, View.NOTES, View.CALENDAR].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes)
+    if ([View.KANBAN, View.NOTES].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -323,6 +324,25 @@ const App: React.FC = () => {
                 actions={actions}
                 privacyMode={privacyMode}
             />
+        );
+    }
+
+    // 4.5. Standalone: Calendar
+    if (currentView === View.CALENDAR) {
+        return (
+            <div className="animate-fade-in">
+                <FinancialCalendar 
+                    transactions={data.transactions} 
+                    budgets={data.budgets}
+                    agendaEvents={data.agendaEvents}
+                    onAddTransaction={actions.addTransaction}
+                    onAddAgendaEvent={actions.addAgendaEvent}
+                    onUpdateAgendaEvent={actions.updateAgendaEvent}
+                    onDeleteAgendaEvent={actions.deleteAgendaEvent}
+                    onSyncAgendaEvents={actions.syncAgendaEvents}
+                    privacyMode={privacyMode} 
+                />
+            </div>
         );
     }
 
