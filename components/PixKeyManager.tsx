@@ -134,10 +134,12 @@ export const PixKeyManager: React.FC<PixKeyManagerProps> = ({ pixKeys, onAdd, on
           </div>
         ) : (
           Object.values(
-            pixKeys.reduce((acc, key) => {
-              const normalizedBank = (key.bank || 'Outros').trim().toLowerCase();
+            (pixKeys || []).reduce((acc, key) => {
+              if (!key) return acc;
+              const bankName = key.bank || 'Outros';
+              const normalizedBank = bankName.trim().toLowerCase();
               if (!acc[normalizedBank]) {
-                acc[normalizedBank] = { name: key.bank || 'Outros', keys: [] };
+                acc[normalizedBank] = { name: bankName, keys: [] };
               }
               acc[normalizedBank].keys.push(key);
               return acc;
@@ -155,9 +157,9 @@ export const PixKeyManager: React.FC<PixKeyManagerProps> = ({ pixKeys, onAdd, on
                   <div key={key.id} className="group relative flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg" title={key.type.toUpperCase()}>{getIcon(key.type)}</span>
+                        <span className="text-lg" title={(key.type || 'other').toUpperCase()}>{getIcon(key.type)}</span>
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {key.label || key.type.toUpperCase()}
+                          {key.label || (key.type || 'other').toUpperCase()}
                         </span>
                       </div>
                       <button
