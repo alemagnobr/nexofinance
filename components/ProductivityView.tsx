@@ -2,7 +2,8 @@ import React from 'react';
 import { View } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { Notes } from './Notes';
-import { Wallet, StickyNote } from 'lucide-react';
+import { FinancialCalendar } from './FinancialCalendar';
+import { Wallet, StickyNote, Calendar } from 'lucide-react';
 
 interface ProductivityViewProps {
   currentView: View;
@@ -18,6 +19,7 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
   const tabs = [
     { id: View.KANBAN, label: 'NEXO Flow', icon: Wallet },
     { id: View.NOTES, label: 'NEXO Notes', icon: StickyNote },
+    { id: View.CALENDAR, label: 'Agenda', icon: Calendar },
   ];
 
   return (
@@ -25,7 +27,7 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
       {/* Internal Tabs Navigation */}
       <div>
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Produtividade</p>
-        <div className="grid grid-cols-2 gap-2 md:gap-3">
+        <div className="grid grid-cols-3 gap-2 md:gap-3">
           {tabs.map(tab => {
             const isActive = currentView === tab.id;
             return (
@@ -70,6 +72,19 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
              onUpdate={actions.updateNote}
              onDelete={actions.deleteNote}
              privacyMode={privacyMode}
+          />
+        )}
+        {currentView === View.CALENDAR && (
+          <FinancialCalendar 
+            transactions={data.transactions} 
+            budgets={data.budgets}
+            agendaEvents={data.agendaEvents}
+            onAddTransaction={actions.addTransaction}
+            onAddAgendaEvent={actions.addAgendaEvent}
+            onUpdateAgendaEvent={actions.updateAgendaEvent}
+            onDeleteAgendaEvent={actions.deleteAgendaEvent}
+            onSyncAgendaEvents={actions.syncAgendaEvents}
+            privacyMode={privacyMode} 
           />
         )}
       </div>

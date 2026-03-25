@@ -2,10 +2,9 @@
 import React from 'react';
 import { View, Transaction, Budget, Debt } from '../types';
 import { TransactionList } from './TransactionList';
-import { FinancialCalendar } from './FinancialCalendar';
 import { SubscriptionManager } from './SubscriptionManager';
 import { DebtManager } from './DebtManager';
-import { Receipt, Calendar, Repeat, ShieldAlert } from 'lucide-react';
+import { Receipt, Repeat, ShieldAlert } from 'lucide-react';
 
 interface MovementsViewProps {
   currentView: View;
@@ -30,13 +29,6 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
       inactiveClass: 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200'
     },
     { 
-      id: View.CALENDAR, 
-      label: 'Agenda', 
-      icon: Calendar,
-      activeClass: 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30',
-      inactiveClass: 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200'
-    },
-    { 
       id: View.SUBSCRIPTIONS, 
       label: 'Assinaturas', 
       icon: Repeat,
@@ -56,7 +48,7 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
     <div className="space-y-6">
       {/* Internal Tabs Navigation - Enhanced Design */}
       <div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {tabs.map(tab => {
             const isActive = currentView === tab.id;
             return (
@@ -91,19 +83,6 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
             privacyMode={privacyMode}
             hasApiKey={hasApiKey}
             quickActionSignal={quickActionSignal}
-          />
-        )}
-        {currentView === View.CALENDAR && (
-          <FinancialCalendar 
-            transactions={data.transactions} 
-            budgets={data.budgets}
-            agendaEvents={data.agendaEvents}
-            onAddTransaction={actions.addTransaction}
-            onAddAgendaEvent={actions.addAgendaEvent}
-            onUpdateAgendaEvent={actions.updateAgendaEvent}
-            onDeleteAgendaEvent={actions.deleteAgendaEvent}
-            onSyncAgendaEvents={actions.syncAgendaEvents}
-            privacyMode={privacyMode} 
           />
         )}
         {currentView === View.SUBSCRIPTIONS && (

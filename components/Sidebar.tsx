@@ -69,9 +69,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   // Group Logic Helpers to determine active state
-  const isMovementsActive = [View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
+  const isMovementsActive = [View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
   const isAssetsActive = [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView);
-  const isProductivityActive = [View.KANBAN, View.NOTES].includes(currentView);
+  const isProductivityActive = [View.KANBAN, View.NOTES, View.CALENDAR].includes(currentView);
   const isUtilitiesActive = [View.SHOPPING_LIST, View.PASSWORDS].includes(currentView);
 
   return (
@@ -200,6 +200,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Simplified Footer Grid */}
         <div className="flex justify-between items-center gap-2">
           
+          <button
+            onClick={() => handleNavClick(View.PIX_KEYS)}
+            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.PIX_KEYS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            title="Minhas Chaves Pix"
+          >
+            <Landmark className="w-5 h-5" />
+          </button>
+
           <button
             onClick={() => handleNavClick(View.SETTINGS)}
             className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.SETTINGS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}

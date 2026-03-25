@@ -188,6 +188,17 @@ export interface AgendaEvent {
   updatedAt?: string;
 }
 
+export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random' | 'other';
+
+export interface PixKey {
+  id: string;
+  bank: string;
+  type: PixKeyType;
+  key: string;
+  label?: string;
+  createdAt: string;
+}
+
 export interface AppData {
   transactions: Transaction[];
   categories: Category[]; // New field
@@ -201,6 +212,7 @@ export interface AppData {
   notes: Note[]; // Novo campo: Notas
   passwords: PasswordEntry[]; // Novo campo: Senhas
   agendaEvents: AgendaEvent[]; // Novo campo: Agenda Geral
+  pixKeys: PixKey[]; // Novo campo: Chaves Pix
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
@@ -220,5 +232,6 @@ export enum View {
   KANBAN = 'KANBAN',
   NOTES = 'NOTES',
   PASSWORDS = 'PASSWORDS',
+  PIX_KEYS = 'PIX_KEYS',
   SETTINGS = 'SETTINGS'
 }

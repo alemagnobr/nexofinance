@@ -31,6 +31,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
   });
 
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
+  const [revealedNotes, setRevealedNotes] = useState<Record<string, string>>({});
 
   // Auto-lock timer
   useEffect(() => {
@@ -80,10 +81,12 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
     setMasterPassword('');
     setIsLocked(true);
     setRevealedPasswords({});
+    setRevealedNotes({});
     setIsModalOpen(false);
   };
 
-  const decryptPassword = (encrypted: string): string => {
+  const decryptData = (encrypted: string): string => {
+    if (!encrypted) return '';
     try {
       const bytes = CryptoJS.AES.decrypt(encrypted, masterPassword);
       return bytes.toString(CryptoJS.enc.Utf8);
@@ -92,7 +95,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
     }
   };
 
-  const toggleReveal = (id: string, encrypted: string) => {
+  const toggleRevealPassword = (id: string, encrypted: string) => {
     if (revealedPasswords[id]) {
       const newRevealed = { ...revealedPasswords };
       delete newRevealed[id];
@@ -100,7 +103,20 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
     } else {
       setRevealedPasswords({
         ...revealedPasswords,
-        [id]: decryptPassword(encrypted)
+        [id]: decryptData(encrypted)
+      });
+    }
+  };
+
+  const toggleRevealNotes = (id: string, encrypted: string) => {
+    if (revealedNotes[id]) {
+      const newRevealed = { ...revealedNotes };
+      delete newRevealed[id];
+      setRevealedNotes(newRevealed);
+    } else {
+      setRevealedNotes({
+        ...revealedNotes,
+        [id]: decryptData(encrypted)
       });
     }
   };
@@ -116,9 +132,9 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
       setFormData({
         title: entry.title,
         username: entry.username,
-        password: decryptPassword(entry.encryptedPassword),
+        password: decryptData(entry.encryptedPassword),
         url: entry.url || '',
-        notes: entry.notes || '',
+        notes: entry.notes ? decryptData(entry.notes) : '',
         category: entry.category || 'Geral'
       });
     } else {
@@ -140,6 +156,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
     if (!formData.title || !formData.password) return;
 
     const encryptedPassword = CryptoJS.AES.encrypt(formData.password, masterPassword).toString();
+    const encryptedNotes = formData.notes ? CryptoJS.AES.encrypt(formData.notes, masterPassword).toString() : '';
 
     if (editingId) {
       onUpdate(editingId, {
@@ -147,7 +164,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
         username: formData.username,
         encryptedPassword,
         url: formData.url,
-        notes: formData.notes,
+        notes: encryptedNotes,
         category: formData.category
       });
     } else {
@@ -156,7 +173,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
         username: formData.username,
         encryptedPassword,
         url: formData.url,
-        notes: formData.notes,
+        notes: encryptedNotes,
         category: formData.category
       });
     }
@@ -302,14 +319,14 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
                   </div>
                   <div className="flex items-center gap-1">
                     <button 
-                      onClick={() => toggleReveal(entry.id, entry.encryptedPassword)} 
+                      onClick={() => toggleRevealPassword(entry.id, entry.encryptedPassword)} 
                       className="p-1 text-slate-400 hover:text-indigo-500 transition-colors"
                       title={revealedPasswords[entry.id] ? "Ocultar Senha" : "Mostrar Senha"}
                     >
                       {revealedPasswords[entry.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                     <button 
-                      onClick={() => copyToClipboard(decryptPassword(entry.encryptedPassword))} 
+                      onClick={() => copyToClipboard(decryptData(entry.encryptedPassword))} 
                       className="p-1 text-slate-400 hover:text-indigo-500 transition-colors"
                       title="Copiar Senha"
                     >
@@ -317,6 +334,30 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({ passwords, onA
                     </button>
                   </div>
                 </div>
+
+                {entry.notes && (
+                  <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                    <div className="truncate flex-1 text-xs text-slate-600 dark:text-slate-400 italic">
+                      {revealedNotes[entry.id] ? revealedNotes[entry.id] : 'Notas protegidas •••'}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => toggleRevealNotes(entry.id, entry.notes!)} 
+                        className="p-1 text-slate-400 hover:text-indigo-500 transition-colors"
+                        title={revealedNotes[entry.id] ? "Ocultar Notas" : "Mostrar Notas"}
+                      >
+                        {revealedNotes[entry.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      <button 
+                        onClick={() => copyToClipboard(decryptData(entry.notes!))} 
+                        className="p-1 text-slate-400 hover:text-indigo-500 transition-colors"
+                        title="Copiar Notas"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {entry.url && (

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -12,6 +12,7 @@ import {
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
   addAgendaEventFire, updateAgendaEventFire, deleteAgendaEventFire,
+  addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
@@ -30,6 +31,7 @@ const DEFAULT_DATA: AppData = {
     notes: [],
     passwords: [],
     agendaEvents: [],
+    pixKeys: [],
     unlockedBadges: [],
     walletBalance: 0,
     categories: DEFAULT_CATEGORIES // Initial defaults
@@ -530,6 +532,27 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }
   };
 
+  // --- PIX KEYS ACTIONS ---
+  const addPixKey = async (key: Omit<PixKey, 'id' | 'createdAt'>) => {
+      const newKey: PixKey = {
+          ...key,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString()
+      };
+      if (user) await addPixKeyFire(user.uid, newKey);
+      else setData(prev => ({ ...prev, pixKeys: [newKey, ...prev.pixKeys] }));
+  };
+
+  const updatePixKey = async (id: string, updates: Partial<PixKey>) => {
+      if (user) await updatePixKeyFire(user.uid, id, updates);
+      else setData(prev => ({ ...prev, pixKeys: prev.pixKeys.map(k => k.id === id ? { ...k, ...updates } : k) }));
+  };
+
+  const deletePixKey = async (id: string) => {
+      if (user) await deletePixKeyFire(user.uid, id);
+      else setData(prev => ({ ...prev, pixKeys: prev.pixKeys.filter(k => k.id !== id) }));
+  };
+
   const syncAgendaEvents = async (timeMin: Date, timeMax: Date) => {
       if (!user) return;
       try {
@@ -657,6 +680,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addAgendaEvent,
         updateAgendaEvent,
         deleteAgendaEvent,
+        addPixKey,
+        updatePixKey,
+        deletePixKey,
         syncAgendaEvents,
         addCategory,
         deleteCategory,

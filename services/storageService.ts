@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey } from '../types';
 import { db } from './firebase';
 import { 
   collection, 
@@ -46,6 +46,7 @@ const DEFAULT_DATA: AppData = {
   notes: [],
   passwords: [],
   agendaEvents: [],
+  pixKeys: [],
   unlockedBadges: [],
   walletBalance: 0
 };
@@ -75,6 +76,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.notes) data.notes = [];
     if (!data.passwords) data.passwords = [];
     if (!data.agendaEvents) data.agendaEvents = [];
+    if (!data.pixKeys) data.pixKeys = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
@@ -189,6 +191,11 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ agendaEvents });
   });
 
+  const unsubPixKeys = onSnapshot(query(collection(db, 'users', uid, 'pix_keys'), orderBy('createdAt', 'desc')), (snapshot) => {
+    const pixKeys = snapshot.docs.map(doc => doc.data() as PixKey);
+    onUpdate({ pixKeys });
+  });
+
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -226,6 +233,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubNotes();
     unsubPasswords();
     unsubAgendaEvents();
+    unsubPixKeys();
     unsubCategories();
     unsubUserDoc();
   };
@@ -413,6 +421,17 @@ export const deleteAgendaEventFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'agenda_events', id));
 };
 
+// PIX KEYS
+export const addPixKeyFire = async (uid: string, item: PixKey) => {
+    await setDoc(doc(db, 'users', uid, 'pix_keys', item.id), item);
+};
+export const updatePixKeyFire = async (uid: string, id: string, data: Partial<PixKey>) => {
+    await updateDoc(doc(db, 'users', uid, 'pix_keys', id), data);
+};
+export const deletePixKeyFire = async (uid: string, id: string) => {
+    await deleteDoc(doc(db, 'users', uid, 'pix_keys', id));
+};
+
 // CATEGORIES
 export const addCategoryFire = async (uid: string, category: Category) => {
     await setDoc(doc(db, 'users', uid, 'categories', category.id), category);
@@ -494,6 +513,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     localData.agendaEvents?.forEach(e => {
         const ref = doc(db, 'users', uid, 'agenda_events', e.id);
         batch.set(ref, e);
+    });
+
+    localData.pixKeys?.forEach(k => {
+        const ref = doc(db, 'users', uid, 'pix_keys', k.id);
+        batch.set(ref, k);
     });
 
     // Migrating categories

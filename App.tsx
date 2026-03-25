@@ -14,6 +14,7 @@ import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
 import { useAppData } from './hooks/useAppData';
 import { SettingsView } from './components/SettingsView';
+import { PixKeyManager } from './components/PixKeyManager';
 
 // New Wrapper Views
 import { MovementsView } from './components/MovementsView';
@@ -109,7 +110,19 @@ const App: React.FC = () => {
     if (isGuest) {
         setIsGuest(false);
         setData({
-            transactions: [], investments: [], budgets: [], debts: [], shoppingList: [], unlockedBadges: [], kanbanColumns: [], kanbanBoards: [], notes: [], passwords: [], categories: [], agendaEvents: []
+            transactions: [], 
+            investments: [], 
+            budgets: [], 
+            debts: [], 
+            shoppingList: [], 
+            unlockedBadges: [], 
+            kanbanColumns: [], 
+            kanbanBoards: [], 
+            notes: [], 
+            passwords: [], 
+            categories: [], 
+            agendaEvents: [],
+            pixKeys: []
         });
     } else {
         await signOut(auth);
@@ -253,6 +266,18 @@ const App: React.FC = () => {
                 onImportBackup={handleImportBackup}
                 onFactoryReset={handleFactoryReset}
             />
+        );
+    }
+
+    if (currentView === View.PIX_KEYS) {
+        return (
+            <div className="max-w-4xl mx-auto p-4 md:p-8 animate-fade-in">
+                <PixKeyManager 
+                    pixKeys={data.pixKeys || []}
+                    onAdd={actions.addPixKey}
+                    onDelete={actions.deletePixKey}
+                />
+            </div>
         );
     }
 
