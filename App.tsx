@@ -25,6 +25,8 @@ import { UtilitiesView } from './components/UtilitiesView';
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
 
+import { Toaster } from 'sonner';
+
 const App: React.FC = () => {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
@@ -494,6 +496,7 @@ const App: React.FC = () => {
         handleFinishWelcome={handleFinishWelcome}
         copyPix={copyPix}
       />
+      <Toaster position="top-right" richColors />
     </div>
   );
 };
