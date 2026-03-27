@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2 } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown } from 'lucide-react';
 import { syncTransactionsToCalendar } from '../services/calendarService';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
@@ -10,11 +10,20 @@ interface FinancialCalendarProps {
   transactions: Transaction[];
   budgets: Budget[]; // Added budget prop
   agendaEvents?: AgendaEvent[];
+  taskLists?: TaskList[];
+  tasks?: Task[];
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
+  onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
   onAddAgendaEvent?: (e: Omit<AgendaEvent, 'id' | 'updatedAt'>) => void;
   onUpdateAgendaEvent?: (id: string, updates: Partial<AgendaEvent>) => void;
   onDeleteAgendaEvent?: (id: string) => void;
   onSyncAgendaEvents?: (timeMin: Date, timeMax: Date) => Promise<void> | void;
+  onAddTaskList?: (list: Omit<TaskList, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
+  onUpdateTaskList?: (id: string, updates: Partial<TaskList>) => void;
+  onDeleteTaskList?: (id: string) => void;
+  onAddTask?: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void;
+  onDeleteTask?: (id: string) => void;
   privacyMode: boolean;
 }
 
@@ -60,11 +69,20 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   transactions, 
   budgets, 
   agendaEvents = [],
+  taskLists = [],
+  tasks = [],
   onAddTransaction, 
+  onUpdateTransaction,
   onAddAgendaEvent,
   onUpdateAgendaEvent,
   onDeleteAgendaEvent,
   onSyncAgendaEvents,
+  onAddTaskList,
+  onUpdateTaskList,
+  onDeleteTaskList,
+  onAddTask,
+  onUpdateTask,
+  onDeleteTask,
   privacyMode 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -72,6 +90,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   const [filterType, setFilterType] = useState<ViewFilter>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isListManagerOpen, setIsListManagerOpen] = useState(false);
+  const [newListName, setNewListName] = useState('');
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editingListName, setEditingListName] = useState('');
   const [agendaFormData, setAgendaFormData] = useState({
       id: '',
       title: '',
@@ -79,6 +102,13 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       startTime: '',
       endTime: '',
       allDay: true
+  });
+  const [taskFormData, setTaskFormData] = useState({
+      id: '',
+      title: '',
+      description: '',
+      listId: '',
+      dueDate: ''
   });
 
   // Form State
@@ -222,6 +252,15 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     return displayedTransactions.filter(t => {
        const day = parseInt(t.date.split('-')[2]);
        return day === selectedDay;
+    }).sort((a, b) => {
+        // 1. Paid first, Pending last
+        if (a.status === 'paid' && b.status === 'pending') return -1;
+        if (a.status === 'pending' && b.status === 'paid') return 1;
+        
+        // 2. Custom order
+        const orderA = a.order || 0;
+        const orderB = b.order || 0;
+        return orderA - orderB;
     });
   }, [displayedTransactions, selectedDay]);
 
@@ -239,6 +278,37 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
           return targetDate >= eStart && targetDate <= eEnd;
       });
   }, [displayedAgendaEvents, selectedDay, year, month]);
+
+  const handleMoveTransaction = (index: number, direction: 'up' | 'down') => {
+      if (!onUpdateTransaction) return;
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= selectedTransactions.length) return;
+      
+      const currentTx = selectedTransactions[index];
+      const targetTx = selectedTransactions[newIndex];
+      
+      // Only allow moving within the same status group
+      if (currentTx.status !== targetTx.status) return;
+      
+      // Get all transactions in the same status group
+      const groupTxs = selectedTransactions.filter(t => t.status === currentTx.status);
+      
+      // Create a new array with the swapped items
+      const newGroupTxs = [...groupTxs];
+      const currentIndexInGroup = newGroupTxs.findIndex(t => t.id === currentTx.id);
+      const targetIndexInGroup = newGroupTxs.findIndex(t => t.id === targetTx.id);
+      
+      // Swap
+      [newGroupTxs[currentIndexInGroup], newGroupTxs[targetIndexInGroup]] = [newGroupTxs[targetIndexInGroup], newGroupTxs[currentIndexInGroup]];
+      
+      // Update order for all items in the group to ensure consistency
+      newGroupTxs.forEach((t, i) => {
+          if (t.order !== i) {
+              onUpdateTransaction(t.id, { order: i });
+          }
+      });
+  };
 
   // Heatmap Calculation
   const maxDailyExpense = useMemo(() => {
@@ -373,6 +443,62 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       setIsModalOpen(false);
   };
 
+  const handleOpenTaskModal = () => {
+      if (!selectedDay) return;
+      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(selectedDay).padStart(2,'0')}`;
+      setTaskFormData({
+          id: '',
+          title: '',
+          description: '',
+          listId: taskLists && taskLists.length > 0 ? taskLists[0].id : '',
+          dueDate: dateStr
+      });
+      setIsTaskModalOpen(true);
+  };
+
+  const handleTaskSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedDay || !onAddTask || !onUpdateTask) return;
+
+      // Ensure we have a list to add to, if not create a default one
+      let targetListId = taskFormData.listId;
+      if (!targetListId) {
+          if (taskLists && taskLists.length > 0) {
+              targetListId = taskLists[0].id;
+          } else if (onAddTaskList) {
+              // Create a default list if none exists
+              const newListId = crypto.randomUUID();
+              await onAddTaskList({
+                  id: newListId,
+                  title: 'Minhas Tarefas'
+              });
+              targetListId = newListId;
+          } else {
+              alert("Por favor, crie uma lista de tarefas primeiro.");
+              return;
+          }
+      }
+
+      if (taskFormData.id) {
+          await onUpdateTask(taskFormData.id, {
+              title: taskFormData.title,
+              description: taskFormData.description,
+              listId: targetListId,
+              dueDate: taskFormData.dueDate
+          });
+      } else {
+          await onAddTask({
+              title: taskFormData.title,
+              description: taskFormData.description,
+              listId: targetListId,
+              completed: false,
+              dueDate: taskFormData.dueDate
+          });
+      }
+
+      setIsTaskModalOpen(false);
+  };
+
   const handleSyncCalendar = async () => {
       if (!auth.currentUser) {
           alert('Você precisa estar logado para sincronizar.');
@@ -434,6 +560,12 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         return targetDate >= eStart && targetDate <= eEnd;
     });
 
+    const dayTasks = tasks?.filter(t => {
+        if (!t.dueDate) return false;
+        const [tYear, tMonth, tDay] = t.dueDate.split('-').map(Number);
+        return tDay === day && tMonth === month + 1 && tYear === year;
+    }) || [];
+
     const incomeSum = dayTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const expenseSum = dayTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     
@@ -466,6 +598,9 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                 {dayAgendaEvents.length > 0 && (
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${dayAgendaEvents.length} Eventos`}></div>
                 )}
+                {dayTasks.length > 0 && (
+                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full" title={`${dayTasks.length} Tarefas`}></div>
+                )}
                 {dayTrans.some(t => t.status === 'pending') && (
                     <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" title="Pagamentos Pendentes"></div>
                 )}
@@ -486,6 +621,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
            {dayAgendaEvents.length > 0 && (
               <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-900/30 px-1 rounded truncate">
                  {dayAgendaEvents.length} Evento{dayAgendaEvents.length > 1 ? 's' : ''}
+              </div>
+           )}
+           {dayTasks.length > 0 && (
+              <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 px-1 rounded truncate">
+                 {dayTasks.length} Tarefa{dayTasks.length > 1 ? 's' : ''}
               </div>
            )}
            {dayTrans.some((t: any) => t.isGhost) && (
@@ -746,6 +886,204 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
            </div>
        )}
 
+       {/* ADD TASK MODAL */}
+       {isTaskModalOpen && (
+           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                       <div>
+                           <h3 className="text-lg font-bold text-slate-800 dark:text-white">{taskFormData.id ? 'Editar Tarefa' : 'Nova Tarefa'}</h3>
+                           <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                               <ListTodo className="w-3 h-3" />
+                               {selectedDay} de {currentDate.toLocaleDateString('pt-BR', { month: 'long' })}
+                           </p>
+                       </div>
+                       <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                           <X className="w-5 h-5" />
+                       </button>
+                   </div>
+                   
+                   <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Título</label>
+                           <input 
+                               autoFocus
+                               required
+                               type="text" 
+                               placeholder="Ex: Pagar conta de luz, Comprar leite..."
+                               value={taskFormData.title}
+                               onChange={(e) => setTaskFormData({...taskFormData, title: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                           />
+                       </div>
+
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Data de Vencimento</label>
+                           <input 
+                               required
+                               type="date" 
+                               value={taskFormData.dueDate}
+                               onChange={(e) => setTaskFormData({...taskFormData, dueDate: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                           />
+                       </div>
+
+                       {taskLists && taskLists.length > 0 && (
+                           <div className="flex items-end gap-2">
+                               <div className="flex-1">
+                                   <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Lista</label>
+                                   <select
+                                       value={taskFormData.listId}
+                                       onChange={(e) => setTaskFormData({...taskFormData, listId: e.target.value})}
+                                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                   >
+                                       {taskLists.map(list => (
+                                           <option key={list.id} value={list.id}>{list.title}</option>
+                                       ))}
+                                   </select>
+                               </div>
+                               <button 
+                                   type="button" 
+                                   onClick={() => setIsListManagerOpen(true)} 
+                                   className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition-colors border border-slate-200 dark:border-slate-600" 
+                                   title="Gerenciar Listas"
+                               >
+                                   <Layers className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                               </button>
+                           </div>
+                       )}
+
+                        <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Descrição (Opcional)</label>
+                           <textarea 
+                               placeholder="Detalhes adicionais..."
+                               value={taskFormData.description}
+                               onChange={(e) => setTaskFormData({...taskFormData, description: e.target.value})}
+                               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] resize-none"
+                           />
+                       </div>
+
+                       <button 
+                           type="submit"
+                           className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 mt-4"
+                       >
+                           {taskFormData.id ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />} 
+                           {taskFormData.id ? 'Atualizar Tarefa' : 'Salvar Tarefa'}
+                       </button>
+                   </form>
+               </div>
+           </div>
+       )}
+
+       {/* LIST MANAGER MODAL */}
+       {isListManagerOpen && (
+           <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+                   <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                       <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                           <Layers className="w-5 h-5 text-indigo-500" />
+                           Gerenciar Listas
+                       </h3>
+                       <button onClick={() => setIsListManagerOpen(false)} className="text-slate-400 hover:text-slate-600">
+                           <X className="w-5 h-5" />
+                       </button>
+                   </div>
+                   <div className="p-6 space-y-4">
+                       <div className="flex gap-2">
+                           <input
+                               type="text"
+                               placeholder="Nome da nova lista..."
+                               value={newListName}
+                               onChange={(e) => setNewListName(e.target.value)}
+                               onKeyDown={async (e) => {
+                                   if (e.key === 'Enter') {
+                                       e.preventDefault();
+                                       if (!newListName.trim() || !onAddTaskList) return;
+                                       const newListId = crypto.randomUUID();
+                                       await onAddTaskList({ id: newListId, title: newListName.trim() });
+                                       setNewListName('');
+                                       setTaskFormData(prev => ({ ...prev, listId: newListId }));
+                                   }
+                               }}
+                               className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           />
+                           <button
+                               type="button"
+                               onClick={async () => {
+                                   if (!newListName.trim() || !onAddTaskList) return;
+                                   const newListId = crypto.randomUUID();
+                                   await onAddTaskList({ id: newListId, title: newListName.trim() });
+                                   setNewListName('');
+                                   setTaskFormData(prev => ({ ...prev, listId: newListId }));
+                               }}
+                               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-indigo-500/20"
+                           >
+                               <Plus className="w-5 h-5" />
+                           </button>
+                       </div>
+                       
+                       <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                           {taskLists?.map(list => (
+                               <div key={list.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                   {editingListId === list.id ? (
+                                       <input
+                                           autoFocus
+                                           type="text"
+                                           value={editingListName}
+                                           onChange={(e) => setEditingListName(e.target.value)}
+                                           onBlur={async () => {
+                                               if (editingListName.trim() && editingListName !== list.title && onUpdateTaskList) {
+                                                   await onUpdateTaskList(list.id, { title: editingListName.trim() });
+                                               }
+                                               setEditingListId(null);
+                                           }}
+                                           onKeyDown={async (e) => {
+                                               if (e.key === 'Enter') {
+                                                   if (editingListName.trim() && editingListName !== list.title && onUpdateTaskList) {
+                                                       await onUpdateTaskList(list.id, { title: editingListName.trim() });
+                                                   }
+                                                   setEditingListId(null);
+                                               }
+                                           }}
+                                           className="flex-1 px-2 py-1 rounded border border-indigo-500 dark:bg-slate-700 dark:text-white outline-none"
+                                       />
+                                   ) : (
+                                       <span className="font-medium text-slate-700 dark:text-slate-200">{list.title}</span>
+                                   )}
+                                   <div className="flex items-center gap-1">
+                                       <button
+                                           type="button"
+                                           onClick={() => {
+                                               setEditingListId(list.id);
+                                               setEditingListName(list.title);
+                                           }}
+                                           className="p-1.5 text-slate-400 hover:text-indigo-600 rounded transition-colors"
+                                       >
+                                           <Edit2 className="w-4 h-4" />
+                                       </button>
+                                       <button
+                                           type="button"
+                                           onClick={async () => {
+                                               if (window.confirm('Excluir esta lista apagará todas as tarefas nela. Continuar?')) {
+                                                   if (onDeleteTaskList) await onDeleteTaskList(list.id);
+                                                   if (taskFormData.listId === list.id) {
+                                                       setTaskFormData(prev => ({ ...prev, listId: taskLists.find(l => l.id !== list.id)?.id || '' }));
+                                                   }
+                                               }
+                                           }}
+                                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                                       >
+                                           <Trash2 className="w-4 h-4" />
+                                       </button>
+                                   </div>
+                               </div>
+                           ))}
+                       </div>
+                   </div>
+               </div>
+           </div>
+       )}
+
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -862,15 +1200,25 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                         >
                             <CalendarClock className="w-3 h-3" /> Evento
                         </button>
+                        <button 
+                            onClick={handleOpenTaskModal}
+                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                        >
+                            <ListTodo className="w-3 h-3" /> Tarefa
+                        </button>
                     </div>
                 )}
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-               {selectedDay && selectedTransactions.length === 0 && selectedAgendaEvents.length === 0 && (
+               {selectedDay && selectedTransactions.length === 0 && selectedAgendaEvents.length === 0 && (!tasks || tasks.filter(t => {
+                   if (!t.dueDate) return false;
+                   const [tYear, tMonth, tDay] = t.dueDate.split('-').map(Number);
+                   return tDay === selectedDay && tMonth === month + 1 && tYear === year;
+               }).length === 0) && (
                   <div className="text-center py-10">
                       <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">Nenhuma movimentação ou evento.</p>
+                      <p className="text-slate-400 text-sm">Nenhuma movimentação, evento ou tarefa.</p>
                   </div>
                )}
                {!selectedDay && (
@@ -920,46 +1268,142 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                  </div>
                ))}
 
-               {/* Render Transactions */}
-               {selectedTransactions.map((t, idx) => (
-                 <div key={t.id || idx} className={`flex items-center justify-between p-3 rounded-lg border ${
-                     (t as any).isGhost 
-                     ? 'bg-slate-50 dark:bg-slate-800 border-dashed border-indigo-300 dark:border-indigo-700' 
-                     : 'bg-white dark:bg-slate-700/50 border-slate-100 dark:border-slate-700'
-                 }`}>
-                    <div className="flex items-center gap-3">
-                       <div className={`p-2 rounded-full ${
-                           t.type === 'income' 
-                           ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                           : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
-                       }`}>
-                          {t.type === 'income' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+               {/* Render Tasks */}
+               {tasks && tasks.filter(t => {
+                   if (!t.dueDate) return false;
+                   const [tYear, tMonth, tDay] = t.dueDate.split('-').map(Number);
+                   return tDay === selectedDay && tMonth === month + 1 && tYear === year;
+               }).map(task => (
+                   <div key={task.id} className={`flex items-center justify-between p-3 rounded-lg border ${task.completed ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60' : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                       <div className="flex items-start gap-3">
+                           <button 
+                               onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: !task.completed })}
+                               className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-500 hover:border-indigo-500'}`}
+                           >
+                               {task.completed && <Check className="w-3 h-3" />}
+                           </button>
+                           <div>
+                               <p className={`font-semibold text-sm ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-white'}`}>{task.title}</p>
+                               {task.description && <p className={`text-xs mt-0.5 line-clamp-2 ${task.completed ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>{task.description}</p>}
+                               <div className="flex items-center gap-2 mt-1">
+                                   <span className="text-[10px] bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                       <ListTodo className="w-3 h-3" />
+                                       {taskLists?.find(l => l.id === task.listId)?.title || 'Tarefa'}
+                                   </span>
+                               </div>
+                           </div>
                        </div>
-                       <div>
-                          <div className="flex items-center gap-2">
-                             <p className="font-semibold text-slate-800 dark:text-white text-sm line-clamp-1">{t.description}</p>
-                             {(t as any).isGhost && (
-                                 <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded uppercase font-bold">Previsto</span>
-                             )}
-                          </div>
-                          <div className="flex flex-col">
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{t.category}</p>
-                              {t.observation && <p className="text-[10px] text-slate-400 italic mt-0.5">{t.observation}</p>}
-                          </div>
+                       <div className="flex flex-col gap-1">
+                           <button 
+                               onClick={() => {
+                                   setTaskFormData({
+                                       id: task.id,
+                                       title: task.title,
+                                       description: task.description || '',
+                                       listId: task.listId,
+                                       dueDate: task.dueDate || ''
+                                   });
+                                   setIsTaskModalOpen(true);
+                               }}
+                               className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                               title="Editar Tarefa"
+                           >
+                               <Edit2 className="w-4 h-4" />
+                           </button>
+                           <button 
+                               onClick={() => onDeleteTask && onDeleteTask(task.id)}
+                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
+                               title="Excluir Tarefa"
+                           >
+                               <Trash2 className="w-4 h-4" />
+                           </button>
                        </div>
-                    </div>
-                    <div className="text-right">
-                       <p className={`font-bold text-sm ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {formatFullValue(t.amount)}
-                       </p>
-                       {t.type === 'expense' && (
-                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                           {t.status === 'pending' ? 'Pendente' : 'Pago'}
-                         </span>
-                       )}
-                    </div>
-                 </div>
+                   </div>
                ))}
+
+               {/* Render Transactions */}
+               {selectedTransactions.map((t, idx) => {
+                 const showPendingSeparator = (idx === 0 && t.status === 'pending') || (idx > 0 && selectedTransactions[idx - 1].status === 'paid' && t.status === 'pending');
+                 const showPaidSeparator = idx === 0 && t.status === 'paid';
+                 const canMoveUp = idx > 0 && selectedTransactions[idx - 1].status === t.status;
+                 const canMoveDown = idx < selectedTransactions.length - 1 && selectedTransactions[idx + 1].status === t.status;
+                 
+                 return (
+                   <React.Fragment key={t.id || idx}>
+                     {showPaidSeparator && (
+                         <div className="flex items-center gap-2 py-2">
+                             <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pagos</span>
+                             <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                         </div>
+                     )}
+                     {showPendingSeparator && (
+                         <div className="flex items-center gap-2 py-2">
+                             <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Pendentes</span>
+                             <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                         </div>
+                     )}
+                     <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                         (t as any).isGhost 
+                         ? 'bg-slate-50 dark:bg-slate-800 border-dashed border-indigo-300 dark:border-indigo-700' 
+                         : 'bg-white dark:bg-slate-700/50 border-slate-100 dark:border-slate-700'
+                     }`}>
+                        <div className="flex items-center gap-3">
+                           <div className={`p-2 rounded-full ${
+                               t.type === 'income' 
+                               ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                               : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+                           }`}>
+                              {t.type === 'income' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                           </div>
+                           <div>
+                              <div className="flex items-center gap-2">
+                                 <p className="font-semibold text-slate-800 dark:text-white text-sm line-clamp-1">{t.description}</p>
+                                 {(t as any).isGhost && (
+                                     <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded uppercase font-bold">Previsto</span>
+                                 )}
+                              </div>
+                              <div className="flex flex-col">
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">{t.category}</p>
+                                  {t.observation && <p className="text-[10px] text-slate-400 italic mt-0.5">{t.observation}</p>}
+                              </div>
+                           </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right">
+                               <p className={`font-bold text-sm ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  {formatFullValue(t.amount)}
+                               </p>
+                               {t.type === 'expense' && (
+                                 <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                   {t.status === 'pending' ? 'Pendente' : 'Pago'}
+                                 </span>
+                               )}
+                            </div>
+                            {onUpdateTransaction && !(t as any).isGhost && (
+                                <div className="flex flex-col gap-0.5 border-l border-slate-100 dark:border-slate-700 pl-2 ml-1">
+                                    <button 
+                                        onClick={() => handleMoveTransaction(idx, 'up')}
+                                        disabled={!canMoveUp}
+                                        className={`p-0.5 rounded ${canMoveUp ? 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600' : 'text-slate-200 dark:text-slate-600 cursor-not-allowed'}`}
+                                    >
+                                        <ChevronUp className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleMoveTransaction(idx, 'down')}
+                                        disabled={!canMoveDown}
+                                        className={`p-0.5 rounded ${canMoveDown ? 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600' : 'text-slate-200 dark:text-slate-600 cursor-not-allowed'}`}
+                                    >
+                                        <ChevronDown className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                     </div>
+                   </React.Fragment>
+                 );
+               })}
             </div>
          </div>
       </div>

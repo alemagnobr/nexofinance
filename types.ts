@@ -26,6 +26,7 @@ export interface Transaction {
   observation?: string; // Notas opcionais do usuário
   googleEventId?: string; // ID do evento no Google Calendar
   autoPay?: boolean; // Lançamento automático na data
+  order?: number; // Ordem de exibição no dia
 }
 
 export interface InvestmentHistory {
@@ -188,6 +189,25 @@ export interface AgendaEvent {
   updatedAt?: string;
 }
 
+// --- TASKS TYPES ---
+export interface TaskList {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Task {
+  id: string;
+  listId: string;
+  title: string;
+  description?: string;
+  dueDate?: string; // YYYY-MM-DD
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random' | 'other';
 
 export interface PixKey {
@@ -212,6 +232,8 @@ export interface AppData {
   notes: Note[]; // Novo campo: Notas
   passwords: PasswordEntry[]; // Novo campo: Senhas
   agendaEvents: AgendaEvent[]; // Novo campo: Agenda Geral
+  taskLists: TaskList[]; // Novo campo: Listas de Tarefas
+  tasks: Task[]; // Novo campo: Tarefas
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;

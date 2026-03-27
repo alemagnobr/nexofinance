@@ -372,6 +372,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                  >
                     <Sparkles className="w-4 h-4" /> Gerar com IA
                  </button>
+                 <button 
+                    onClick={() => setIsFinishing(true)}
+                    disabled={items.length === 0}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 disabled:opacity-50"
+                 >
+                    <CreditCard className="w-4 h-4" /> Finalizar
+                 </button>
              </div>
         </div>
         
@@ -428,19 +435,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </div>
 
       {/* ADD ITEM INPUT */}
-      <form onSubmit={handleAddItem} className="flex flex-col gap-2">
-         <div className="flex flex-col md:flex-row gap-2">
-            <div className="relative flex-1 flex gap-2">
+      <form onSubmit={handleAddItem} className="flex flex-col gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+         <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
                <input 
                   id="new-item-input"
                   type="text"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="Adicionar item..."
-                  className="flex-1 p-3 pl-4 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  placeholder="Nome do item..."
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   autoComplete="off"
                />
-               <div className="relative w-28 md:w-32">
+            </div>
+            
+            <div className="flex gap-3">
+               <div className="relative flex-1 md:w-32">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
                   <input 
                      type="number" 
@@ -448,57 +458,41 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                      placeholder="0,00"
                      value={newItemPrice}
                      onChange={(e) => setNewItemPrice(e.target.value)}
-                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   />
                </div>
+               
                <select
                    value={newItemCategory}
                    onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                   className="hidden md:block w-28 md:w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                   className="flex-1 md:w-40 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
                >
                    {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
             </div>
+         </div>
+         
+         <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+               <input 
+                  type="text"
+                  value={newItemObservation}
+                  onChange={(e) => setNewItemObservation(e.target.value)}
+                  placeholder="Observação (opcional)"
+                  className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  autoComplete="off"
+               />
+            </div>
+            
             <button 
                type="submit" 
                disabled={!newItemName.trim()}
-               className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 font-bold"
             >
-               <Plus className="w-6 h-6" />
+               <Plus className="w-5 h-5" /> <span className="md:hidden">Adicionar Item</span>
             </button>
          </div>
-         {/* Observation input */}
-         <div className="flex">
-            <input 
-               type="text"
-               value={newItemObservation}
-               onChange={(e) => setNewItemObservation(e.target.value)}
-               placeholder="Observação (opcional)"
-               className="w-full p-2 pl-4 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-               autoComplete="off"
-            />
-         </div>
       </form>
-      
-      {/* Mobile Category Select fallback if user types on mobile */}
-      <div className="md:hidden overflow-x-auto pb-2 -mt-4">
-          <div className="flex gap-2 px-1">
-              {SHOPPING_CATEGORIES.map(cat => (
-                  <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setNewItemCategory(cat)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap ${
-                          newItemCategory === cat 
-                          ? 'bg-indigo-600 text-white border-indigo-600' 
-                          : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                      }`}
-                  >
-                      {cat}
-                  </button>
-              ))}
-          </div>
-      </div>
 
       {/* LIST (GROUPED BY CATEGORY) */}
       <div className="space-y-6">

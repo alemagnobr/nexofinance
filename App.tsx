@@ -12,6 +12,7 @@ import { Dashboard } from './components/Dashboard';
 import { AiAssistant } from './components/AiAssistant';
 import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { useAppData } from './hooks/useAppData';
 import { SettingsView } from './components/SettingsView';
 import { PixKeyManager } from './components/PixKeyManager';
@@ -53,6 +54,7 @@ const App: React.FC = () => {
   const [userKeyInput, setUserKeyInput] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,7 +127,9 @@ const App: React.FC = () => {
             passwords: [], 
             categories: [], 
             agendaEvents: [],
-            pixKeys: []
+            pixKeys: [],
+            taskLists: [],
+            tasks: []
         });
     } else {
         await signOut(auth);
@@ -335,11 +339,20 @@ const App: React.FC = () => {
                     transactions={data.transactions} 
                     budgets={data.budgets}
                     agendaEvents={data.agendaEvents}
+                    taskLists={data.taskLists}
+                    tasks={data.tasks}
                     onAddTransaction={actions.addTransaction}
+                    onUpdateTransaction={actions.updateTransaction}
                     onAddAgendaEvent={actions.addAgendaEvent}
                     onUpdateAgendaEvent={actions.updateAgendaEvent}
                     onDeleteAgendaEvent={actions.deleteAgendaEvent}
                     onSyncAgendaEvents={actions.syncAgendaEvents}
+                    onAddTaskList={actions.addTaskList}
+                    onUpdateTaskList={actions.updateTaskList}
+                    onDeleteTaskList={actions.deleteTaskList}
+                    onAddTask={actions.addTask}
+                    onUpdateTask={actions.updateTask}
+                    onDeleteTask={actions.deleteTask}
                     privacyMode={privacyMode} 
                 />
             </div>
@@ -397,6 +410,7 @@ const App: React.FC = () => {
         hasKey={hasKey}
         onOpenKeyModal={() => setIsKeyModalOpen(true)}
         onOpenDonateModal={() => setIsDonateModalOpen(true)}
+        onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
         onFactoryReset={handleFactoryReset}
@@ -515,6 +529,10 @@ const App: React.FC = () => {
         handleRemoveKey={handleRemoveKey}
         handleFinishWelcome={handleFinishWelcome}
         copyPix={copyPix}
+      />
+      <ShortcutsModal 
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
       />
       <Toaster position="top-right" richColors />
     </div>

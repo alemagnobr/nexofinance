@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -47,6 +47,8 @@ const DEFAULT_DATA: AppData = {
   notes: [],
   passwords: [],
   agendaEvents: [],
+  taskLists: [],
+  tasks: [],
   pixKeys: [],
   unlockedBadges: [],
   walletBalance: 0
@@ -77,6 +79,8 @@ export const loadData = (userId?: string): AppData => {
     if (!data.notes) data.notes = [];
     if (!data.passwords) data.passwords = [];
     if (!data.agendaEvents) data.agendaEvents = [];
+    if (!data.taskLists) data.taskLists = [];
+    if (!data.tasks) data.tasks = [];
     if (!data.pixKeys) data.pixKeys = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
@@ -227,6 +231,20 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar agenda");
   });
 
+  const unsubTaskLists = onSnapshot(query(collection(db, 'users', uid, 'task_lists'), orderBy('createdAt', 'asc')), (snapshot) => {
+    const taskLists = snapshot.docs.map(doc => doc.data() as TaskList);
+    onUpdate({ taskLists });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar listas de tarefas");
+  });
+
+  const unsubTasks = onSnapshot(query(collection(db, 'users', uid, 'tasks'), orderBy('createdAt', 'asc')), (snapshot) => {
+    const tasks = snapshot.docs.map(doc => doc.data() as Task);
+    onUpdate({ tasks });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar tarefas");
+  });
+
   const unsubPixKeys = onSnapshot(query(collection(db, 'users', uid, 'pix_keys'), orderBy('createdAt', 'desc')), (snapshot) => {
     const pixKeys = snapshot.docs.map(doc => doc.data() as PixKey);
     onUpdate({ pixKeys });
@@ -275,6 +293,8 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubNotes();
     unsubPasswords();
     unsubAgendaEvents();
+    unsubTaskLists();
+    unsubTasks();
     unsubPixKeys();
     unsubCategories();
     unsubUserDoc();
@@ -591,6 +611,51 @@ export const deleteAgendaEventFire = async (uid: string, id: string) => {
     }
 };
 
+// TASKS
+export const addTaskListFire = async (uid: string, list: TaskList) => {
+    try {
+      await setDoc(doc(db, 'users', uid, 'task_lists', list.id), list);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao adicionar lista de tarefas");
+    }
+};
+export const updateTaskListFire = async (uid: string, id: string, data: Partial<TaskList>) => {
+    try {
+      await updateDoc(doc(db, 'users', uid, 'task_lists', id), data);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao atualizar lista de tarefas");
+    }
+};
+export const deleteTaskListFire = async (uid: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'task_lists', id));
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao excluir lista de tarefas");
+    }
+};
+
+export const addTaskFire = async (uid: string, task: Task) => {
+    try {
+      await setDoc(doc(db, 'users', uid, 'tasks', task.id), task);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao adicionar tarefa");
+    }
+};
+export const updateTaskFire = async (uid: string, id: string, data: Partial<Task>) => {
+    try {
+      await updateDoc(doc(db, 'users', uid, 'tasks', id), data);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao atualizar tarefa");
+    }
+};
+export const deleteTaskFire = async (uid: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'tasks', id));
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao excluir tarefa");
+    }
+};
+
 // PIX KEYS
 export const addPixKeyFire = async (uid: string, item: PixKey) => {
     try {
@@ -716,6 +781,16 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
       localData.agendaEvents?.forEach(e => {
           const ref = doc(db, 'users', uid, 'agenda_events', e.id);
           batch.set(ref, e);
+      });
+
+      localData.taskLists?.forEach(tl => {
+          const ref = doc(db, 'users', uid, 'task_lists', tl.id);
+          batch.set(ref, tl);
+      });
+
+      localData.tasks?.forEach(t => {
+          const ref = doc(db, 'users', uid, 'tasks', t.id);
+          batch.set(ref, t);
       });
 
       localData.pixKeys?.forEach(k => {

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -12,6 +12,8 @@ import {
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
   addAgendaEventFire, updateAgendaEventFire, deleteAgendaEventFire,
+  addTaskListFire, updateTaskListFire, deleteTaskListFire,
+  addTaskFire, updateTaskFire, deleteTaskFire,
   addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
@@ -31,6 +33,8 @@ const DEFAULT_DATA: AppData = {
     notes: [],
     passwords: [],
     agendaEvents: [],
+    taskLists: [],
+    tasks: [],
     pixKeys: [],
     unlockedBadges: [],
     walletBalance: 0,
@@ -619,6 +623,63 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }
   };
 
+  // --- TASKS ACTIONS ---
+  const addTaskList = async (list: Omit<TaskList, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+      const newList: TaskList = {
+          ...list,
+          id: list.id || crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+      if (user) await addTaskListFire(user.uid, newList);
+      else setData(prev => ({ ...prev, taskLists: [...prev.taskLists, newList] }));
+  };
+
+  const updateTaskList = async (id: string, updates: Partial<TaskList>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      if (user) await updateTaskListFire(user.uid, id, finalUpdates);
+      else setData(prev => ({ ...prev, taskLists: prev.taskLists.map(l => l.id === id ? { ...l, ...finalUpdates } : l) }));
+  };
+
+  const deleteTaskList = async (id: string) => {
+      if (user) {
+          await deleteTaskListFire(user.uid, id);
+          // Delete all tasks in this list
+          const tasksToDelete = data.tasks.filter(t => t.listId === id);
+          for (const t of tasksToDelete) {
+              await deleteTaskFire(user.uid, t.id);
+          }
+      } else {
+          setData(prev => ({ 
+              ...prev, 
+              taskLists: prev.taskLists.filter(l => l.id !== id),
+              tasks: prev.tasks.filter(t => t.listId !== id)
+          }));
+      }
+  };
+
+  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const newTask: Task = {
+          ...task,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+      if (user) await addTaskFire(user.uid, newTask);
+      else setData(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+  };
+
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      if (user) await updateTaskFire(user.uid, id, finalUpdates);
+      else setData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === id ? { ...t, ...finalUpdates } : t) }));
+  };
+
+  const deleteTask = async (id: string) => {
+      if (user) await deleteTaskFire(user.uid, id);
+      else setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -684,6 +745,12 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         updatePixKey,
         deletePixKey,
         syncAgendaEvents,
+        addTaskList,
+        updateTaskList,
+        deleteTaskList,
+        addTask,
+        updateTask,
+        deleteTask,
         addCategory,
         deleteCategory,
         unlockBadge,
