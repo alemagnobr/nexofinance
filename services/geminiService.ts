@@ -41,6 +41,67 @@ export interface WealthAnalysisResult {
     actionItems: { title: string; type: 'buy' | 'sell' | 'hold'; description: string }[];
 }
 
+export interface ParsedAgendaInput {
+  type: 'event' | 'task';
+  title: string;
+  description?: string;
+  startDate: string; // ISO string
+  endDate?: string;  // ISO string
+  allDay?: boolean;
+}
+
+export const parseAgendaInput = async (input: string, currentDate: Date): Promise<ParsedAgendaInput | null> => {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const systemPrompt = `
+    Você é um assistente de calendário inteligente.
+    O usuário fornecerá um comando em linguagem natural para criar um evento ou uma tarefa.
+    A data e hora atual de referência é: ${currentDate.toISOString()} (${currentDate.toLocaleString('pt-BR')}).
+    O fuso horário atual do usuário é UTC${currentDate.getTimezoneOffset() > 0 ? '-' : '+'}${Math.abs(currentDate.getTimezoneOffset() / 60)}.
+    
+    Extraia os detalhes e retorne um objeto JSON.
+    - Se for um compromisso com hora marcada ou duração, classifique como "event".
+    - Se for algo a fazer (lembrete, conta a pagar), classifique como "task".
+    - Converta termos como "amanhã", "próxima sexta", "daqui a 2 horas" para datas reais baseadas na data atual.
+    - IMPORTANTE: Retorne as datas no fuso horário local do usuário, no formato YYYY-MM-DDTHH:mm:ss (SEM a letra 'Z' no final). Exemplo: "2026-03-30T14:00:00".
+    - Se o usuário não especificar o ano, assuma o ano atual.
+    - Se não especificar a hora para um evento, assuma que é o dia todo (allDay: true).
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: input,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            type: { type: Type.STRING, description: "Deve ser 'event' ou 'task'" },
+            title: { type: Type.STRING, description: "Título curto e claro" },
+            description: { type: Type.STRING, description: "Detalhes adicionais, se houver" },
+            startDate: { type: Type.STRING, description: "Data de início no formato YYYY-MM-DDTHH:mm:ss (SEM a letra Z)" },
+            endDate: { type: Type.STRING, description: "Data de término no formato YYYY-MM-DDTHH:mm:ss (SEM a letra Z)" },
+            allDay: { type: Type.BOOLEAN, description: "Verdadeiro se durar o dia todo ou não tiver hora específica" }
+          },
+          required: ["type", "title", "startDate"]
+        }
+      }
+    });
+
+    const text = response.text?.trim();
+    if (!text) return null;
+    return JSON.parse(text) as ParsedAgendaInput;
+  } catch (error) {
+    console.error("Erro ao processar entrada da agenda:", error);
+    return null;
+  }
+};
+
 export const generateShoppingListFromRecipe = async (prompt: string): Promise<Omit<ShoppingItem, 'id' | 'actualPrice' | 'isChecked'>[]> => {
   const apiKey = getApiKey();
   if (!apiKey) return [];

@@ -346,7 +346,6 @@ const App: React.FC = () => {
                     onAddAgendaEvent={actions.addAgendaEvent}
                     onUpdateAgendaEvent={actions.updateAgendaEvent}
                     onDeleteAgendaEvent={actions.deleteAgendaEvent}
-                    onSyncAgendaEvents={actions.syncAgendaEvents}
                     onAddTaskList={actions.addTaskList}
                     onUpdateTaskList={actions.updateTaskList}
                     onDeleteTaskList={actions.deleteTaskList}

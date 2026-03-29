@@ -2,9 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown } from 'lucide-react';
-import { syncTransactionsToCalendar } from '../services/calendarService';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
+import { AIAgendaAssistant } from './AIAgendaAssistant';
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
@@ -17,7 +17,6 @@ interface FinancialCalendarProps {
   onAddAgendaEvent?: (e: Omit<AgendaEvent, 'id' | 'updatedAt'>) => void;
   onUpdateAgendaEvent?: (id: string, updates: Partial<AgendaEvent>) => void;
   onDeleteAgendaEvent?: (id: string) => void;
-  onSyncAgendaEvents?: (timeMin: Date, timeMax: Date) => Promise<void> | void;
   onAddTaskList?: (list: Omit<TaskList, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   onUpdateTaskList?: (id: string, updates: Partial<TaskList>) => void;
   onDeleteTaskList?: (id: string) => void;
@@ -76,7 +75,6 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   onAddAgendaEvent,
   onUpdateAgendaEvent,
   onDeleteAgendaEvent,
-  onSyncAgendaEvents,
   onAddTaskList,
   onUpdateTaskList,
   onDeleteTaskList,
@@ -88,7 +86,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
   const [filterType, setFilterType] = useState<ViewFilter>('all');
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
@@ -133,14 +131,23 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  // Sync Agenda Events when month changes
-  useEffect(() => {
-      if (onSyncAgendaEvents) {
-          const timeMin = new Date(year, month, 1);
-          const timeMax = new Date(year, month + 1, 0, 23, 59, 59);
-          onSyncAgendaEvents(timeMin, timeMax);
+  // Week view calculations
+  const currentWeekStart = useMemo(() => {
+      const d = new Date(year, month, selectedDay || 1);
+      const dayOfWeek = d.getDay(); // 0 (Sun) to 6 (Sat)
+      const diff = d.getDate() - dayOfWeek;
+      return new Date(d.setDate(diff));
+  }, [year, month, selectedDay]);
+
+  const weekDays = useMemo(() => {
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+          const d = new Date(currentWeekStart);
+          d.setDate(d.getDate() + i);
+          days.push(d);
       }
-  }, [year, month, onSyncAgendaEvents]);
+      return days;
+  }, [currentWeekStart]);
 
   // --- ALERTS LOGIC (Copied from Dashboard but focused on Exceeded) ---
   const budgetAlerts = useMemo(() => {
@@ -323,14 +330,34 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   }, [displayedTransactions, daysInMonth]);
 
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-    setSelectedDay(null);
+  const handlePrev = () => {
+    if (viewMode === 'month') {
+        setCurrentDate(new Date(year, month - 1, 1));
+        setSelectedDay(null);
+    } else if (viewMode === 'week') {
+        const d = new Date(year, month, (selectedDay || 1) - 7);
+        setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+        setSelectedDay(d.getDate());
+    } else if (viewMode === 'day') {
+        const d = new Date(year, month, (selectedDay || 1) - 1);
+        setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+        setSelectedDay(d.getDate());
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-    setSelectedDay(null);
+  const handleNext = () => {
+    if (viewMode === 'month') {
+        setCurrentDate(new Date(year, month + 1, 1));
+        setSelectedDay(null);
+    } else if (viewMode === 'week') {
+        const d = new Date(year, month, (selectedDay || 1) + 7);
+        setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+        setSelectedDay(d.getDate());
+    } else if (viewMode === 'day') {
+        const d = new Date(year, month, (selectedDay || 1) + 1);
+        setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+        setSelectedDay(d.getDate());
+    }
   };
 
   const handleOpenModal = () => {
@@ -499,36 +526,6 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       setIsTaskModalOpen(false);
   };
 
-  const handleSyncCalendar = async () => {
-      if (!auth.currentUser) {
-          alert('Você precisa estar logado para sincronizar.');
-          return;
-      }
-      
-      setIsSyncing(true);
-      try {
-          // Pass updater function. If offline (guest), this won't work as expected since service needs auth token.
-          // But auth.currentUser check protects us.
-          const count = await syncTransactionsToCalendar(transactions, (id, updates) => {
-              updateTransactionFire(auth.currentUser!.uid, id, updates);
-          });
-          
-          if (onSyncAgendaEvents) {
-              const timeMin = new Date(year, month, 1);
-              const timeMax = new Date(year, month + 1, 0);
-              await onSyncAgendaEvents(timeMin, timeMax);
-          }
-          
-          if (count > 0) alert(`${count} eventos criados na sua Google Agenda e eventos importados com sucesso!`);
-          else alert('Tudo sincronizado! Eventos importados e nenhuma nova conta pendente encontrada.');
-      } catch (error: any) {
-          console.error(error);
-          alert('Erro ao sincronizar: ' + error.message);
-      } finally {
-          setIsSyncing(false);
-      }
-  };
-
   const formatValue = (val: number) => {
     if (privacyMode) return '•••';
     if (val >= 1000) return (val/1000).toFixed(1) + 'k';
@@ -641,6 +638,33 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
        
+       <AIAgendaAssistant 
+          onAddEvent={(event) => {
+            if (onAddAgendaEvent) {
+              onAddAgendaEvent({
+                ...event,
+                id: Date.now().toString(),
+                userId: auth.currentUser?.uid || ''
+              });
+            }
+          }}
+          onAddTask={(task) => {
+            if (onAddTask) {
+              // Get or create a default list
+              let defaultListId = taskLists.length > 0 ? taskLists[0].id : 'default';
+              if (taskLists.length === 0 && onAddTaskList) {
+                onAddTaskList({ id: 'default', title: 'Tarefas Gerais' });
+              }
+              onAddTask({
+                ...task,
+                id: Date.now().toString(),
+                listId: defaultListId,
+                userId: auth.currentUser?.uid || ''
+              });
+            }
+          }}
+        />
+
        {/* ALERTS SECTION */}
        {budgetAlerts.length > 0 && (
          <div className="space-y-2 mb-4">
@@ -1096,31 +1120,26 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* GOOGLE CALENDAR SYNC BUTTON */}
-            <button 
-                onClick={handleSyncCalendar}
-                disabled={isSyncing}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm border ${
-                    isSyncing 
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
-                    : 'bg-white hover:bg-slate-50 text-indigo-600 border-indigo-100 hover:border-indigo-300 dark:bg-slate-800 dark:text-indigo-400 dark:border-slate-700'
-                }`}
-                title="Sincronizar contas pendentes com Google Agenda"
-            >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Sincronizando...' : 'Sincronizar Agenda'}
-            </button>
-
-            <a 
-                href="https://calendar.google.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm border bg-white hover:bg-slate-50 text-blue-600 border-blue-100 hover:border-blue-300 dark:bg-slate-800 dark:text-blue-400 dark:border-slate-700"
-                title="Acessar Google Agenda"
-            >
-                <ExternalLink className="w-4 h-4" />
-                Acessar Google Agenda
-            </a>
+            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mr-2">
+                <button 
+                    onClick={() => setViewMode('month')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'month' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                >
+                    Mês
+                </button>
+                <button 
+                    onClick={() => setViewMode('week')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'week' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                >
+                    Semana
+                </button>
+                <button 
+                    onClick={() => setViewMode('day')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'day' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+                >
+                    Dia
+                </button>
+            </div>
 
             <button 
                 onClick={() => exportToICS(displayedTransactions)}
@@ -1131,13 +1150,15 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
             </button>
 
             <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex-1 md:flex-none justify-center">
-                <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+                <button onClick={handlePrev} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
                 <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div className="px-4 font-semibold text-slate-700 dark:text-slate-200 capitalize min-w-[140px] text-center">
-                {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                {viewMode === 'day' 
+                    ? new Date(year, month, selectedDay || 1).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                 </div>
-                <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+                <button onClick={handleNext} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
                 <ChevronRight className="w-5 h-5" />
                 </button>
             </div>
@@ -1167,18 +1188,258 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          {/* Calendar Grid */}
-         <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
-               {DAYS_OF_WEEK.map(d => (
-                 <div key={d} className="py-3 text-center text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
-                   {d}
+         {viewMode === 'month' ? (
+             <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+                   {DAYS_OF_WEEK.map(d => (
+                     <div key={d} className="py-3 text-center text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
+                       {d}
+                     </div>
+                   ))}
+                </div>
+                <div className="grid grid-cols-7">
+                   {calendarCells}
+                </div>
+             </div>
+         ) : viewMode === 'week' ? (
+             <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                 {/* Week Header */}
+                 <div className="grid grid-cols-8 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+                     <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
+                     {weekDays.map((d, i) => (
+                         <div key={i} onClick={() => { setSelectedDay(d.getDate()); setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1)); }} className={`py-2 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 ${d.getDate() === selectedDay && d.getMonth() === month ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                             <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">{DAYS_OF_WEEK[i]}</div>
+                             <div className={`text-lg font-bold ${d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                 {d.getDate()}
+                             </div>
+                         </div>
+                     ))}
                  </div>
-               ))}
-            </div>
-            <div className="grid grid-cols-7">
-               {calendarCells}
-            </div>
-         </div>
+                 
+                 {/* All Day Section */}
+                 <div className="grid grid-cols-8 border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
+                     <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                         O Dia Todo
+                     </div>
+                     {weekDays.map((d, i) => {
+                         const dayTrans = displayedTransactions.filter(t => {
+                             const [tYear, tMonth, tDay] = t.date.split('-').map(Number);
+                             return tDay === d.getDate() && tMonth === d.getMonth() + 1 && tYear === d.getFullYear();
+                         });
+                         const dayTasks = tasks?.filter(t => {
+                             if (!t.dueDate) return false;
+                             const [tYear, tMonth, tDay] = t.dueDate.split('-').map(Number);
+                             return tDay === d.getDate() && tMonth === d.getMonth() + 1 && tYear === d.getFullYear();
+                         }) || [];
+                         const dayAgendaEvents = displayedAgendaEvents.filter(e => {
+                             const eStart = new Date(e.startDate);
+                             eStart.setHours(0, 0, 0, 0);
+                             const eEnd = new Date(e.endDate);
+                             eEnd.setHours(23, 59, 59, 999);
+                             const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                             return targetDate >= eStart && targetDate <= eEnd && e.allDay;
+                         });
+
+                         return (
+                             <div key={i} className="p-1 border-r border-slate-200 dark:border-slate-600 min-h-[40px]">
+                                 {dayTrans.map(t => (
+                                     <div key={t.id} className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                         {t.type === 'income' ? '+' : '-'}{formatValue(t.amount)} {t.description}
+                                     </div>
+                                 ))}
+                                 {dayTasks.map(t => (
+                                     <div key={t.id} className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                         {t.title}
+                                     </div>
+                                 ))}
+                                 {dayAgendaEvents.map(e => (
+                                     <div key={e.id} onClick={() => handleEditAgendaEvent(e)} className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                         {e.title}
+                                     </div>
+                                 ))}
+                             </div>
+                         );
+                     })}
+                 </div>
+
+                 {/* Time Grid */}
+                 <div className="flex-1 overflow-y-auto relative">
+                     <div className="grid grid-cols-8">
+                         {/* Time Labels */}
+                         <div className="border-r border-slate-200 dark:border-slate-600">
+                             {Array.from({ length: 24 }).map((_, i) => (
+                                 <div key={i} className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1">
+                                     <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, '0')}:00`}</span>
+                                 </div>
+                             ))}
+                         </div>
+                         
+                         {/* Day Columns */}
+                         {weekDays.map((d, dayIdx) => {
+                             const dayAgendaEvents = displayedAgendaEvents.filter(e => {
+                                 const eStart = new Date(e.startDate);
+                                 const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                 return eStart.getDate() === targetDate.getDate() && eStart.getMonth() === targetDate.getMonth() && eStart.getFullYear() === targetDate.getFullYear() && !e.allDay;
+                             });
+
+                             return (
+                                 <div key={dayIdx} className="border-r border-slate-200 dark:border-slate-600 relative">
+                                     {Array.from({ length: 24 }).map((_, i) => (
+                                         <div key={i} className="h-12 border-b border-slate-100 dark:border-slate-700/50"></div>
+                                     ))}
+                                     
+                                     {/* Render Events */}
+                                     {dayAgendaEvents.map(e => {
+                                         const start = new Date(e.startDate);
+                                         const end = new Date(e.endDate);
+                                         const startHour = start.getHours() + start.getMinutes() / 60;
+                                         const endHour = end.getHours() + end.getMinutes() / 60;
+                                         const top = startHour * 48; // 48px per hour (h-12)
+                                         const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
+
+                                         return (
+                                             <div 
+                                                 key={e.id}
+                                                 onClick={() => handleEditAgendaEvent(e)}
+                                                 className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
+                                                 style={{ top: `${top}px`, height: `${height}px` }}
+                                             >
+                                                 <div className="text-[10px] font-bold leading-tight truncate">{e.title}</div>
+                                                 {height >= 40 && (
+                                                     <div className="text-[9px] opacity-80 leading-tight truncate">
+                                                         {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
+                             );
+                         })}
+                     </div>
+                 </div>
+             </div>
+         ) : (
+             <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+                 {/* Day Header */}
+                 <div className="grid grid-cols-[60px_1fr] bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+                     <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
+                     <div className="py-2 text-center bg-indigo-50 dark:bg-indigo-900/20">
+                         <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                             {DAYS_OF_WEEK[new Date(year, month, selectedDay || 1).getDay()]}
+                         </div>
+                         <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                             {selectedDay || 1}
+                         </div>
+                     </div>
+                 </div>
+                 
+                 {/* All Day Section */}
+                 <div className="grid grid-cols-[60px_1fr] border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
+                     <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                         O Dia Todo
+                     </div>
+                     <div className="p-1 min-h-[40px]">
+                         {(() => {
+                             const d = new Date(year, month, selectedDay || 1);
+                             const dayTrans = displayedTransactions.filter(t => {
+                                 const [tYear, tMonth, tDay] = t.date.split('-').map(Number);
+                                 return tDay === d.getDate() && tMonth === d.getMonth() + 1 && tYear === d.getFullYear();
+                             });
+                             const dayTasks = tasks?.filter(t => {
+                                 if (!t.dueDate) return false;
+                                 const [tYear, tMonth, tDay] = t.dueDate.split('-').map(Number);
+                                 return tDay === d.getDate() && tMonth === d.getMonth() + 1 && tYear === d.getFullYear();
+                             }) || [];
+                             const dayAgendaEvents = displayedAgendaEvents.filter(e => {
+                                 const eStart = new Date(e.startDate);
+                                 eStart.setHours(0, 0, 0, 0);
+                                 const eEnd = new Date(e.endDate);
+                                 eEnd.setHours(23, 59, 59, 999);
+                                 const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                 return targetDate >= eStart && targetDate <= eEnd && e.allDay;
+                             });
+
+                             return (
+                                 <>
+                                     {dayTrans.map(t => (
+                                         <div key={t.id} className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                                             {t.type === 'income' ? '+' : '-'}{formatValue(t.amount)} {t.description}
+                                         </div>
+                                     ))}
+                                     {dayTasks.map(t => (
+                                         <div key={t.id} className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                                             {t.title}
+                                         </div>
+                                     ))}
+                                     {dayAgendaEvents.map(e => (
+                                         <div key={e.id} onClick={() => handleEditAgendaEvent(e)} className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                             {e.title}
+                                         </div>
+                                     ))}
+                                 </>
+                             );
+                         })()}
+                     </div>
+                 </div>
+
+                 {/* Time Grid */}
+                 <div className="flex-1 overflow-y-auto relative">
+                     <div className="grid grid-cols-[60px_1fr]">
+                         {/* Time Labels */}
+                         <div className="border-r border-slate-200 dark:border-slate-600">
+                             {Array.from({ length: 24 }).map((_, i) => (
+                                 <div key={i} className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1">
+                                     <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, '0')}:00`}</span>
+                                 </div>
+                             ))}
+                         </div>
+                         
+                         {/* Day Column */}
+                         <div className="relative">
+                             {Array.from({ length: 24 }).map((_, i) => (
+                                 <div key={i} className="h-12 border-b border-slate-100 dark:border-slate-700/50"></div>
+                             ))}
+                             
+                             {/* Render Events */}
+                             {(() => {
+                                 const d = new Date(year, month, selectedDay || 1);
+                                 const dayAgendaEvents = displayedAgendaEvents.filter(e => {
+                                     const eStart = new Date(e.startDate);
+                                     const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                                     return eStart.getDate() === targetDate.getDate() && eStart.getMonth() === targetDate.getMonth() && eStart.getFullYear() === targetDate.getFullYear() && !e.allDay;
+                                 });
+
+                                 return dayAgendaEvents.map(e => {
+                                     const start = new Date(e.startDate);
+                                     const end = new Date(e.endDate);
+                                     const startHour = start.getHours() + start.getMinutes() / 60;
+                                     const endHour = end.getHours() + end.getMinutes() / 60;
+                                     const top = startHour * 48; // 48px per hour (h-12)
+                                     const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
+
+                                     return (
+                                         <div 
+                                             key={e.id}
+                                             onClick={() => handleEditAgendaEvent(e)}
+                                             className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
+                                             style={{ top: `${top}px`, height: `${height}px` }}
+                                         >
+                                             <div className="text-[10px] font-bold leading-tight truncate">{e.title}</div>
+                                             {height >= 40 && (
+                                                 <div className="text-[9px] opacity-80 leading-tight truncate">
+                                                     {start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                 </div>
+                                             )}
+                                         </div>
+                                     );
+                                 });
+                             })()}
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         )}
 
          {/* Details Sidebar */}
          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-0 overflow-hidden flex flex-col h-full min-h-[400px]">
