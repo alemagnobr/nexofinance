@@ -1,8 +1,8 @@
 {
   "name": "NEXO Hub Financeiro",
   "short_name": "NEXO",
-  "start_url": "/nexofinance/",
-  "scope": "/nexofinance/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
