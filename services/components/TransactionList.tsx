@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
 interface TransactionListProps {
@@ -253,6 +253,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           groups[t.date].total += val;
       });
 
+      // Sort transactions within each group
+      Object.values(groups).forEach(group => {
+          group.transactions.sort((a, b) => {
+              // 1. Paid first, Pending last
+              if (a.status === 'paid' && b.status === 'pending') return -1;
+              if (a.status === 'pending' && b.status === 'paid') return 1;
+              
+              // 2. Custom order
+              const orderA = a.order || 0;
+              const orderB = b.order || 0;
+              return orderA - orderB;
+          });
+      });
+
       // 2. Create array sorted Newest -> Oldest (Standard display order)
       const sortedGroups = Object.entries(groups)
           .map(([date, data]) => ({ date, ...data }))
@@ -467,6 +481,38 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         setAnalyzingReceipt(false);
       };
       reader.readAsDataURL(file);
+  };
+
+  const handleMoveTransaction = (groupDate: string, index: number, direction: 'up' | 'down') => {
+      const group = groupedTransactions.find(g => g.date === groupDate);
+      if (!group) return;
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= group.transactions.length) return;
+      
+      const currentTx = group.transactions[index];
+      const targetTx = group.transactions[newIndex];
+      
+      // Only allow moving within the same status group
+      if (currentTx.status !== targetTx.status) return;
+      
+      // Get all transactions in the same status group
+      const groupTxs = group.transactions.filter(t => t.status === currentTx.status);
+      
+      // Create a new array with the swapped items
+      const newGroupTxs = [...groupTxs];
+      const currentIndexInGroup = newGroupTxs.findIndex(t => t.id === currentTx.id);
+      const targetIndexInGroup = newGroupTxs.findIndex(t => t.id === targetTx.id);
+      
+      // Swap
+      [newGroupTxs[currentIndexInGroup], newGroupTxs[targetIndexInGroup]] = [newGroupTxs[targetIndexInGroup], newGroupTxs[currentIndexInGroup]];
+      
+      // Update order for all items in the group to ensure consistency
+      newGroupTxs.forEach((t, i) => {
+          if (t.order !== i) {
+              onUpdate(t.id, { order: i });
+          }
+      });
   };
 
   return (
@@ -908,161 +954,218 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                       </div>
 
                       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden divide-y divide-slate-100 dark:divide-slate-700">
-                          {group.transactions.map((t) => (
-                              <div key={t.id} className="group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                  
-                                  {/* --- MOBILE VIEW (< md) --- */}
-                                  <div className="md:hidden p-4 flex items-center gap-3 relative">
-                                      {/* Icon Box */}
-                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                          t.type === 'income' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30'
-                                      }`}>
-                                          {t.type === 'income' ? <ArrowUpCircle className="w-5 h-5" /> : <ArrowDownCircle className="w-5 h-5" />}
-                                      </div>
+                          {group.transactions.map((t, index) => {
+                              const showPaidSeparator = index === 0 && t.status === 'paid';
+                              const showPendingSeparator = (index === 0 && t.status === 'pending') || 
+                                                           (index > 0 && t.status === 'pending' && group.transactions[index - 1].status === 'paid');
+                              
+                              const isFirstInStatus = index === 0 || group.transactions[index - 1].status !== t.status;
+                              const isLastInStatus = index === group.transactions.length - 1 || group.transactions[index + 1].status !== t.status;
 
-                                      {/* Main Content */}
-                                      <div className="flex-1 min-w-0" onClick={() => handleEdit(t)}>
-                                          <div className="flex justify-between items-start">
-                                              <h4 className="font-bold text-slate-800 dark:text-white truncate pr-2 text-sm">{t.description}</h4>
-                                              <span className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                                  {t.type === 'expense' && '- '}{formatValue(t.amount)}
-                                              </span>
+                              return (
+                                  <React.Fragment key={t.id}>
+                                      {showPaidSeparator && (
+                                          <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 border-b border-emerald-100 dark:border-emerald-800/50 flex items-center gap-2">
+                                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Pagos</span>
                                           </div>
+                                      )}
+                                      {showPendingSeparator && (
+                                          <div className="bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 border-b border-amber-100 dark:border-amber-800/50 flex items-center gap-2">
+                                              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Pendentes</span>
+                                          </div>
+                                      )}
+                                      <div className="group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                           
-                                          <div className="flex justify-between items-center mt-1">
-                                              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(t.category)}`}>
-                                                      {t.category}
-                                                  </span>
-                                                  {t.isRecurring && (
-                                                      <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded" title="Recorrente Infinito">
-                                                          <Infinity className="w-3 h-3" /> 
-                                                          Fixo
+                                          {/* --- MOBILE VIEW (< md) --- */}
+                                          <div className="md:hidden p-4 flex items-center gap-3 relative">
+                                              {/* Icon Box */}
+                                              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                                  t.type === 'income' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30'
+                                              }`}>
+                                                  {t.type === 'income' ? <ArrowUpCircle className="w-5 h-5" /> : <ArrowDownCircle className="w-5 h-5" />}
+                                              </div>
+
+                                              {/* Main Content */}
+                                              <div className="flex-1 min-w-0" onClick={() => handleEdit(t)}>
+                                                  <div className="flex justify-between items-start">
+                                                      <h4 className="font-bold text-slate-800 dark:text-white truncate pr-2 text-sm">{t.description}</h4>
+                                                      <span className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                                          {t.type === 'expense' && '- '}{formatValue(t.amount)}
                                                       </span>
-                                                  )}
-                                                  {t.status === 'pending' && t.autoPay && (
-                                                      <span className="flex items-center gap-0.5 text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" title="Lançamento Automático">
-                                                          <Zap className="w-3 h-3" /> Auto
-                                                      </span>
+                                                  </div>
+                                                  
+                                                  <div className="flex justify-between items-center mt-1">
+                                                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(t.category)}`}>
+                                                              {t.category}
+                                                          </span>
+                                                          {t.isRecurring && (
+                                                              <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded" title="Recorrente Infinito">
+                                                                  <Infinity className="w-3 h-3" /> 
+                                                                  Fixo
+                                                              </span>
+                                                          )}
+                                                          {t.status === 'pending' && t.autoPay && (
+                                                              <span className="flex items-center gap-0.5 text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" title="Lançamento Automático">
+                                                                  <Zap className="w-3 h-3" /> Auto
+                                                              </span>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                                  
+                                                  {t.observation && (
+                                                      <p className="text-[10px] text-slate-400 mt-1 italic truncate flex items-center gap-1">
+                                                          <StickyNote className="w-3 h-3" /> {t.observation}
+                                                      </p>
                                                   )}
                                               </div>
-                                          </div>
-                                          
-                                          {t.observation && (
-                                              <p className="text-[10px] text-slate-400 mt-1 italic truncate flex items-center gap-1">
-                                                  <StickyNote className="w-3 h-3" /> {t.observation}
-                                              </p>
-                                          )}
-                                      </div>
 
-                                      {/* Actions */}
-                                      <div className="flex items-center gap-2 pl-2">
-                                          <button 
-                                              onClick={() => onToggleStatus(t.id)}
-                                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                                  t.status === 'paid' 
-                                                  ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                                  : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
-                                              }`}
-                                          >
-                                              <CheckCircle className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                <Pencil className="w-4 h-4" />
-                                          </button>
-                                          <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                <Trash2 className="w-4 h-4" />
-                                          </button>
-                                      </div>
-                                  </div>
-
-                                  {/* --- DESKTOP TABLE ROW (>= md) --- */}
-                                  <div className="hidden md:flex items-center gap-4 p-3 text-sm">
-                                      {/* Icon */}
-                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                          t.type === 'income' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30'
-                                      }`}>
-                                          {t.type === 'income' ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
-                                      </div>
-
-                                      {/* Display Mode */}
-                                      <>
-                                          {/* Date (Day) */}
-                                          <div className="w-8 text-center font-bold text-slate-400 text-xs">
-                                              {parseInt(t.date.split('-')[2])}
-                                          </div>
-
-                                          {/* Category */}
-                                          <div className="w-24 shrink-0">
-                                              <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${getCategoryStyle(t.category)}`}>
-                                                  {t.category}
-                                              </span>
-                                          </div>
-
-                                          {/* Description */}
-                                          <div 
-                                              className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500 flex flex-col justify-center"
-                                              onClick={() => handleEdit(t)}
-                                              title="Clique para editar"
-                                          >
-                                              <div className="flex items-center gap-2">
-                                                  {t.description}
-                                                  {t.isRecurring && (
-                                                      <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Recorrência Infinita">
-                                                          <Infinity className="w-3 h-3" /> Recorrente
-                                                      </span>
-                                                  )}
-                                                  {t.status === 'pending' && t.autoPay && (
-                                                      <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Lançamento Automático">
-                                                          <Zap className="w-3 h-3" /> Auto
-                                                      </span>
-                                                  )}
+                                              {/* Actions */}
+                                              <div className="flex flex-col items-center gap-1 pl-2 border-l border-slate-100 dark:border-slate-700">
+                                                  <div className="flex items-center gap-1">
+                                                      <button 
+                                                          onClick={() => handleMoveTransaction(group.date, index, 'up')}
+                                                          disabled={isFirstInStatus}
+                                                          className={`p-1 rounded ${isFirstInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                      >
+                                                          <ChevronUp className="w-4 h-4" />
+                                                      </button>
+                                                      <button 
+                                                          onClick={() => handleMoveTransaction(group.date, index, 'down')}
+                                                          disabled={isLastInStatus}
+                                                          className={`p-1 rounded ${isLastInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                      >
+                                                          <ChevronDown className="w-4 h-4" />
+                                                      </button>
+                                                  </div>
+                                                  <div className="flex items-center gap-1">
+                                                      <button 
+                                                          onClick={() => onToggleStatus(t.id)}
+                                                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                              t.status === 'paid' 
+                                                              ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                                              : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
+                                                          }`}
+                                                      >
+                                                          <CheckCircle className="w-3.5 h-3.5" />
+                                                      </button>
+                                                      <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                            <Pencil className="w-4 h-4" />
+                                                      </button>
+                                                      <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                            <Trash2 className="w-4 h-4" />
+                                                      </button>
+                                                  </div>
                                               </div>
-                                              {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                           </div>
 
-                                          {/* Payment Method */}
-                                          <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
-                                              <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
-                                              <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
-                                          </div>
+                                          {/* --- DESKTOP TABLE ROW (>= md) --- */}
+                                          <div className="hidden md:flex items-center gap-4 p-3 text-sm">
+                                              {/* Icon */}
+                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                                  t.type === 'income' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30'
+                                              }`}>
+                                                  {t.type === 'income' ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
+                                              </div>
 
-                                          {/* Amount */}
-                                          <div 
-                                              className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
-                                              onClick={() => handleEdit(t)}
-                                          >
-                                              {formatValue(t.amount)}
-                                          </div>
+                                              {/* Display Mode */}
+                                              <>
+                                                  {/* Date (Day) */}
+                                                  <div className="w-8 text-center font-bold text-slate-400 text-xs">
+                                                      {parseInt(t.date.split('-')[2])}
+                                                  </div>
 
-                                          {/* Status */}
-                                          <div className="w-8 flex justify-center">
-                                              <button 
-                                                  onClick={() => onToggleStatus(t.id)}
-                                                  className={`transition-all hover:scale-110 ${
-                                                      t.status === 'paid' 
-                                                      ? 'text-emerald-500' 
-                                                      : 'text-slate-300 hover:text-emerald-400'
-                                                  }`}
-                                                  title={t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
-                                              >
-                                                  <CheckCircle className="w-5 h-5" />
-                                              </button>
-                                          </div>
+                                                  {/* Category */}
+                                                  <div className="w-24 shrink-0">
+                                                      <span className={`px-2 py-1 rounded text-[10px] font-medium border block text-center truncate ${getCategoryStyle(t.category)}`}>
+                                                          {t.category}
+                                                      </span>
+                                                  </div>
 
-                                          {/* Actions */}
-                                          <div className="w-16 flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                              <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                  <Pencil className="w-4 h-4" />
-                                              </button>
-                                              <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                  <Trash2 className="w-4 h-4" />
-                                              </button>
+                                                  {/* Description */}
+                                                  <div 
+                                                      className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500 flex flex-col justify-center"
+                                                      onClick={() => handleEdit(t)}
+                                                      title="Clique para editar"
+                                                  >
+                                                      <div className="flex items-center gap-2">
+                                                          {t.description}
+                                                          {t.isRecurring && (
+                                                              <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Recorrência Infinita">
+                                                                  <Infinity className="w-3 h-3" /> Recorrente
+                                                              </span>
+                                                          )}
+                                                          {t.status === 'pending' && t.autoPay && (
+                                                              <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Lançamento Automático">
+                                                                  <Zap className="w-3 h-3" /> Auto
+                                                              </span>
+                                                          )}
+                                                      </div>
+                                                      {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
+                                                  </div>
+
+                                                  {/* Payment Method */}
+                                                  <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
+                                                      <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
+                                                      <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                                  </div>
+
+                                                  {/* Amount */}
+                                                  <div 
+                                                      className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
+                                                      onClick={() => handleEdit(t)}
+                                                  >
+                                                      {formatValue(t.amount)}
+                                                  </div>
+
+                                                  {/* Status */}
+                                                  <div className="w-8 flex justify-center">
+                                                      <button 
+                                                          onClick={() => onToggleStatus(t.id)}
+                                                          className={`transition-all hover:scale-110 ${
+                                                              t.status === 'paid' 
+                                                              ? 'text-emerald-500' 
+                                                              : 'text-slate-300 hover:text-emerald-400'
+                                                          }`}
+                                                          title={t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
+                                                      >
+                                                          <CheckCircle className="w-5 h-5" />
+                                                      </button>
+                                                  </div>
+
+                                                  {/* Actions */}
+                                                  <div className="w-24 flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                      <div className="flex flex-col mr-1">
+                                                          <button 
+                                                              onClick={() => handleMoveTransaction(group.date, index, 'up')}
+                                                              disabled={isFirstInStatus}
+                                                              className={`p-0.5 rounded ${isFirstInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                          >
+                                                              <ChevronUp className="w-3 h-3" />
+                                                          </button>
+                                                          <button 
+                                                              onClick={() => handleMoveTransaction(group.date, index, 'down')}
+                                                              disabled={isLastInStatus}
+                                                              className={`p-0.5 rounded ${isLastInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                          >
+                                                              <ChevronDown className="w-3 h-3" />
+                                                          </button>
+                                                      </div>
+                                                      <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                          <Pencil className="w-4 h-4" />
+                                                      </button>
+                                                      <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                          <Trash2 className="w-4 h-4" />
+                                                      </button>
+                                                  </div>
+                                              </>
                                           </div>
-                                      </>
-                                  </div>
-                              </div>
-                          ))}
+                                      </div>
+                                  </React.Fragment>
+                              );
+                          })}
                       </div>
                   </div>
               ))

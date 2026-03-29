@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -12,12 +12,13 @@ import {
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
   addAgendaEventFire, updateAgendaEventFire, deleteAgendaEventFire,
+  addTaskListFire, updateTaskListFire, deleteTaskListFire,
+  addTaskFire, updateTaskFire, deleteTaskFire,
   addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
 } from '../services/storageService';
-import { deleteCalendarEvent, updateCalendarEvent, createGeneralCalendarEvent, updateGeneralCalendarEvent, deleteGeneralCalendarEvent, fetchGoogleEvents } from '../services/calendarService';
 
 const DEFAULT_DATA: AppData = {
     transactions: [],
@@ -31,6 +32,8 @@ const DEFAULT_DATA: AppData = {
     notes: [],
     passwords: [],
     agendaEvents: [],
+    taskLists: [],
+    tasks: [],
     pixKeys: [],
     unlockedBadges: [],
     walletBalance: 0,
@@ -188,18 +191,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
-    // 1. Google Calendar Integration: Update event if connected
-    const currentTransaction = data.transactions.find(t => t.id === id);
-    if (currentTransaction && currentTransaction.googleEventId && user) {
-        // Se a data, valor ou descrição mudaram, atualiza no Google
-        if (updates.date || updates.amount || updates.description || updates.category) {
-            const updatedTx = { ...currentTransaction, ...updates };
-            // Fire and forget (não espera terminar para atualizar UI)
-            updateCalendarEvent(updatedTx, currentTransaction.googleEventId)
-                .catch(err => console.warn("Falha ao atualizar Google Agenda:", err));
-        }
-    }
-
     if (user) await updateTransactionFire(user.uid, id, updates);
     else setData(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === id ? { ...t, ...updates } : t) }));
   };
@@ -238,11 +229,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
             const tDate = new Date(t.date);
             if (tDate >= deletedDate) {
                 toDelete.push(t.id);
-                // 1. Google Calendar Integration: Delete event if connected
-                if (t.googleEventId && user) {
-                    deleteCalendarEvent(t.googleEventId)
-                        .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
-                }
             } else {
                 if (transactionToDelete.isRecurring) {
                     toUpdate.push(t.id);
@@ -270,10 +256,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         }
     } else {
         // Normal deletion
-        if (transactionToDelete.googleEventId && user) {
-            deleteCalendarEvent(transactionToDelete.googleEventId)
-                .catch(err => console.warn("Falha ao remover do Google Agenda:", err));
-        }
         if (user) await deleteTransactionFire(user.uid, id);
         else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
     }
@@ -376,7 +358,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const addShoppingItem = async (item: Omit<ShoppingItem, 'id'>) => {
-    const newItem: ShoppingItem = { ...item, id: crypto.randomUUID() };
+    const newItem: ShoppingItem = { 
+      ...item, 
+      id: crypto.randomUUID(),
+      month: item.month || new Date().toISOString().slice(0, 7)
+    };
     if (user) await addShoppingItemFire(user.uid, newItem);
     else setData(prev => ({ ...prev, shoppingList: [...(prev.shoppingList || []), newItem] }));
   };
@@ -391,9 +377,14 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingList: prev.shoppingList.filter(item => item.id !== id) }));
   };
 
-  const clearShoppingList = async () => {
-    if (user) await clearShoppingListFire(user.uid);
-    else setData(prev => ({ ...prev, shoppingList: [] }));
+  const clearShoppingList = async (month?: string) => {
+    if (user) await clearShoppingListFire(user.uid, month);
+    else setData(prev => ({ 
+      ...prev, 
+      shoppingList: month 
+        ? prev.shoppingList.filter(item => item.month !== month)
+        : [] 
+    }));
   };
 
   const setShoppingBudget = async (amount: number) => {
@@ -485,13 +476,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       };
       
       if (user) {
-          // Sync to Google Calendar first
-          try {
-              const googleEventId = await createGeneralCalendarEvent(newEvent);
-              if (googleEventId) newEvent.googleEventId = googleEventId;
-          } catch (e) {
-              console.error("Failed to sync new event to Google Calendar", e);
-          }
           await addAgendaEventFire(user.uid, newEvent);
       } else {
           setData(prev => ({ ...prev, agendaEvents: [...prev.agendaEvents, newEvent] }));
@@ -502,14 +486,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
       
       if (user) {
-          const existingEvent = data.agendaEvents.find(e => e.id === id);
-          if (existingEvent?.googleEventId) {
-              try {
-                  await updateGeneralCalendarEvent({ ...existingEvent, ...updates } as AgendaEvent, existingEvent.googleEventId);
-              } catch (e) {
-                  console.error("Failed to update event in Google Calendar", e);
-              }
-          }
           await updateAgendaEventFire(user.uid, id, finalUpdates);
       } else {
           setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.map(e => e.id === id ? { ...e, ...finalUpdates } : e) }));
@@ -518,14 +494,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
   const deleteAgendaEvent = async (id: string) => {
       if (user) {
-          const existingEvent = data.agendaEvents.find(e => e.id === id);
-          if (existingEvent?.googleEventId) {
-              try {
-                  await deleteGeneralCalendarEvent(existingEvent.googleEventId);
-              } catch (e) {
-                  console.error("Failed to delete event from Google Calendar", e);
-              }
-          }
           await deleteAgendaEventFire(user.uid, id);
       } else {
           setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.filter(e => e.id !== id) }));
@@ -553,70 +521,61 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, pixKeys: prev.pixKeys.filter(k => k.id !== id) }));
   };
 
-  const syncAgendaEvents = async (timeMin: Date, timeMax: Date) => {
-      if (!user) return;
-      try {
-          const googleEvents = await fetchGoogleEvents(timeMin, timeMax);
-          
-          // Track IDs of events fetched from Google
-          const fetchedGoogleIds = new Set<string>();
+  // --- TASKS ACTIONS ---
+  const addTaskList = async (list: Omit<TaskList, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+      const newList: TaskList = {
+          ...list,
+          id: list.id || crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+      if (user) await addTaskListFire(user.uid, newList);
+      else setData(prev => ({ ...prev, taskLists: [...prev.taskLists, newList] }));
+  };
 
-          for (const gEvent of googleEvents) {
-              fetchedGoogleIds.add(gEvent.id);
+  const updateTaskList = async (id: string, updates: Partial<TaskList>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      if (user) await updateTaskListFire(user.uid, id, finalUpdates);
+      else setData(prev => ({ ...prev, taskLists: prev.taskLists.map(l => l.id === id ? { ...l, ...finalUpdates } : l) }));
+  };
 
-              // Skip if this event is already a transaction
-              if (data.transactions.some(t => t.googleEventId === gEvent.id)) {
-                  continue;
-              }
-
-              // Check if we already have it
-              const exists = data.agendaEvents.find(e => e.googleEventId === gEvent.id);
-              if (!exists) {
-                  // Create it locally
-                  const newEvent: AgendaEvent = {
-                      id: crypto.randomUUID(),
-                      title: gEvent.summary || 'Evento sem título',
-                      description: gEvent.description || '',
-                      startDate: gEvent.start?.dateTime || gEvent.start?.date || new Date().toISOString(),
-                      endDate: gEvent.end?.dateTime || gEvent.end?.date || new Date().toISOString(),
-                      allDay: !!gEvent.start?.date,
-                      googleEventId: gEvent.id,
-                      updatedAt: new Date().toISOString()
-                  };
-                  await addAgendaEventFire(user.uid, newEvent);
-              } else {
-                  // Update locally if Google event is newer (simplified: just update)
-                  // In a real app, compare updated timestamps
-                  const updates: Partial<AgendaEvent> = {
-                      title: gEvent.summary || 'Evento sem título',
-                      description: gEvent.description || '',
-                      startDate: gEvent.start?.dateTime || gEvent.start?.date || exists.startDate,
-                      endDate: gEvent.end?.dateTime || gEvent.end?.date || exists.endDate,
-                      allDay: !!gEvent.start?.date,
-                      updatedAt: new Date().toISOString()
-                  };
-                  await updateAgendaEventFire(user.uid, exists.id, updates);
-              }
+  const deleteTaskList = async (id: string) => {
+      if (user) {
+          await deleteTaskListFire(user.uid, id);
+          // Delete all tasks in this list
+          const tasksToDelete = data.tasks.filter(t => t.listId === id);
+          for (const t of tasksToDelete) {
+              await deleteTaskFire(user.uid, t.id);
           }
-
-          // Delete local events that were removed from Google Calendar
-          // Only process events that have a googleEventId and fall within the synced time range
-          const eventsToDelete = data.agendaEvents.filter(e => {
-              if (!e.googleEventId) return false;
-              
-              const eventDate = new Date(e.startDate);
-              const isInRange = eventDate >= timeMin && eventDate <= timeMax;
-              
-              return isInRange && !fetchedGoogleIds.has(e.googleEventId);
-          });
-
-          for (const e of eventsToDelete) {
-              await deleteAgendaEventFire(user.uid, e.id);
-          }
-
-      } catch (e) {
-          console.error("Error syncing agenda events", e);
+      } else {
+          setData(prev => ({ 
+              ...prev, 
+              taskLists: prev.taskLists.filter(l => l.id !== id),
+              tasks: prev.tasks.filter(t => t.listId !== id)
+          }));
       }
+  };
+
+  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const newTask: Task = {
+          ...task,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+      };
+      if (user) await addTaskFire(user.uid, newTask);
+      else setData(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+  };
+
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+      if (user) await updateTaskFire(user.uid, id, finalUpdates);
+      else setData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === id ? { ...t, ...finalUpdates } : t) }));
+  };
+
+  const deleteTask = async (id: string) => {
+      if (user) await deleteTaskFire(user.uid, id);
+      else setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
   };
 
   // --- CATEGORY ACTIONS ---
@@ -683,7 +642,12 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addPixKey,
         updatePixKey,
         deletePixKey,
-        syncAgendaEvents,
+        addTaskList,
+        updateTaskList,
+        deleteTaskList,
+        addTask,
+        updateTask,
+        deleteTask,
         addCategory,
         deleteCategory,
         unlockBadge,

@@ -131,7 +131,7 @@ export const Notes: React.FC<NotesProps> = ({ notes, onAdd, onUpdate, onDelete, 
       </div>
 
       {/* Grid */}
-      <div className="columns-1 md:columns-2 lg:columns-3 gap-4 space-y-4">
+      <div className="columns-1 sm:columns-2 md:columns-3 gap-4 space-y-4">
           {filteredNotes.length === 0 ? (
               <div className="col-span-full py-12 text-center text-slate-400 flex flex-col items-center">
                   <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-full mb-3">

@@ -24,8 +24,8 @@ export interface Transaction {
   paymentMethod?: PaymentMethod;
   debtId?: string; // ID da dívida vinculada (se houver)
   observation?: string; // Notas opcionais do usuário
-  googleEventId?: string; // ID do evento no Google Calendar
   autoPay?: boolean; // Lançamento automático na data
+  order?: number; // Ordem de exibição no dia
 }
 
 export interface InvestmentHistory {
@@ -82,6 +82,7 @@ export interface ShoppingItem {
   isChecked: boolean; // Se já pegou o item
   category?: ShoppingCategory; // Novo campo
   observation?: string; // Observação opcional
+  month?: string; // Formato "YYYY-MM" para histórico mensal
 }
 
 // --- KANBAN TYPES ---
@@ -184,8 +185,26 @@ export interface AgendaEvent {
   startDate: string; // ISO datetime or YYYY-MM-DD
   endDate: string; // ISO datetime or YYYY-MM-DD
   allDay: boolean;
-  googleEventId?: string;
   updatedAt?: string;
+}
+
+// --- TASKS TYPES ---
+export interface TaskList {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Task {
+  id: string;
+  listId: string;
+  title: string;
+  description?: string;
+  dueDate?: string; // YYYY-MM-DD
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random' | 'other';
@@ -212,6 +231,8 @@ export interface AppData {
   notes: Note[]; // Novo campo: Notas
   passwords: PasswordEntry[]; // Novo campo: Senhas
   agendaEvents: AgendaEvent[]; // Novo campo: Agenda Geral
+  taskLists: TaskList[]; // Novo campo: Listas de Tarefas
+  tasks: Task[]; // Novo campo: Tarefas
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;

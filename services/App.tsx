@@ -12,6 +12,7 @@ import { Dashboard } from './components/Dashboard';
 import { AiAssistant } from './components/AiAssistant';
 import { Sidebar } from './components/Sidebar';
 import { AppModals } from './components/AppModals';
+import { ShortcutsModal } from './components/ShortcutsModal';
 import { useAppData } from './hooks/useAppData';
 import { SettingsView } from './components/SettingsView';
 import { PixKeyManager } from './components/PixKeyManager';
@@ -21,9 +22,12 @@ import { MovementsView } from './components/MovementsView';
 import { AssetsView } from './components/AssetsView';
 import { ProductivityView } from './components/ProductivityView';
 import { UtilitiesView } from './components/UtilitiesView';
+import { FinancialCalendar } from './components/FinancialCalendar';
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
+
+import { Toaster } from 'sonner';
 
 const App: React.FC = () => {
   // Auth State
@@ -50,6 +54,7 @@ const App: React.FC = () => {
   const [userKeyInput, setUserKeyInput] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [isDonateModalOpen, setIsDonateModalOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +127,9 @@ const App: React.FC = () => {
             passwords: [], 
             categories: [], 
             agendaEvents: [],
-            pixKeys: []
+            pixKeys: [],
+            taskLists: [],
+            tasks: []
         });
     } else {
         await signOut(auth);
@@ -281,8 +288,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 2. Group: Movements (Transactions, Calendar, Subscriptions, Debts)
-    if ([View.TRANSACTIONS, View.CALENDAR, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)) {
+    // 2. Group: Movements (Transactions, Subscriptions, Debts)
+    if ([View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)) {
         return (
             <MovementsView 
                 currentView={currentView}
@@ -321,6 +328,33 @@ const App: React.FC = () => {
                 actions={actions}
                 privacyMode={privacyMode}
             />
+        );
+    }
+
+    // 4.5. Standalone: Calendar
+    if (currentView === View.CALENDAR) {
+        return (
+            <div className="animate-fade-in">
+                <FinancialCalendar 
+                    transactions={data.transactions} 
+                    budgets={data.budgets}
+                    agendaEvents={data.agendaEvents}
+                    taskLists={data.taskLists}
+                    tasks={data.tasks}
+                    onAddTransaction={actions.addTransaction}
+                    onUpdateTransaction={actions.updateTransaction}
+                    onAddAgendaEvent={actions.addAgendaEvent}
+                    onUpdateAgendaEvent={actions.updateAgendaEvent}
+                    onDeleteAgendaEvent={actions.deleteAgendaEvent}
+                    onAddTaskList={actions.addTaskList}
+                    onUpdateTaskList={actions.updateTaskList}
+                    onDeleteTaskList={actions.deleteTaskList}
+                    onAddTask={actions.addTask}
+                    onUpdateTask={actions.updateTask}
+                    onDeleteTask={actions.deleteTask}
+                    privacyMode={privacyMode} 
+                />
+            </div>
         );
     }
 
@@ -375,6 +409,7 @@ const App: React.FC = () => {
         hasKey={hasKey}
         onOpenKeyModal={() => setIsKeyModalOpen(true)}
         onOpenDonateModal={() => setIsDonateModalOpen(true)}
+        onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
         onFactoryReset={handleFactoryReset}
@@ -494,6 +529,11 @@ const App: React.FC = () => {
         handleFinishWelcome={handleFinishWelcome}
         copyPix={copyPix}
       />
+      <ShortcutsModal 
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
+      <Toaster position="top-right" richColors />
     </div>
   );
 };

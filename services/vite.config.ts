@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, (process as any).cwd(), '');
 
   return {
-    base: '/nexofinance/',
+    base: './',
     plugins: [react()],
     server: {
       port: 3000,
@@ -19,30 +19,15 @@ export default defineConfig(({ mode }) => {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
     },
     build: {
-      chunkSizeWarningLimit: 1000, // Aumenta limite do aviso para 1MB (opcional, mas reduz ruído)
+      chunkSizeWarningLimit: 1500, // Aumenta limite do aviso para 1.5MB
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              // Separa Firebase (geralmente o maior)
-              if (id.includes('firebase')) {
-                return 'vendor-firebase';
-              }
-              // Separa Recharts (gráficos)
-              if (id.includes('recharts')) {
-                return 'vendor-recharts';
-              }
-              // Separa React e ReactDOM
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'vendor-react';
-              }
-              // Separa Google GenAI
-              if (id.includes('@google/genai')) {
-                return 'vendor-genai';
-              }
-              // O resto vai para um vendor genérico
-              return 'vendor-utils';
-            }
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+            recharts: ['recharts'],
+            lucide: ['lucide-react'],
+            genai: ['@google/genai']
           }
         }
       }

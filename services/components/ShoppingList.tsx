@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, ShoppingCategory } from '../types';
-import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2 } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { generateShoppingListFromRecipe } from '../services/geminiService';
 
 interface ShoppingListProps {
@@ -9,7 +9,7 @@ interface ShoppingListProps {
   onAdd: (item: Omit<ShoppingItem, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<ShoppingItem>) => void;
   onDelete: (id: string) => void;
-  onClearList: () => void;
+  onClearList: (month?: string) => void;
   onFinishShopping: (total: number, paymentMethod: string, category: string) => void;
   
   // Novos Props
@@ -45,6 +45,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [aiPrompt, setAiPrompt] = useState('');
   const [loadingAi, setLoadingAi] = useState(false);
 
+  // Month Navigation
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const monthStr = useMemo(() => currentDate.toISOString().slice(0, 7), [currentDate]);
+
   // Budget Edit Mode
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [tempBudget, setTempBudget] = useState(shoppingBudget.toString());
@@ -53,23 +57,36 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [checkoutCategory, setCheckoutCategory] = useState('Alimentos');
   const [checkoutMethod, setCheckoutMethod] = useState('debit_card');
 
+  // Filtered Items by Month
+  const filteredItems = useMemo(() => {
+    return items.filter(item => !item.month || item.month === monthStr);
+  }, [items, monthStr]);
+
   // Calculated Total
   const total = useMemo(() => {
-    return items.reduce((acc, item) => acc + (item.actualPrice * item.quantity), 0);
-  }, [items]);
+    return filteredItems.reduce((acc, item) => acc + (item.actualPrice * item.quantity), 0);
+  }, [filteredItems]);
 
   // Grouped Items
   const groupedItems = useMemo(() => {
       const groups: Record<string, ShoppingItem[]> = {};
       SHOPPING_CATEGORIES.forEach(cat => groups[cat] = []);
       
-      items.forEach(item => {
+      filteredItems.forEach(item => {
           const cat = item.category || 'Outros';
           if (!groups[cat]) groups[cat] = [];
           groups[cat].push(item);
       });
       return groups;
-  }, [items]);
+  }, [filteredItems]);
+
+  const handlePrevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const handleNextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+
+  const formatMonth = (date: Date) => {
+    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      .replace(/^\w/, (c) => c.toUpperCase());
+  };
 
   // Effect for Quick Action
   useEffect(() => {
@@ -80,8 +97,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   }, [quickActionSignal]);
 
   const handleSelectAll = () => {
-    const allChecked = items.length > 0 && items.every(item => item.isChecked);
-    items.forEach(item => {
+    const allChecked = filteredItems.length > 0 && filteredItems.every(item => item.isChecked);
+    filteredItems.forEach(item => {
       if (item.isChecked === allChecked) {
         onUpdate(item.id, { isChecked: !allChecked });
       }
@@ -98,7 +115,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       actualPrice: parseFloat(newItemPrice.replace(',', '.')) || 0,
       isChecked: false,
       category: newItemCategory,
-      observation: newItemObservation.trim() || undefined
+      observation: newItemObservation.trim() || undefined,
+      month: monthStr
     });
     setNewItemName('');
     setNewItemCategory('Outros'); // Reset to default
@@ -342,6 +360,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
       {/* HEADER & BUDGET BAR */}
       <div>
+        {/* Month Selector */}
+        <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
+            <button 
+                onClick={handlePrevMonth}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-400"
+            >
+                <ChevronLeft className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-2 text-slate-800 dark:text-white font-bold">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <span className="text-sm md:text-base">{formatMonth(currentDate)}</span>
+            </div>
+            
+            <button 
+                onClick={handleNextMonth}
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-400"
+            >
+                <ChevronRight className="w-5 h-5" />
+            </button>
+        </div>
+
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 gap-4">
              <div>
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -353,14 +393,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
              <div className="flex flex-wrap items-center gap-2">
                  <button 
                     onClick={handleSelectAll}
-                    disabled={items.length === 0}
+                    disabled={filteredItems.length === 0}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 disabled:opacity-50"
                  >
-                    <Check className="w-4 h-4" /> {items.length > 0 && items.every(i => i.isChecked) ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+                    <Check className="w-4 h-4" /> {filteredItems.length > 0 && filteredItems.every(i => i.isChecked) ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
                  </button>
                  <button 
-                    onClick={() => onClearList()}
-                    disabled={items.length === 0}
+                    onClick={() => onClearList(monthStr)}
+                    disabled={filteredItems.length === 0}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 disabled:opacity-50"
                  >
                     <Trash2 className="w-4 h-4" /> Limpar Lista
@@ -371,6 +411,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
                  >
                     <Sparkles className="w-4 h-4" /> Gerar com IA
+                 </button>
+                 <button 
+                    onClick={() => setIsFinishing(true)}
+                    disabled={filteredItems.length === 0}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 disabled:opacity-50"
+                 >
+                    <CreditCard className="w-4 h-4" /> Finalizar
                  </button>
              </div>
         </div>
@@ -428,19 +475,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </div>
 
       {/* ADD ITEM INPUT */}
-      <form onSubmit={handleAddItem} className="flex flex-col gap-2">
-         <div className="flex flex-col md:flex-row gap-2">
-            <div className="relative flex-1 flex gap-2">
+      <form onSubmit={handleAddItem} className="flex flex-col gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+         <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
                <input 
                   id="new-item-input"
                   type="text"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="Adicionar item..."
-                  className="flex-1 p-3 pl-4 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  placeholder="Nome do item..."
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   autoComplete="off"
                />
-               <div className="relative w-28 md:w-32">
+            </div>
+            
+            <div className="flex gap-3">
+               <div className="relative flex-1 md:w-32">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
                   <input 
                      type="number" 
@@ -448,64 +498,48 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                      placeholder="0,00"
                      value={newItemPrice}
                      onChange={(e) => setNewItemPrice(e.target.value)}
-                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   />
                </div>
+               
                <select
                    value={newItemCategory}
                    onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                   className="hidden md:block w-28 md:w-32 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                   className="flex-1 md:w-40 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
                >
                    {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
             </div>
+         </div>
+         
+         <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+               <input 
+                  type="text"
+                  value={newItemObservation}
+                  onChange={(e) => setNewItemObservation(e.target.value)}
+                  placeholder="Observação (opcional)"
+                  className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  autoComplete="off"
+               />
+            </div>
+            
             <button 
                type="submit" 
                disabled={!newItemName.trim()}
-               className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 font-bold"
             >
-               <Plus className="w-6 h-6" />
+               <Plus className="w-5 h-5" /> <span className="md:hidden">Adicionar Item</span>
             </button>
          </div>
-         {/* Observation input */}
-         <div className="flex">
-            <input 
-               type="text"
-               value={newItemObservation}
-               onChange={(e) => setNewItemObservation(e.target.value)}
-               placeholder="Observação (opcional)"
-               className="w-full p-2 pl-4 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-               autoComplete="off"
-            />
-         </div>
       </form>
-      
-      {/* Mobile Category Select fallback if user types on mobile */}
-      <div className="md:hidden overflow-x-auto pb-2 -mt-4">
-          <div className="flex gap-2 px-1">
-              {SHOPPING_CATEGORIES.map(cat => (
-                  <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setNewItemCategory(cat)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap ${
-                          newItemCategory === cat 
-                          ? 'bg-indigo-600 text-white border-indigo-600' 
-                          : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
-                      }`}
-                  >
-                      {cat}
-                  </button>
-              ))}
-          </div>
-      </div>
 
       {/* LIST (GROUPED BY CATEGORY) */}
       <div className="space-y-6">
-         {items.length === 0 ? (
+         {filteredItems.length === 0 ? (
             <div className="p-12 text-center text-slate-400 flex flex-col items-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                <ShoppingCart className="w-16 h-16 mb-4 opacity-20" />
-               <p>Sua lista está vazia.</p>
+               <p className="font-medium text-slate-800 dark:text-white">Sua lista para {formatMonth(currentDate)} está vazia.</p>
                {hasApiKey && <p className="text-sm mt-2 text-purple-500 cursor-pointer hover:underline" onClick={() => setIsAiModalOpen(true)}>Experimente usar a IA para criar uma lista!</p>}
             </div>
          ) : (
@@ -615,7 +649,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
            </button>
            <button 
              onClick={() => setIsFinishing(true)}
-             disabled={items.length === 0}
+             disabled={filteredItems.length === 0}
              className="flex-1 bg-slate-900 text-white rounded-full shadow-xl font-bold flex items-center justify-between px-6 hover:scale-105 transition-transform disabled:opacity-70 disabled:scale-100"
            >
               <div className="flex flex-col items-start leading-tight">

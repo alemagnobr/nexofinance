@@ -5,7 +5,7 @@ import {
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
   HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote,
-  ArrowLeftRight, Layout, Settings, Wrench
+  ArrowLeftRight, Layout, Settings, Wrench, Link
 } from 'lucide-react';
 import { View } from '../types';
 
@@ -30,6 +30,7 @@ interface SidebarProps {
   // Modal triggers
   onOpenKeyModal: () => void;
   onOpenDonateModal: () => void;
+  onOpenShortcutsModal: () => void;
   
   // Data actions
   onExportBackup: () => void;
@@ -44,7 +45,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   user, isGuest, mobileMenuOpen, setMobileMenuOpen, currentView, onNavigate, onLogout,
   privacyMode, setPrivacyMode, darkMode, setDarkMode, isFullscreen, toggleFullscreen, hasKey,
-  onOpenKeyModal, onOpenDonateModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
+  onOpenKeyModal, onOpenDonateModal, onOpenShortcutsModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
 }) => {
   
   const handleNavClick = (view: View) => {
@@ -71,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Group Logic Helpers to determine active state
   const isMovementsActive = [View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
   const isAssetsActive = [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView);
-  const isProductivityActive = [View.KANBAN, View.NOTES, View.CALENDAR].includes(currentView);
+  const isProductivityActive = [View.KANBAN, View.NOTES].includes(currentView);
   const isUtilitiesActive = [View.SHOPPING_LIST, View.PASSWORDS].includes(currentView);
 
   return (
@@ -149,6 +150,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
         
         <NavItem 
+            active={currentView === View.CALENDAR} 
+            onClick={() => handleNavClick(View.CALENDAR)} 
+            icon={Calendar} 
+            label="Agenda" 
+        />
+
+        <NavItem 
             active={isProductivityActive} 
             onClick={() => handleNavClick(View.KANBAN)} 
             icon={Layout} 
@@ -198,19 +206,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
          )}
 
         {/* Simplified Footer Grid */}
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex justify-between items-center gap-2 flex-wrap">
           
           <button
             onClick={() => handleNavClick(View.PIX_KEYS)}
-            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.PIX_KEYS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.PIX_KEYS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
             title="Minhas Chaves Pix"
           >
             <Landmark className="w-5 h-5" />
           </button>
 
           <button
+            onClick={onOpenShortcutsModal}
+            className="flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
+            title="Atalhos Rápidos"
+          >
+            <Link className="w-5 h-5" />
+          </button>
+
+          <button
             onClick={() => handleNavClick(View.SETTINGS)}
-            className={`flex-1 flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.SETTINGS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            className={`flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg transition-all border border-slate-800 hover:border-slate-700 ${currentView === View.SETTINGS ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
             title="Configurações e Dados"
           >
             <Settings className="w-5 h-5" />
@@ -218,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={toggleFullscreen}
-            className="flex-1 flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
+            className="flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all border border-slate-800 hover:border-slate-700"
             title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
           >
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
@@ -226,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             onClick={onOpenDonateModal}
-            className="flex-1 flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-pink-500 transition-all border border-slate-800 hover:border-slate-700"
+            className="flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-pink-500 transition-all border border-slate-800 hover:border-slate-700"
             title="Apoiar Projeto"
           >
             <Heart className="w-5 h-5" />
