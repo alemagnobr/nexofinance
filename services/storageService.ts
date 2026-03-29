@@ -14,7 +14,8 @@ import {
   writeBatch,
   runTransaction,
   limit,
-  orderBy
+  orderBy,
+  where
 } from 'firebase/firestore';
 
 // --- LOCAL STORAGE (LEGACY / GUEST MODE) ---
@@ -485,9 +486,12 @@ export const deleteShoppingItemFire = async (uid: string, id: string) => {
     handleFirestoreError(error, "Erro ao excluir item da lista");
   }
 };
-export const clearShoppingListFire = async (uid: string) => {
+export const clearShoppingListFire = async (uid: string, month?: string) => {
   try {
-    const q = query(collection(db, 'users', uid, 'shopping_list'));
+    let q = query(collection(db, 'users', uid, 'shopping_list'));
+    if (month) {
+      q = query(collection(db, 'users', uid, 'shopping_list'), where('month', '==', month));
+    }
     const snapshot = await getDocs(q);
     const batch = writeBatch(db);
     snapshot.docs.forEach((doc) => {

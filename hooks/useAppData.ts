@@ -380,7 +380,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const addShoppingItem = async (item: Omit<ShoppingItem, 'id'>) => {
-    const newItem: ShoppingItem = { ...item, id: crypto.randomUUID() };
+    const newItem: ShoppingItem = { 
+      ...item, 
+      id: crypto.randomUUID(),
+      month: item.month || new Date().toISOString().slice(0, 7)
+    };
     if (user) await addShoppingItemFire(user.uid, newItem);
     else setData(prev => ({ ...prev, shoppingList: [...(prev.shoppingList || []), newItem] }));
   };
@@ -395,9 +399,14 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingList: prev.shoppingList.filter(item => item.id !== id) }));
   };
 
-  const clearShoppingList = async () => {
-    if (user) await clearShoppingListFire(user.uid);
-    else setData(prev => ({ ...prev, shoppingList: [] }));
+  const clearShoppingList = async (month?: string) => {
+    if (user) await clearShoppingListFire(user.uid, month);
+    else setData(prev => ({ 
+      ...prev, 
+      shoppingList: month 
+        ? prev.shoppingList.filter(item => item.month !== month)
+        : [] 
+    }));
   };
 
   const setShoppingBudget = async (amount: number) => {

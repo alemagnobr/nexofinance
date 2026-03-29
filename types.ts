@@ -83,6 +83,7 @@ export interface ShoppingItem {
   isChecked: boolean; // Se já pegou o item
   category?: ShoppingCategory; // Novo campo
   observation?: string; // Observação opcional
+  month?: string; // Formato "YYYY-MM" para histórico mensal
 }
 
 // --- KANBAN TYPES ---
