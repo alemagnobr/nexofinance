@@ -26,6 +26,7 @@ export interface Transaction {
   observation?: string; // Notas opcionais do usuário
   autoPay?: boolean; // Lançamento automático na data
   order?: number; // Ordem de exibição no dia
+  googleEventId?: string; // ID do evento no Google Calendar
 }
 
 export interface InvestmentHistory {
