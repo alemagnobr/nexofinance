@@ -1,9 +1,9 @@
 
-const CACHE_NAME = 'nexo-fin-v3';
+const CACHE_NAME = 'nexo-fin-v2';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
 // Install Event
