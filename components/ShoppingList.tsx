@@ -493,7 +493,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       </div>
 
       {/* ADD ITEM INPUT */}
-      <form onSubmit={handleAddItem} className="flex flex-col gap-3 bg-indigo-50/80 dark:bg-indigo-900/20 p-4 md:p-5 rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-800/50 mb-6">
+      <form onSubmit={handleAddItem} className="flex flex-col gap-3 bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
          <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
                <input 
@@ -502,13 +502,13 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   placeholder="Nome do item..."
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   autoComplete="off"
                />
             </div>
             
             <div className="flex gap-3">
-               <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-700 h-12 shadow-sm">
+               <div className="flex items-center bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-700 h-12">
                   <button type="button" onClick={() => setNewItemQuantity(Math.max(1, newItemQuantity - 1))} className="p-2 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
                   <span className="w-8 text-center font-bold text-slate-700 dark:text-white text-sm">{newItemQuantity}</span>
                   <button type="button" onClick={() => setNewItemQuantity(newItemQuantity + 1)} className="p-2 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
@@ -521,11 +521,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         placeholder="0,00"
                         value={newItemPrice}
                         onChange={(e) => setNewItemPrice(formatCurrencyInput(e.target.value))}
-                        className="w-full pl-8 pr-3 py-3 h-12 text-sm font-bold text-right rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                        className="w-full pl-8 pr-3 py-3 h-12 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                      />
                   </div>
                   {newItemQuantity > 1 && parseCurrencyInput(newItemPrice) > 0 && (
-                     <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mt-1 text-right px-1">
+                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1 text-right px-1">
                         Subtotal: {formatValue(newItemQuantity * parseCurrencyInput(newItemPrice))}
                      </span>
                   )}
@@ -534,7 +534,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                <select
                    value={newItemCategory}
                    onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                   className="flex-1 md:w-40 p-3 h-12 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                   className="flex-1 md:w-40 p-3 h-12 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
                >
                    {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
@@ -548,7 +548,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                   value={newItemObservation}
                   onChange={(e) => setNewItemObservation(e.target.value)}
                   placeholder="Observação (opcional)"
-                  className="w-full p-3 text-sm rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  className="w-full p-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   autoComplete="off"
                />
             </div>
