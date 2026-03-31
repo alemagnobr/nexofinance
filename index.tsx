@@ -17,8 +17,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-import { FocusProvider } from './contexts/FocusContext';
-
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: ReactNode}) {
     super(props);
@@ -65,9 +63,7 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <FocusProvider>
-        <App />
-      </FocusProvider>
+      <App />
     </ErrorBoundary>
   </React.StrictMode>
 );

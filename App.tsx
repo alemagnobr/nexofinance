@@ -11,7 +11,6 @@ import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { AiAssistant } from './components/AiAssistant';
 import { Sidebar } from './components/Sidebar';
-import { FocusTimerModal } from './components/FocusTimerModal';
 import { AppModals } from './components/AppModals';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { useAppData } from './hooks/useAppData';
@@ -515,7 +514,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <FocusTimerModal />
       <AppModals 
         showWelcome={showWelcome}
         isDonateModalOpen={isDonateModalOpen}
