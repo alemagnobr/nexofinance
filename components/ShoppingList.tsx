@@ -33,6 +33,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<ShoppingCategory>('Outros');
   const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemObservation, setNewItemObservation] = useState('');
   
   // Edit Item Modal
@@ -59,7 +60,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
 
   // Filtered Items by Month
   const filteredItems = useMemo(() => {
-    return items.filter(item => !item.month || item.month === monthStr);
+    return items.filter(item => item.month === monthStr);
   }, [items, monthStr]);
 
   // Calculated Total
@@ -105,14 +106,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     });
   };
 
+  const formatCurrencyInput = (value: string) => {
+    const numericValue = value.replace(/\D/g, '');
+    if (!numericValue) return '';
+    const floatValue = parseFloat(numericValue) / 100;
+    return floatValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const parseCurrencyInput = (value: string) => {
+    const numericValue = value.replace(/\D/g, '');
+    if (!numericValue) return 0;
+    return parseFloat(numericValue) / 100;
+  };
+
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
     
     onAdd({
       name: newItemName.trim(),
-      quantity: 1,
-      actualPrice: parseFloat(newItemPrice.replace(',', '.')) || 0,
+      quantity: newItemQuantity,
+      actualPrice: parseCurrencyInput(newItemPrice),
       isChecked: false,
       category: newItemCategory,
       observation: newItemObservation.trim() || undefined,
@@ -121,6 +135,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     setNewItemName('');
     setNewItemCategory('Outros'); // Reset to default
     setNewItemPrice('');
+    setNewItemQuantity(1);
     setNewItemObservation('');
   };
 
@@ -325,10 +340,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                            <div className="relative">
                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
                                <input 
-                                  type="number" 
-                                  step="0.01"
-                                  value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice}
-                                  onChange={(e) => setEditingItem({...editingItem, actualPrice: parseFloat(e.target.value) || 0})}
+                                  type="text" 
+                                  value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  onChange={(e) => setEditingItem({...editingItem, actualPrice: parseCurrencyInput(e.target.value)})}
                                   className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold"
                                />
                            </div>
@@ -399,7 +413,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <Check className="w-4 h-4" /> {filteredItems.length > 0 && filteredItems.every(i => i.isChecked) ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
                  </button>
                  <button 
-                    onClick={() => onClearList(monthStr)}
+                    onClick={() => {
+                       if (window.confirm('Tem certeza que deseja limpar a lista deste mês?')) {
+                          onClearList(monthStr);
+                       }
+                    }}
                     disabled={filteredItems.length === 0}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 disabled:opacity-50"
                  >
@@ -490,22 +508,33 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
             </div>
             
             <div className="flex gap-3">
-               <div className="relative flex-1 md:w-32">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                  <input 
-                     type="number" 
-                     step="0.01"
-                     placeholder="0,00"
-                     value={newItemPrice}
-                     onChange={(e) => setNewItemPrice(e.target.value)}
-                     className="w-full pl-8 pr-3 py-3 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                  />
+               <div className="flex items-center bg-slate-100 dark:bg-slate-900 rounded-xl p-1 border border-slate-200 dark:border-slate-700 h-12">
+                  <button type="button" onClick={() => setNewItemQuantity(Math.max(1, newItemQuantity - 1))} className="p-2 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
+                  <span className="w-8 text-center font-bold text-slate-700 dark:text-white text-sm">{newItemQuantity}</span>
+                  <button type="button" onClick={() => setNewItemQuantity(newItemQuantity + 1)} className="p-2 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
+               </div>
+               <div className="relative flex-1 md:w-32 flex flex-col">
+                  <div className="relative">
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                     <input 
+                        type="text" 
+                        placeholder="0,00"
+                        value={newItemPrice}
+                        onChange={(e) => setNewItemPrice(formatCurrencyInput(e.target.value))}
+                        className="w-full pl-8 pr-3 py-3 h-12 text-sm font-bold text-right rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                     />
+                  </div>
+                  {newItemQuantity > 1 && parseCurrencyInput(newItemPrice) > 0 && (
+                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1 text-right px-1">
+                        Subtotal: {formatValue(newItemQuantity * parseCurrencyInput(newItemPrice))}
+                     </span>
+                  )}
                </div>
                
                <select
                    value={newItemCategory}
                    onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                   className="flex-1 md:w-40 p-3 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                   className="flex-1 md:w-40 p-3 h-12 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
                >
                    {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                </select>
@@ -597,20 +626,26 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                     </div>
 
                                     {/* Price Input (Calculator Mode) */}
-                                    <div className="relative">
-                                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                                       <input 
-                                          type="number" 
-                                          step="0.01"
-                                          placeholder="0,00"
-                                          value={item.actualPrice === 0 ? '' : item.actualPrice}
-                                          onChange={(e) => onUpdate(item.id, { actualPrice: parseFloat(e.target.value) || 0 })}
-                                          className={`w-24 pl-8 pr-2 py-2 rounded-lg border outline-none font-bold text-right transition-colors ${
-                                             item.actualPrice > 0 
-                                             ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
-                                             : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:border-indigo-500'
-                                          }`}
-                                       />
+                                    <div className="relative flex flex-col items-end">
+                                       <div className="relative">
+                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                                          <input 
+                                             type="text" 
+                                             placeholder="0,00"
+                                             value={item.actualPrice === 0 ? '' : item.actualPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                             onChange={(e) => onUpdate(item.id, { actualPrice: parseCurrencyInput(e.target.value) })}
+                                             className={`w-28 pl-8 pr-2 py-2 rounded-lg border outline-none font-bold text-right transition-colors ${
+                                                item.actualPrice > 0 
+                                                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
+                                                : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:border-indigo-500'
+                                             }`}
+                                          />
+                                       </div>
+                                       {item.quantity > 1 && item.actualPrice > 0 && (
+                                          <span className="text-[10px] text-slate-400 font-medium mt-1">
+                                             Subtotal: {formatValue(item.quantity * item.actualPrice)}
+                                          </span>
+                                       )}
                                     </div>
 
                                     {/* Edit */}
