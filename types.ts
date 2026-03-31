@@ -219,6 +219,15 @@ export interface PixKey {
   createdAt: string;
 }
 
+export interface Habit {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  createdAt: string;
+  completedDates: string[]; // YYYY-MM-DD
+}
+
 export interface AppData {
   transactions: Transaction[];
   categories: Category[]; // New field
@@ -235,6 +244,7 @@ export interface AppData {
   taskLists: TaskList[]; // Novo campo: Listas de Tarefas
   tasks: Task[]; // Novo campo: Tarefas
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
+  habits: Habit[]; // Novo campo: Hábitos
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
@@ -255,5 +265,6 @@ export enum View {
   NOTES = 'NOTES',
   PASSWORDS = 'PASSWORDS',
   PIX_KEYS = 'PIX_KEYS',
+  PRODUCTIVITY = 'PRODUCTIVITY',
   SETTINGS = 'SETTINGS'
 }
