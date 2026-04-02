@@ -9,7 +9,7 @@ interface DashboardProps {
   privacyMode: boolean;
   onUnlockBadge: (id: string) => void;
   onNavigate: (view: View) => void;
-  onToggleHabitDate: (id: string, dateStr: string) => void;
+  onToggleHabitEntry: (id: string, dayIndex: number, status: 'done' | 'missed', dateStr: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -122,7 +122,7 @@ const getEffectiveBudget = (budgets: Budget[], category: string, date: Date) => 
   return budgets.find(b => b.category === category && b.isRecurring);
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate, onToggleHabitDate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate, onToggleHabitEntry }) => {
   
   // History Chart State
   const [historyStartMonth, setHistoryStartMonth] = useState(() => {
@@ -918,9 +918,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'habits') {
             const todayStr = new Date().toISOString().split('T')[0];
             const activeHabits = data.habits || [];
-            const completedToday = activeHabits.filter(h => h.completedDates.includes(todayStr)).length;
+            
+            // Find if a habit has an entry for today
+            const hasEntryToday = (habit: any) => {
+                return Object.values(habit.entries || {}).some((e: any) => e.date === todayStr && e.status === 'done');
+            };
+
+            const completedToday = activeHabits.filter(hasEntryToday).length;
             const totalHabits = activeHabits.length;
             const progress = totalHabits > 0 ? (completedToday / totalHabits) * 100 : 0;
+
+            const handleQuickToggle = (habit: any) => {
+                // If already done today, maybe we don't untoggle from dashboard, or we find the entry and remove it?
+                // For simplicity, let's just navigate to productivity view if they click it, or we can find the first empty slot.
+                const entries = habit.entries || {};
+                const todayEntryEntry = Object.entries(entries).find(([_, e]: [string, any]) => e.date === todayStr) as [string, any] | undefined;
+                
+                if (todayEntryEntry) {
+                    // Toggle existing today entry
+                    const dayIndex = parseInt(todayEntryEntry[0]);
+                    const currentStatus = todayEntryEntry[1].status;
+                    onToggleHabitEntry(habit.id, dayIndex, currentStatus === 'done' ? 'missed' : 'done', todayStr);
+                } else {
+                    // Find first empty slot
+                    const targetDays = habit.targetDays || 21;
+                    let firstEmpty = -1;
+                    for (let i = 0; i < targetDays; i++) {
+                        if (!entries[i]) {
+                            firstEmpty = i;
+                            break;
+                        }
+                    }
+                    if (firstEmpty !== -1) {
+                        onToggleHabitEntry(habit.id, firstEmpty, 'done', todayStr);
+                    }
+                }
+            };
 
             return (
               <div key="habits" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
@@ -961,11 +994,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                           
                           <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5">
                               {activeHabits.slice(0, 4).map(habit => {
-                                  const isCompleted = habit.completedDates.includes(todayStr);
+                                  const isCompleted = hasEntryToday(habit);
                                   return (
                                       <div 
                                           key={habit.id}
-                                          onClick={() => onToggleHabitDate(habit.id, todayStr)}
+                                          onClick={() => handleQuickToggle(habit)}
                                           className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
                                               isCompleted 
                                               ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30' 
@@ -974,7 +1007,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                                       >
                                           <div className="flex items-center gap-2 truncate">
                                               <span className="text-sm">{habit.icon}</span>
-                                              <span className={`text-xs truncate font-medium ${isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-slate-700 dark:text-slate-300'}`}>
+                                              <span title={habit.name} className={`text-xs truncate font-medium ${isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-slate-700 dark:text-slate-300'}`}>
                                                   {habit.name}
                                               </span>
                                           </div>

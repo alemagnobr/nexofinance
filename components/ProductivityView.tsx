@@ -59,7 +59,7 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
              onAdd={actions.addHabit}
              onUpdate={actions.updateHabit}
              onDelete={actions.deleteHabit}
-             onToggleDate={actions.toggleHabitDate}
+             onToggleEntry={actions.toggleHabitEntry}
              privacyMode={privacyMode}
           />
         )}

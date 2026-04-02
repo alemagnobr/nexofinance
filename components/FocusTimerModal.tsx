@@ -3,8 +3,9 @@ import { X, Play, Square, Timer, Coffee, BrainCircuit } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 
 export const FocusTimerModal: React.FC = () => {
-  const { isModalOpen, closeModal, isActive, timeLeft, totalTime, startFocus, stopFocus } = useFocus();
+  const { isModalOpen, closeModal, isActive, timeLeft, totalTime, focusReason, startFocus, stopFocus } = useFocus();
   const [customMinutes, setCustomMinutes] = useState('25');
+  const [reasonInput, setReasonInput] = useState('');
 
   if (!isModalOpen) return null;
 
@@ -94,7 +95,7 @@ export const FocusTimerModal: React.FC = () => {
                 </button>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
                 <input 
                   type="number" 
                   value={customMinutes}
@@ -104,22 +105,38 @@ export const FocusTimerModal: React.FC = () => {
                   min="1"
                   max="120"
                 />
+                <input 
+                  type="text" 
+                  value={reasonInput}
+                  onChange={(e) => setReasonInput(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-center text-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Motivo do foco (opcional)"
+                  maxLength={50}
+                />
               </div>
 
               <button 
-                onClick={() => startFocus(parseInt(customMinutes) || 25)}
+                onClick={() => startFocus(parseInt(customMinutes) || 25, reasonInput)}
                 className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-500/30"
               >
                 <Play className="w-5 h-5 fill-current" /> Iniciar Foco
               </button>
             </div>
           ) : (
-            <button 
-              onClick={stopFocus}
-              className="w-full py-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 dark:text-rose-400 font-bold flex items-center justify-center gap-2 transition-colors"
-            >
-              <Square className="w-5 h-5 fill-current" /> Parar
-            </button>
+            <div className="w-full space-y-4">
+              {focusReason && (
+                <div className="text-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 font-bold uppercase tracking-wider mb-1">Focando em</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">{focusReason}</p>
+                </div>
+              )}
+              <button 
+                onClick={stopFocus}
+                className="w-full py-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 dark:text-rose-400 font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <Square className="w-5 h-5 fill-current" /> Parar
+              </button>
+            </div>
           )}
 
         </div>

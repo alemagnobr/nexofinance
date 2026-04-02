@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Habit } from '../types';
-import { Target, Plus, Trash2, Edit2, CheckCircle2, Circle, Calendar as CalendarIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Habit, HabitEntry } from '../types';
+import { Target, Plus, Trash2, Edit2, CheckCircle2, Circle, X, Calendar as CalendarIcon, Check, XCircle } from 'lucide-react';
 
 interface HabitTrackerProps {
   habits: Habit[];
-  onAdd: (habit: Omit<Habit, 'id' | 'createdAt' | 'completedDates'>) => void;
+  onAdd: (habit: Omit<Habit, 'id' | 'createdAt' | 'entries'>) => void;
   onUpdate: (id: string, updates: Partial<Habit>) => void;
   onDelete: (id: string) => void;
-  onToggleDate: (id: string, dateStr: string) => void;
+  onToggleEntry: (id: string, dayIndex: number, status: 'done' | 'missed', dateStr: string) => void;
   privacyMode: boolean;
 }
 
@@ -19,73 +19,45 @@ const COLORS = [
 const ICONS = ['🎯', '💧', '🏃', '📚', '🧘', '🥗', '💻', '🎸', '🎨', '✍️', '💸', '🧹'];
 
 export const HabitTracker: React.FC<HabitTrackerProps> = ({
-  habits, onAdd, onUpdate, onDelete, onToggleDate, privacyMode
+  habits, onAdd, onUpdate, onDelete, onToggleEntry, privacyMode
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', icon: '🎯', color: '#3b82f6' });
+  const [formData, setFormData] = useState({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
   
-  // Calendar state
-  const [currentDate, setCurrentDate] = useState(new Date());
-
-  const daysInMonth = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const days = new Date(year, month + 1, 0).getDate();
-    return Array.from({ length: days }, (_, i) => {
-      const d = new Date(year, month, i + 1);
-      return d.toISOString().split('T')[0];
-    });
-  }, [currentDate]);
+  // Entry Modal State
+  const [entryModal, setEntryModal] = useState<{ habitId: string, dayIndex: number, status: 'done' | 'missed', date: string } | null>(null);
 
   const handleSave = () => {
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || formData.targetDays < 1) return;
     
     if (editingId) {
-      onUpdate(editingId, formData);
+      onUpdate(editingId, { name: formData.name, icon: formData.icon, color: formData.color, targetDays: formData.targetDays });
     } else {
-      onAdd(formData);
+      onAdd({ name: formData.name, icon: formData.icon, color: formData.color, targetDays: formData.targetDays });
     }
     
     setIsAdding(false);
     setEditingId(null);
-    setFormData({ name: '', icon: '🎯', color: '#3b82f6' });
+    setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
   };
 
   const startEdit = (habit: Habit) => {
-    setFormData({ name: habit.name, icon: habit.icon, color: habit.color });
+    setFormData({ name: habit.name, icon: habit.icon, color: habit.color, targetDays: habit.targetDays || 21 });
     setEditingId(habit.id);
     setIsAdding(true);
   };
 
-  const calculateStreak = (habit: Habit) => {
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      
-      if (habit.completedDates.includes(dateStr)) {
-        streak++;
-      } else if (i === 0) {
-        // If today is missed, check yesterday to keep streak alive
-        continue;
-      } else {
-        break;
-      }
-    }
-    return streak;
+  const handleSaveEntry = () => {
+      if (!entryModal) return;
+      onToggleEntry(entryModal.habitId, entryModal.dayIndex, entryModal.status, entryModal.date);
+      setEntryModal(null);
   };
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const formatDateShort = (dateStr: string) => {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-');
+      return `${parseInt(d)}/${parseInt(m)}`;
   };
 
   return (
@@ -100,7 +72,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
         </div>
         <button
           onClick={() => {
-            setFormData({ name: '', icon: '🎯', color: '#3b82f6' });
+            setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
             setIsAdding(true);
             setEditingId(null);
           }}
@@ -121,7 +93,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Hábito</label>
               <input
@@ -134,6 +106,18 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
               />
             </div>
             
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dias (Meta)</label>
+              <input
+                type="number"
+                value={formData.targetDays}
+                onChange={(e) => setFormData({ ...formData, targetDays: parseInt(e.target.value) || 1 })}
+                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                min="1"
+                max="365"
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cor</label>
               <div className="flex flex-wrap gap-2">
@@ -199,122 +183,141 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
           </button>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-          {/* Calendar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-700/50">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-slate-400" />
-              <span className="font-bold text-slate-700 dark:text-slate-200 capitalize">
-                {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button onClick={prevMonth} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600">
-                Hoje
-              </button>
-              <button onClick={nextMonth} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500">
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
+        <div className="space-y-6">
+          {habits.map(habit => {
+            const targetDays = habit.targetDays || 21;
+            const entries = habit.entries || {};
+            const completedCount = Object.values(entries).filter(e => e.status === 'done').length;
+            const progress = (completedCount / targetDays) * 100;
 
-          <div className="overflow-x-auto">
-            <div className="min-w-[800px]">
-              {/* Days Header */}
-              <div className="flex border-b border-slate-100 dark:border-slate-700/50">
-                <div className="w-64 flex-shrink-0 p-4 bg-slate-50/50 dark:bg-slate-800/50">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hábitos</span>
-                </div>
-                <div className="flex-1 flex">
-                  {daysInMonth.map(dateStr => {
-                    const d = new Date(dateStr + 'T12:00:00');
-                    const isToday = dateStr === new Date().toISOString().split('T')[0];
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    
-                    return (
-                      <div 
-                        key={dateStr} 
-                        className={`flex-1 flex flex-col items-center justify-center py-2 border-l border-slate-100 dark:border-slate-700/50 ${isToday ? 'bg-indigo-50 dark:bg-indigo-900/20' : isWeekend ? 'bg-slate-50/50 dark:bg-slate-800/30' : ''}`}
-                      >
-                        <span className={`text-[10px] font-medium ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>
-                          {d.toLocaleDateString('pt-BR', { weekday: 'short' }).charAt(0)}
-                        </span>
-                        <span className={`text-xs font-bold ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {d.getDate()}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Habits Rows */}
-              <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {habits.map(habit => {
-                  const streak = calculateStreak(habit);
-                  
-                  return (
-                    <div key={habit.id} className="flex hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
-                      {/* Habit Info */}
-                      <div className="w-64 flex-shrink-0 p-3 flex items-center justify-between border-r border-slate-100 dark:border-slate-700/50">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <div 
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
-                            style={{ backgroundColor: `${habit.color}20`, color: habit.color }}
-                          >
-                            {habit.icon}
-                          </div>
-                          <div className="truncate">
-                            <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{habit.name}</p>
-                            <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                              🔥 {streak} dias seguidos
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => startEdit(habit)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/30">
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => onDelete(habit.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/30">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Habit Days */}
-                      <div className="flex-1 flex">
-                        {daysInMonth.map(dateStr => {
-                          const isCompleted = habit.completedDates.includes(dateStr);
-                          const isFuture = dateStr > new Date().toISOString().split('T')[0];
-                          
-                          return (
-                            <div 
-                              key={dateStr}
-                              onClick={() => !isFuture && onToggleDate(habit.id, dateStr)}
-                              className={`flex-1 flex items-center justify-center border-l border-slate-100 dark:border-slate-700/50 ${isFuture ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                            >
-                              {isCompleted ? (
-                                <div 
-                                  className="w-5 h-5 rounded-md flex items-center justify-center shadow-sm"
-                                  style={{ backgroundColor: habit.color }}
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                                </div>
-                              ) : (
-                                <div className="w-5 h-5 rounded-md border-2 border-slate-200 dark:border-slate-700" />
-                              )}
-                            </div>
-                          );
-                        })}
+            return (
+              <div key={habit.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                      style={{ backgroundColor: `${habit.color}20`, color: habit.color }}
+                    >
+                      {habit.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-slate-800 dark:text-white break-words">{habit.name}</h4>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                        <span>Meta: {targetDays} dias</span>
+                        <span>•</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{completedCount} concluídos</span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                  
+                  {!privacyMode && (
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => startEdit(habit)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => onDelete(habit.id)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-3">
+                    {Array.from({ length: targetDays }).map((_, i) => {
+                      const entry = entries[i];
+                      const isDone = entry?.status === 'done';
+                      const isMissed = entry?.status === 'missed';
+                      
+                      return (
+                        <div key={i} className="flex flex-col items-center gap-1">
+                          {entry?.date ? (
+                            <span className="text-[9px] font-medium text-slate-400">{formatDateShort(entry.date)}</span>
+                          ) : (
+                            <span className="text-[9px] font-medium text-transparent">--/--</span>
+                          )}
+                          <button
+                            onClick={() => setEntryModal({ habitId: habit.id, dayIndex: i, status: entry?.status || 'done', date: entry?.date || new Date().toISOString().split('T')[0] })}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all border ${
+                              isDone 
+                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' 
+                                : isMissed
+                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800/50'
+                                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                            }`}
+                          >
+                            {isDone ? <Check className="w-5 h-5" /> : isMissed ? <X className="w-5 h-5" /> : i + 1}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Entry Modal */}
+      {entryModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-700">
+              <h3 className="font-bold text-slate-800 dark:text-white">Registrar Dia {entryModal.dayIndex + 1}</h3>
+              <button onClick={() => setEntryModal(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEntryModal({ ...entryModal, status: 'done' })}
+                    className={`flex-1 py-2 px-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${entryModal.status === 'done' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-2 border-emerald-500' : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Feito
+                  </button>
+                  <button
+                    onClick={() => setEntryModal({ ...entryModal, status: 'missed' })}
+                    className={`flex-1 py-2 px-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${entryModal.status === 'missed' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-2 border-red-500' : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}
+                  >
+                    <XCircle className="w-4 h-4" /> Não Feito
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Data</label>
+                <input
+                  type="date"
+                  value={entryModal.date}
+                  onChange={(e) => setEntryModal({ ...entryModal, date: e.target.value })}
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+              <button
+                onClick={() => setEntryModal(null)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEntry}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
+              >
+                Salvar
+              </button>
             </div>
           </div>
         </div>

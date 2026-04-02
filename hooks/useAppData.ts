@@ -592,12 +592,12 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   // --- HABITS ACTIONS ---
-  const addHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'completedDates'>) => {
+  const addHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'entries'>) => {
       const newHabit: Habit = {
           ...habit,
           id: crypto.randomUUID(),
           createdAt: new Date().toISOString(),
-          completedDates: []
+          entries: {}
       };
       if (user) await addHabitFire(user.uid, newHabit);
       else setData(prev => ({ ...prev, habits: [...prev.habits, newHabit] }));
@@ -613,21 +613,18 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, habits: prev.habits.filter(h => h.id !== id) }));
   };
 
-  const toggleHabitDate = async (id: string, dateStr: string) => {
+  const toggleHabitEntry = async (id: string, dayIndex: number, status: 'done' | 'missed', dateStr: string) => {
       const habit = data.habits.find(h => h.id === id);
       if (!habit) return;
 
-      const isCompleted = habit.completedDates.includes(dateStr);
-      const newDates = isCompleted 
-          ? habit.completedDates.filter(d => d !== dateStr)
-          : [...habit.completedDates, dateStr];
+      const newEntries = { ...habit.entries, [dayIndex]: { status, date: dateStr } };
 
       if (user) {
-          await updateHabitFire(user.uid, id, { completedDates: newDates });
+          await updateHabitFire(user.uid, id, { entries: newEntries });
       } else {
           setData(prev => ({
               ...prev,
-              habits: prev.habits.map(h => h.id === id ? { ...h, completedDates: newDates } : h)
+              habits: prev.habits.map(h => h.id === id ? { ...h, entries: newEntries } : h)
           }));
       }
   };
@@ -700,7 +697,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addHabit,
         updateHabit,
         deleteHabit,
-        toggleHabitDate,
+        toggleHabitEntry,
         addTaskList,
         updateTaskList,
         deleteTaskList,

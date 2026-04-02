@@ -5,7 +5,8 @@ interface FocusContextType {
   timeLeft: number;
   totalTime: number;
   isModalOpen: boolean;
-  startFocus: (minutes: number) => void;
+  focusReason: string;
+  startFocus: (minutes: number, reason?: string) => void;
   stopFocus: () => void;
   openModal: () => void;
   closeModal: () => void;
@@ -18,6 +19,7 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [focusReason, setFocusReason] = useState('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -67,9 +69,10 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const startFocus = (minutes: number) => {
+  const startFocus = (minutes: number, reason: string = '') => {
     setTotalTime(minutes * 60);
     setTimeLeft(minutes * 60);
+    setFocusReason(reason);
     setIsActive(true);
   };
 
@@ -77,13 +80,14 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsActive(false);
     setTimeLeft(0);
     setTotalTime(0);
+    setFocusReason('');
   };
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
   return (
-    <FocusContext.Provider value={{ isActive, timeLeft, totalTime, isModalOpen, startFocus, stopFocus, openModal, closeModal }}>
+    <FocusContext.Provider value={{ isActive, timeLeft, totalTime, isModalOpen, focusReason, startFocus, stopFocus, openModal, closeModal }}>
       {children}
     </FocusContext.Provider>
   );

@@ -252,7 +252,7 @@ const App: React.FC = () => {
                 privacyMode={privacyMode} 
                 onUnlockBadge={actions.unlockBadge}
                 onNavigate={(view) => setCurrentView(view)}
-                onToggleHabitDate={actions.toggleHabitDate}
+                onToggleHabitEntry={actions.toggleHabitEntry}
             />
         );
     }
@@ -377,7 +377,7 @@ const App: React.FC = () => {
     }
 
     // Fallback
-    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} onToggleHabitDate={actions.toggleHabitDate} />;
+    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} onToggleHabitEntry={actions.toggleHabitEntry} />;
   };
 
   if (authLoading) {

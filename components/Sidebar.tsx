@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   privacyMode, setPrivacyMode, darkMode, setDarkMode, isFullscreen, toggleFullscreen, hasKey,
   onOpenKeyModal, onOpenDonateModal, onOpenShortcutsModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
 }) => {
-  const { isActive, timeLeft, openModal } = useFocus();
+  const { isActive, timeLeft, openModal, focusReason } = useFocus();
   
   const handleNavClick = (view: View) => {
     onNavigate(view);
@@ -193,6 +193,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           ? `${Math.floor(timeLeft / 60).toString().padStart(2, '0')}:${(timeLeft % 60).toString().padStart(2, '0')}` 
                           : 'Iniciar'}
                       </p>
+                      {isActive && focusReason && (
+                        <p className="text-[8px] text-emerald-300 truncate w-full px-1 mt-0.5" title={focusReason}>
+                          {focusReason}
+                        </p>
+                      )}
                   </div>
               </div>
             </button>

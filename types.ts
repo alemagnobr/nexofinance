@@ -219,13 +219,20 @@ export interface PixKey {
   createdAt: string;
 }
 
+export interface HabitEntry {
+  status: 'done' | 'missed';
+  date: string; // YYYY-MM-DD
+}
+
 export interface Habit {
   id: string;
   name: string;
   icon: string;
   color: string;
   createdAt: string;
-  completedDates: string[]; // YYYY-MM-DD
+  targetDays: number; // Quantidade de dias escolhida
+  entries: Record<number, HabitEntry>; // dayIndex (0 to targetDays-1) -> entry
+  completedDates?: string[]; // Legacy
 }
 
 export interface AppData {
