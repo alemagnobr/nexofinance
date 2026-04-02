@@ -213,50 +213,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                               </button>
                           </div>
                       </div>
-
-                      <div className="space-y-4">
-                          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Score Serasa</h3>
-                          
-                          <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700">
-                              <div className="flex flex-col gap-3">
-                                  <div>
-                                      <p className="font-bold text-slate-800 dark:text-white">Atualizar Score Serasa</p>
-                                      <p className="text-xs text-slate-500 dark:text-slate-400">Insira manualmente o seu score atual.</p>
-                                  </div>
-                                  <div className="flex gap-2">
-                                      <input 
-                                          type="number" 
-                                          min="0"
-                                          max="1000"
-                                          placeholder="Ex: 850"
-                                          defaultValue={data.scoreSerasa || ''}
-                                          id="scoreSerasaInput"
-                                          className="flex-1 p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                      />
-                                      <button 
-                                          onClick={() => {
-                                              const input = document.getElementById('scoreSerasaInput') as HTMLInputElement;
-                                              const val = parseInt(input.value);
-                                              if (!isNaN(val) && val >= 0 && val <= 1000) {
-                                                  actions.updateScoreSerasa(val, new Date().toISOString());
-                                                  alert('Score Serasa atualizado com sucesso!');
-                                              } else {
-                                                  alert('Por favor, insira um valor válido entre 0 e 1000.');
-                                              }
-                                          }}
-                                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors"
-                                      >
-                                          Salvar
-                                      </button>
-                                  </div>
-                                  {data.scoreSerasaUpdatedAt && (
-                                      <p className="text-[10px] text-slate-400">
-                                          Última atualização: {new Date(data.scoreSerasaUpdatedAt).toLocaleString('pt-BR')}
-                                      </p>
-                                  )}
-                              </div>
-                          </div>
-                      </div>
                   </div>
               </div>
           )}

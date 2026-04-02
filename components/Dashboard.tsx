@@ -635,50 +635,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Scale className="w-20 h-20 text-slate-400" />
           </div>
-          <div className="flex flex-col gap-4">
-            {/* Score Financeiro Pessoal */}
-            <div>
-                 <div className="flex items-center justify-between mb-2">
-                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Financeiro Pessoal</h3>
-                   <BadgeAlert className={`w-4 h-4 ${scoreColor}`} />
-                 </div>
-                 <div className="flex items-baseline gap-2 mb-1">
-                    <span className={`text-3xl font-black ${scoreColor} tracking-tighter`}>{healthScore}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
-                 </div>
-                 <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
-                 
-                 {/* Health Score Progress Bar */}
-                 <div className="mt-2 w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
-                    <div 
-                      className={`h-full transition-all duration-1000 ease-out ${
-                          healthScore >= 700 ? 'bg-emerald-500' : 
-                          healthScore >= 500 ? 'bg-amber-400' : 
-                          healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
-                      }`}
-                      style={{ width: `${(healthScore / 1000) * 100}%` }}
-                    />
-                 </div>
-            </div>
-
-            {/* Score Serasa */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                 <div className="flex items-center justify-between mb-2">
-                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Serasa</h3>
-                   <ShieldAlert className="w-4 h-4 text-pink-500" />
-                 </div>
-                 <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">
-                      {data.scoreSerasa !== undefined ? data.scoreSerasa : '-'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
-                 </div>
-                 <p className="text-[10px] text-slate-400">
-                   {data.scoreSerasaUpdatedAt 
-                     ? `Última atualização: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
-                     : 'Ainda não atualizado'}
-                 </p>
-            </div>
+          <div>
+               <div className="flex items-center justify-between mb-2">
+                 <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Financeiro</h3>
+                 <BadgeAlert className={`w-4 h-4 ${scoreColor}`} />
+               </div>
+               <div className="flex items-baseline gap-2 mb-1">
+                  <span className={`text-3xl font-black ${scoreColor} tracking-tighter`}>{healthScore}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
+               </div>
+               <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
+               
+               {/* NEW: Health Score Progress Bar */}
+               <div className="mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                  <div 
+                    className={`h-full transition-all duration-1000 ease-out ${
+                        healthScore >= 700 ? 'bg-emerald-500' : 
+                        healthScore >= 500 ? 'bg-amber-400' : 
+                        healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${(healthScore / 1000) * 100}%` }}
+                  />
+               </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 space-y-1.5">
+                {factors.slice(0, 2).map((factor, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[10px]">
+                        {factor.type === 'good' && <CheckCheck className="w-3 h-3 text-emerald-500" />}
+                        {factor.type === 'bad' && <ShieldAlert className="w-3 h-3 text-rose-500" />}
+                        {factor.type === 'neutral' && <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>}
+                        <span className="text-slate-600 dark:text-slate-400 truncate">{factor.text}</span>
+                    </div>
+                ))}
           </div>
         </div>
           );
