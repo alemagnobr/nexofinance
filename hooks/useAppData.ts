@@ -1,13 +1,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task, Habit } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
   addBudgetFire, deleteBudgetFire, updateBudgetFire,
   addDebtFire, updateDebtFire, deleteDebtFire,
-  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
+  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire, updateScoreSerasaFire,
   saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
@@ -15,6 +15,7 @@ import {
   addTaskListFire, updateTaskListFire, deleteTaskListFire,
   addTaskFire, updateTaskFire, deleteTaskFire,
   addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
+  addHabitFire, updateHabitFire, deleteHabitFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
@@ -35,6 +36,7 @@ const DEFAULT_DATA: AppData = {
     taskLists: [],
     tasks: [],
     pixKeys: [],
+    habits: [],
     unlockedBadges: [],
     walletBalance: 0,
     categories: DEFAULT_CATEGORIES // Initial defaults
@@ -392,6 +394,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingBudget: amount }));
   };
 
+  const updateScoreSerasa = async (score: number, updatedAt: string) => {
+    if (user) await updateScoreSerasaFire(user.uid, score, updatedAt);
+    else setData(prev => ({ ...prev, scoreSerasa: score, scoreSerasaUpdatedAt: updatedAt }));
+  };
+
   // --- KANBAN ACTIONS ---
   const saveKanbanBoard = async (board: KanbanBoard) => {
       if (user) await saveKanbanBoardFire(user.uid, board);
@@ -578,6 +585,47 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       else setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
   };
 
+  // --- HABITS ACTIONS ---
+  const addHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'completedDates'>) => {
+      const newHabit: Habit = {
+          ...habit,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          completedDates: []
+      };
+      if (user) await addHabitFire(user.uid, newHabit);
+      else setData(prev => ({ ...prev, habits: [...prev.habits, newHabit] }));
+  };
+
+  const updateHabit = async (id: string, updates: Partial<Habit>) => {
+      if (user) await updateHabitFire(user.uid, id, updates);
+      else setData(prev => ({ ...prev, habits: prev.habits.map(h => h.id === id ? { ...h, ...updates } : h) }));
+  };
+
+  const deleteHabit = async (id: string) => {
+      if (user) await deleteHabitFire(user.uid, id);
+      else setData(prev => ({ ...prev, habits: prev.habits.filter(h => h.id !== id) }));
+  };
+
+  const toggleHabitDate = async (id: string, dateStr: string) => {
+      const habit = data.habits.find(h => h.id === id);
+      if (!habit) return;
+
+      const isCompleted = habit.completedDates.includes(dateStr);
+      const newDates = isCompleted 
+          ? habit.completedDates.filter(d => d !== dateStr)
+          : [...habit.completedDates, dateStr];
+
+      if (user) {
+          await updateHabitFire(user.uid, id, { completedDates: newDates });
+      } else {
+          setData(prev => ({
+              ...prev,
+              habits: prev.habits.map(h => h.id === id ? { ...h, completedDates: newDates } : h)
+          }));
+      }
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -626,6 +674,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         deleteShoppingItem,
         clearShoppingList,
         setShoppingBudget,
+        updateScoreSerasa,
         saveKanbanColumn,
         deleteKanbanColumn,
         saveKanbanBoard,
@@ -642,6 +691,10 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addPixKey,
         updatePixKey,
         deletePixKey,
+        addHabit,
+        updateHabit,
+        deleteHabit,
+        toggleHabitDate,
         addTaskList,
         updateTaskList,
         deleteTaskList,

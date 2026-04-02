@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
   privacyMode: boolean;
   onUnlockBadge: (id: string) => void;
   onNavigate: (view: View) => void;
+  onToggleHabitDate: (id: string, dateStr: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -121,7 +122,7 @@ const getEffectiveBudget = (budgets: Budget[], category: string, date: Date) => 
   return budgets.find(b => b.category === category && b.isRecurring);
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate, onToggleHabitDate }) => {
   
   // History Chart State
   const [historyStartMonth, setHistoryStartMonth] = useState(() => {
@@ -134,25 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   // Mobile Tabs State
   const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
 
-  // Card Order State
-  const [cardOrder, setCardOrder] = useState<string[]>(() => {
-    const saved = localStorage.getItem('dashboardCardOrder');
-    return saved ? JSON.parse(saved) : ['score', 'balance', 'expenses', 'investments', 'notes'];
-  });
-  const [isEditMode, setIsEditMode] = useState(false);
 
-  const moveCard = (index: number, direction: 1 | -1) => {
-    const newOrder = [...cardOrder];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
-    
-    const temp = newOrder[index];
-    newOrder[index] = newOrder[targetIndex];
-    newOrder[targetIndex] = temp;
-    
-    setCardOrder(newOrder);
-    localStorage.setItem('dashboardCardOrder', JSON.stringify(newOrder));
-  };
 
   // Greeting Logic
   const greeting = useMemo(() => {
@@ -630,12 +613,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
         <div className="flex items-center gap-3 self-end md:self-auto flex-shrink-0">
           <button 
-            onClick={() => setIsEditMode(!isEditMode)}
-            className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${isEditMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          >
-            <Settings2 className="w-4 h-4" /> {isEditMode ? 'Concluir Edição' : 'Organizar Cards'}
-          </button>
-          <button 
             onClick={exportData}
             className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
           >
@@ -644,70 +621,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
       </div>
 
-      {/* Top Cards with Rich Data */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {cardOrder.map((cardId, index) => {
-          const isFirst = index === 0;
-          const isLast = index === cardOrder.length - 1;
-
-          const overlay = isEditMode ? (
-            <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center gap-4 rounded-xl">
-               <button 
-                  onClick={() => moveCard(index, -1)} 
-                  disabled={isFirst}
-                  className={`p-2 rounded-full shadow transition-colors ${isFirst ? 'bg-white/50 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-50 text-slate-700'}`}
-               >
-                  <ArrowLeft className="w-5 h-5" />
-               </button>
-               <button 
-                  onClick={() => moveCard(index, 1)} 
-                  disabled={isLast}
-                  className={`p-2 rounded-full shadow transition-colors ${isLast ? 'bg-white/50 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-50 text-slate-700'}`}
-               >
-                  <ArrowRight className="w-5 h-5" />
-               </button>
-            </div>
-          ) : null;
-
+      {/* --- VISÃO GERAL --- */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {['score', 'balance', 'expenses', 'investments'].map((cardId) => {
           if (cardId === 'score') return (
         <div key="score" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 1: Health Score */}
-          {overlay}
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Scale className="w-20 h-20 text-slate-400" />
           </div>
-          <div>
-               <div className="flex items-center justify-between mb-2">
-                 <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Financeiro</h3>
-                 <BadgeAlert className={`w-4 h-4 ${scoreColor}`} />
-               </div>
-               <div className="flex items-baseline gap-2 mb-1">
-                  <span className={`text-3xl font-black ${scoreColor} tracking-tighter`}>{healthScore}</span>
-                  <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
-               </div>
-               <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
-               
-               {/* NEW: Health Score Progress Bar */}
-               <div className="mt-4 w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
-                  <div 
-                    className={`h-full transition-all duration-1000 ease-out ${
-                        healthScore >= 700 ? 'bg-emerald-500' : 
-                        healthScore >= 500 ? 'bg-amber-400' : 
-                        healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
-                    }`}
-                    style={{ width: `${(healthScore / 1000) * 100}%` }}
-                  />
-               </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 space-y-1.5">
-                {factors.slice(0, 2).map((factor, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-[10px]">
-                        {factor.type === 'good' && <CheckCheck className="w-3 h-3 text-emerald-500" />}
-                        {factor.type === 'bad' && <ShieldAlert className="w-3 h-3 text-rose-500" />}
-                        {factor.type === 'neutral' && <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>}
-                        <span className="text-slate-600 dark:text-slate-400 truncate">{factor.text}</span>
-                    </div>
-                ))}
+          <div className="flex flex-col gap-4">
+            {/* Score Financeiro Pessoal */}
+            <div>
+                 <div className="flex items-center justify-between mb-2">
+                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Financeiro Pessoal</h3>
+                   <BadgeAlert className={`w-4 h-4 ${scoreColor}`} />
+                 </div>
+                 <div className="flex items-baseline gap-2 mb-1">
+                    <span className={`text-3xl font-black ${scoreColor} tracking-tighter`}>{healthScore}</span>
+                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
+                 </div>
+                 <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
+                 
+                 {/* Health Score Progress Bar */}
+                 <div className="mt-2 w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                    <div 
+                      className={`h-full transition-all duration-1000 ease-out ${
+                          healthScore >= 700 ? 'bg-emerald-500' : 
+                          healthScore >= 500 ? 'bg-amber-400' : 
+                          healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${(healthScore / 1000) * 100}%` }}
+                    />
+                 </div>
+            </div>
+
+            {/* Score Serasa */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                 <div className="flex items-center justify-between mb-2">
+                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Serasa</h3>
+                   <ShieldAlert className="w-4 h-4 text-pink-500" />
+                 </div>
+                 <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">
+                      {data.scoreSerasa !== undefined ? data.scoreSerasa : '-'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
+                 </div>
+                 <p className="text-[10px] text-slate-400">
+                   {data.scoreSerasaUpdatedAt 
+                     ? `Última atualização: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
+                     : 'Ainda não atualizado'}
+                 </p>
+            </div>
           </div>
         </div>
           );
@@ -715,7 +686,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'balance') return (
         <div key="balance" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 2: Current Balance & Pending Income */}
-          {overlay}
           <div>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saldo em Caixa</h3>
@@ -770,7 +740,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'expenses') return (
         <div key="expenses" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 3: Saídas (Paid vs Pending) - REDESIGNED */}
-          {overlay}
           <div>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saídas (Mês)</h3>
@@ -846,7 +815,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'investments') return (
         <div key="investments" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 4: Investments (Top Assets) */}
-          {overlay}
           <div>
               <div className="flex items-center justify-between mb-3">
                  <div>
@@ -901,10 +869,99 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
           );
 
+          return null;
+        })}
+      </div>
+
+      {/* --- PRODUTIVIDADE --- */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <Target className="w-5 h-5 text-purple-500" /> Produtividade
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {['habits', 'notes'].map((cardId) => {
+          if (cardId === 'habits') {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const activeHabits = data.habits || [];
+            const completedToday = activeHabits.filter(h => h.completedDates.includes(todayStr)).length;
+            const totalHabits = activeHabits.length;
+            const progress = totalHabits > 0 ? (completedToday / totalHabits) * 100 : 0;
+
+            return (
+              <div key="habits" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+                  <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                          <Target className="w-4 h-4" /> Hábitos de Hoje
+                      </h3>
+                      <button 
+                          onClick={() => onNavigate(View.PRODUCTIVITY)} 
+                          className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
+                          title="Ver todos"
+                      >
+                          <ArrowRight className="w-4 h-4" />
+                      </button>
+                  </div>
+                  
+                  {totalHabits === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                          <Target className="w-6 h-6 opacity-30" />
+                          <p className="text-xs italic text-center">Nenhum hábito criado.</p>
+                      </div>
+                  ) : (
+                      <div className="flex-1 flex flex-col">
+                          <div className="flex items-end justify-between mb-2">
+                              <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
+                                  {completedToday}<span className="text-sm text-slate-400 font-medium">/{totalHabits}</span>
+                              </span>
+                              <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">
+                                  {progress.toFixed(0)}% Concluído
+                              </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
+                              <div 
+                                  className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-500"
+                                  style={{ width: `${progress}%` }}
+                              />
+                          </div>
+                          
+                          <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5">
+                              {activeHabits.slice(0, 4).map(habit => {
+                                  const isCompleted = habit.completedDates.includes(todayStr);
+                                  return (
+                                      <div 
+                                          key={habit.id}
+                                          onClick={() => onToggleHabitDate(habit.id, todayStr)}
+                                          className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
+                                              isCompleted 
+                                              ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30' 
+                                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                          }`}
+                                      >
+                                          <div className="flex items-center gap-2 truncate">
+                                              <span className="text-sm">{habit.icon}</span>
+                                              <span className={`text-xs truncate font-medium ${isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                  {habit.name}
+                                              </span>
+                                          </div>
+                                          {isCompleted ? (
+                                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                                          ) : (
+                                              <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
+                                          )}
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </div>
+                  )}
+              </div>
+            );
+          }
+
           if (cardId === 'notes') return (
         <div key="notes" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
             {/* Card 5: Notes Widget */}
-            {overlay}
             <div className="flex items-center justify-between mb-3">
                 <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                     <StickyNote className="w-4 h-4" /> Notas Fixadas

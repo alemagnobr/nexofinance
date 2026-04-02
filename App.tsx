@@ -11,6 +11,7 @@ import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { AiAssistant } from './components/AiAssistant';
 import { Sidebar } from './components/Sidebar';
+import { FocusTimerModal } from './components/FocusTimerModal';
 import { AppModals } from './components/AppModals';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { useAppData } from './hooks/useAppData';
@@ -129,7 +130,8 @@ const App: React.FC = () => {
             agendaEvents: [],
             pixKeys: [],
             taskLists: [],
-            tasks: []
+            tasks: [],
+            habits: []
         });
     } else {
         await signOut(auth);
@@ -250,6 +252,7 @@ const App: React.FC = () => {
                 privacyMode={privacyMode} 
                 onUnlockBadge={actions.unlockBadge}
                 onNavigate={(view) => setCurrentView(view)}
+                onToggleHabitDate={actions.toggleHabitDate}
             />
         );
     }
@@ -318,8 +321,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Productivity (Kanban, Notes)
-    if ([View.KANBAN, View.NOTES].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes, Habits)
+    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -374,7 +377,7 @@ const App: React.FC = () => {
     }
 
     // Fallback
-    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} />;
+    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} onToggleHabitDate={actions.toggleHabitDate} />;
   };
 
   if (authLoading) {
@@ -512,6 +515,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      <FocusTimerModal />
       <AppModals 
         showWelcome={showWelcome}
         isDonateModalOpen={isDonateModalOpen}
