@@ -285,6 +285,8 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
           if (data.wealthProfile) updates.wealthProfile = data.wealthProfile;
           if (data.shoppingBudget !== undefined) updates.shoppingBudget = data.shoppingBudget;
           if (data.walletBalance !== undefined) updates.walletBalance = data.walletBalance;
+          if (data.scoreSerasa !== undefined) updates.scoreSerasa = data.scoreSerasa;
+          if (data.scoreSerasaUpdatedAt !== undefined) updates.scoreSerasaUpdatedAt = data.scoreSerasaUpdatedAt;
           
           if (Object.keys(updates).length > 0) onUpdate(updates);
       }
@@ -521,6 +523,18 @@ export const updateShoppingBudgetFire = async (uid: string, amount: number) => {
       }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, "Erro ao atualizar orçamento de compras");
+    }
+};
+
+// SCORE SERASA
+export const updateScoreSerasaFire = async (uid: string, score: number, updatedAt: string) => {
+    try {
+      await setDoc(doc(db, 'users', uid), { 
+          scoreSerasa: score,
+          scoreSerasaUpdatedAt: updatedAt
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao atualizar Score Serasa");
     }
 };
 

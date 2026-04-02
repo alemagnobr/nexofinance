@@ -7,7 +7,7 @@ import {
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
   addBudgetFire, deleteBudgetFire, updateBudgetFire,
   addDebtFire, updateDebtFire, deleteDebtFire,
-  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire,
+  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire, updateScoreSerasaFire,
   saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
   addNoteFire, updateNoteFire, deleteNoteFire,
   addPasswordFire, updatePasswordFire, deletePasswordFire,
@@ -394,6 +394,11 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, shoppingBudget: amount }));
   };
 
+  const updateScoreSerasa = async (score: number, updatedAt: string) => {
+    if (user) await updateScoreSerasaFire(user.uid, score, updatedAt);
+    else setData(prev => ({ ...prev, scoreSerasa: score, scoreSerasaUpdatedAt: updatedAt }));
+  };
+
   // --- KANBAN ACTIONS ---
   const saveKanbanBoard = async (board: KanbanBoard) => {
       if (user) await saveKanbanBoardFire(user.uid, board);
@@ -669,6 +674,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         deleteShoppingItem,
         clearShoppingList,
         setShoppingBudget,
+        updateScoreSerasa,
         saveKanbanColumn,
         deleteKanbanColumn,
         saveKanbanBoard,

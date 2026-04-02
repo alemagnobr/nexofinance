@@ -248,6 +248,8 @@ export interface AppData {
   unlockedBadges: string[];
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
+  scoreSerasa?: number;
+  scoreSerasaUpdatedAt?: string;
 }
 
 export enum View {

@@ -5,9 +5,10 @@ import {
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
   HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote,
-  ArrowLeftRight, Layout, Settings, Wrench, Link
+  ArrowLeftRight, Layout, Settings, Wrench, Link, Timer, BrainCircuit
 } from 'lucide-react';
 import { View } from '../types';
+import { useFocus } from '../contexts/FocusContext';
 
 interface SidebarProps {
   user: any; 
@@ -47,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   privacyMode, setPrivacyMode, darkMode, setDarkMode, isFullscreen, toggleFullscreen, hasKey,
   onOpenKeyModal, onOpenDonateModal, onOpenShortcutsModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
 }) => {
+  const { isActive, timeLeft, openModal } = useFocus();
   
   const handleNavClick = (view: View) => {
     onNavigate(view);
@@ -170,8 +172,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
             label="Utilidades" 
         />
 
-        {/* NEXO AI */}
+        {/* Focus Mode */}
         <div className="mt-6 pt-4 border-t border-slate-800">
+             <button
+              onClick={openModal}
+              className={`w-full relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
+                  isActive 
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/20' 
+                  : 'bg-slate-700/50 hover:bg-slate-700'
+              }`}
+            >
+              <div className={`relative flex items-center gap-3 px-3 py-3 rounded-[11px] bg-slate-900 transition-colors h-full`}>
+                  <div className={`p-1.5 rounded-lg ${isActive ? 'bg-emerald-500/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
+                      <BrainCircuit className={`w-5 h-5 ${isActive ? 'text-emerald-400 animate-pulse' : 'text-slate-400 group-hover:text-white'}`} />
+                  </div>
+                  <div className="flex-1 text-left">
+                      <p className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>Modo Foco</p>
+                      <p className={`text-[10px] ${isActive ? 'text-emerald-400 font-mono' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                        {isActive 
+                          ? `${Math.floor(timeLeft / 60).toString().padStart(2, '0')}:${(timeLeft % 60).toString().padStart(2, '0')}` 
+                          : 'Iniciar Sessão'}
+                      </p>
+                  </div>
+              </div>
+            </button>
+        </div>
+
+        {/* NEXO AI */}
+        <div className="mt-4">
              <button
               onClick={() => hasKey ? handleNavClick(View.AI_ASSISTANT) : onOpenKeyModal()}
               className={`w-full relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
