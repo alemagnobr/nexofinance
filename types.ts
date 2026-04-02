@@ -250,6 +250,7 @@ export interface AppData {
   walletBalance?: number; // Saldo calculado e persistido para performance
   scoreSerasa?: number;
   scoreSerasaUpdatedAt?: string;
+  scoreSerasaHistory?: { score: number, date: string }[];
 }
 
 export enum View {

@@ -287,6 +287,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
           if (data.walletBalance !== undefined) updates.walletBalance = data.walletBalance;
           if (data.scoreSerasa !== undefined) updates.scoreSerasa = data.scoreSerasa;
           if (data.scoreSerasaUpdatedAt !== undefined) updates.scoreSerasaUpdatedAt = data.scoreSerasaUpdatedAt;
+          if (data.scoreSerasaHistory !== undefined) updates.scoreSerasaHistory = data.scoreSerasaHistory;
           
           if (Object.keys(updates).length > 0) onUpdate(updates);
       }
@@ -527,11 +528,13 @@ export const updateShoppingBudgetFire = async (uid: string, amount: number) => {
 };
 
 // SCORE SERASA
-export const updateScoreSerasaFire = async (uid: string, score: number, updatedAt: string) => {
+export const updateScoreSerasaFire = async (uid: string, score: number, updatedAt: string, currentHistory: {score: number, date: string}[] = []) => {
     try {
+      const newHistory = [...currentHistory, { score, date: updatedAt }];
       await setDoc(doc(db, 'users', uid), { 
           scoreSerasa: score,
-          scoreSerasaUpdatedAt: updatedAt
+          scoreSerasaUpdatedAt: updatedAt,
+          scoreSerasaHistory: newHistory
       }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, "Erro ao atualizar Score Serasa");

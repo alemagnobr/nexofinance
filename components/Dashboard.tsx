@@ -339,6 +339,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
     return { healthScore: score, scoreLabel: sLabel, scoreColor: sColor, factors: factorsList };
   }, [data.debts, totalIncome, totalExpense, totalPending, currentBalance, totalInvested]);
 
+  const priorityDebts = useMemo(() => {
+    const agreements = data.debts.filter(d => d.status === 'agreement');
+    const others = data.debts.filter(d => d.status !== 'agreement' && d.status !== 'paid');
+    return [...agreements, ...others].slice(0, 2);
+  }, [data.debts]);
 
   // Expense History
   const expenseHistoryData = useMemo(() => {
@@ -673,12 +678,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
                  </div>
-                 <p className="text-[10px] text-slate-400">
+                 <p className="text-[10px] text-slate-400 mb-2">
                    {data.scoreSerasaUpdatedAt 
                      ? `Última atualização: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
                      : 'Ainda não atualizado'}
                  </p>
+
+                 {/* Serasa History Chart */}
+                 {data.scoreSerasaHistory && data.scoreSerasaHistory.length > 0 && (
+                     <div className="h-10 w-full mt-1">
+                         <ResponsiveContainer width="100%" height="100%">
+                             <LineChart data={data.scoreSerasaHistory}>
+                                 <Line type="monotone" dataKey="score" stroke="#ec4899" strokeWidth={2} dot={false} />
+                             </LineChart>
+                         </ResponsiveContainer>
+                     </div>
+                 )}
             </div>
+
+            {/* Priority Debts */}
+            {priorityDebts.length > 0 && (
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                    <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Dívidas em Destaque</h3>
+                    <div className="flex flex-col gap-1.5">
+                        {priorityDebts.map(debt => (
+                            <div key={debt.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${debt.status === 'agreement' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                    <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate">{debt.creditor}</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-800 dark:text-white shrink-0">{formatValue(debt.status === 'agreement' ? (debt.agreedAmount || debt.currentAmount) : debt.currentAmount)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
           </div>
         </div>
           );

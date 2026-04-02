@@ -395,8 +395,14 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const updateScoreSerasa = async (score: number, updatedAt: string) => {
-    if (user) await updateScoreSerasaFire(user.uid, score, updatedAt);
-    else setData(prev => ({ ...prev, scoreSerasa: score, scoreSerasaUpdatedAt: updatedAt }));
+    if (user) {
+        await updateScoreSerasaFire(user.uid, score, updatedAt, data.scoreSerasaHistory || []);
+    } else {
+        setData(prev => {
+            const newHistory = [...(prev.scoreSerasaHistory || []), { score, date: updatedAt }];
+            return { ...prev, scoreSerasa: score, scoreSerasaUpdatedAt: updatedAt, scoreSerasaHistory: newHistory };
+        });
+    }
   };
 
   // --- KANBAN ACTIONS ---

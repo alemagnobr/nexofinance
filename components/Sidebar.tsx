@@ -172,51 +172,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
             label="Utilidades" 
         />
 
-        {/* Focus Mode */}
-        <div className="mt-6 pt-4 border-t border-slate-800">
+        {/* Focus Mode & NEXO AI Side-by-Side */}
+        <div className="mt-6 pt-4 border-t border-slate-800 grid grid-cols-2 gap-2">
              <button
               onClick={openModal}
-              className={`w-full relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
+              className={`relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
                   isActive 
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/20' 
                   : 'bg-slate-700/50 hover:bg-slate-700'
               }`}
             >
-              <div className={`relative flex items-center gap-3 px-3 py-3 rounded-[11px] bg-slate-900 transition-colors h-full`}>
+              <div className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-[11px] bg-slate-900 transition-colors h-full`}>
                   <div className={`p-1.5 rounded-lg ${isActive ? 'bg-emerald-500/20' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
-                      <BrainCircuit className={`w-5 h-5 ${isActive ? 'text-emerald-400 animate-pulse' : 'text-slate-400 group-hover:text-white'}`} />
+                      <BrainCircuit className={`w-4 h-4 ${isActive ? 'text-emerald-400 animate-pulse' : 'text-slate-400 group-hover:text-white'}`} />
                   </div>
-                  <div className="flex-1 text-left">
-                      <p className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>Modo Foco</p>
-                      <p className={`text-[10px] ${isActive ? 'text-emerald-400 font-mono' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                  <div className="text-center">
+                      <p className={`text-xs font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>Foco</p>
+                      <p className={`text-[9px] ${isActive ? 'text-emerald-400 font-mono' : 'text-slate-500 group-hover:text-slate-400'}`}>
                         {isActive 
                           ? `${Math.floor(timeLeft / 60).toString().padStart(2, '0')}:${(timeLeft % 60).toString().padStart(2, '0')}` 
-                          : 'Iniciar Sessão'}
+                          : 'Iniciar'}
                       </p>
                   </div>
               </div>
             </button>
-        </div>
 
-        {/* NEXO AI */}
-        <div className="mt-4">
              <button
               onClick={() => hasKey ? handleNavClick(View.AI_ASSISTANT) : onOpenKeyModal()}
-              className={`w-full relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
+              className={`relative group overflow-hidden rounded-xl p-[1px] transition-all duration-300 ${
                   currentView === View.AI_ASSISTANT 
                   ? 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-lg shadow-purple-500/20' 
                   : 'bg-slate-700/50 hover:bg-gradient-to-r hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500'
               }`}
             >
-              <div className={`relative flex items-center gap-3 px-3 py-3 rounded-[11px] bg-slate-900 transition-colors h-full`}>
+              <div className={`relative flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-[11px] bg-slate-900 transition-colors h-full`}>
                   <div className={`p-1.5 rounded-lg ${currentView === View.AI_ASSISTANT ? 'bg-indigo-500/20' : 'bg-slate-800 group-hover:bg-slate-800'}`}>
-                      <MessageSquareMore className={`w-5 h-5 ${currentView === View.AI_ASSISTANT ? 'text-indigo-400' : 'text-slate-400 group-hover:text-white'}`} />
+                      <MessageSquareMore className={`w-4 h-4 ${currentView === View.AI_ASSISTANT ? 'text-indigo-400' : 'text-slate-400 group-hover:text-white'}`} />
                   </div>
-                  <div className="flex-1 text-left">
-                      <p className={`text-sm font-bold ${currentView === View.AI_ASSISTANT ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>NEXO AI</p>
-                      <p className="text-[10px] text-slate-500 group-hover:text-slate-400">Assistente Virtual</p>
+                  <div className="text-center relative">
+                      <p className={`text-xs font-bold ${currentView === View.AI_ASSISTANT ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>NEXO AI</p>
+                      <p className="text-[9px] text-slate-500 group-hover:text-slate-400">Assistente</p>
+                      {!hasKey && <Key className="absolute -top-6 -right-4 w-3 h-3 text-rose-500 animate-pulse" />}
                   </div>
-                  {!hasKey && <Key className="w-3 h-3 text-rose-500 animate-pulse" />}
               </div>
             </button>
         </div>
