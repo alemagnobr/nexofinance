@@ -135,7 +135,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   // Mobile Tabs State
   const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
 
+  // Card Order State
+  const [cardOrder, setCardOrder] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dashboardCardOrder');
+    const defaultOrder = ['score', 'balance', 'expenses', 'investments', 'habits', 'notes'];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!parsed.includes('habits')) {
+        parsed.splice(4, 0, 'habits'); // Insert habits before notes
+      }
+      return parsed;
+    }
+    return defaultOrder;
+  });
+  const [isEditMode, setIsEditMode] = useState(false);
 
+  const moveCard = (index: number, direction: 1 | -1) => {
+    const newOrder = [...cardOrder];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    
+    const temp = newOrder[index];
+    newOrder[index] = newOrder[targetIndex];
+    newOrder[targetIndex] = temp;
+    
+    setCardOrder(newOrder);
+    localStorage.setItem('dashboardCardOrder', JSON.stringify(newOrder));
+  };
 
   // Greeting Logic
   const greeting = useMemo(() => {
@@ -613,6 +639,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
         <div className="flex items-center gap-3 self-end md:self-auto flex-shrink-0">
           <button 
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${isEditMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          >
+            <Settings2 className="w-4 h-4" /> {isEditMode ? 'Concluir Edição' : 'Organizar Cards'}
+          </button>
+          <button 
             onClick={exportData}
             className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
           >
@@ -621,17 +653,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
       </div>
 
-      {/* --- VISÃO GERAL --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {['score', 'balance', 'expenses', 'investments'].map((cardId) => {
+      {/* Top Cards with Rich Data */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {cardOrder.map((cardId, index) => {
+          const isFirst = index === 0;
+          const isLast = index === cardOrder.length - 1;
+
+          const overlay = isEditMode ? (
+            <div className="absolute inset-0 bg-slate-900/10 dark:bg-slate-900/50 backdrop-blur-[1px] z-10 flex items-center justify-center gap-4 rounded-xl">
+               <button 
+                  onClick={() => moveCard(index, -1)} 
+                  disabled={isFirst}
+                  className={`p-2 rounded-full shadow transition-colors ${isFirst ? 'bg-white/50 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-50 text-slate-700'}`}
+               >
+                  <ArrowLeft className="w-5 h-5" />
+               </button>
+               <button 
+                  onClick={() => moveCard(index, 1)} 
+                  disabled={isLast}
+                  className={`p-2 rounded-full shadow transition-colors ${isLast ? 'bg-white/50 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-50 text-slate-700'}`}
+               >
+                  <ArrowRight className="w-5 h-5" />
+               </button>
+            </div>
+          ) : null;
+
           if (cardId === 'score') return (
         <div key="score" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 1: Health Score */}
+          {overlay}
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Scale className="w-20 h-20 text-slate-400" />
           </div>
@@ -674,6 +724,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'balance') return (
         <div key="balance" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 2: Current Balance & Pending Income */}
+          {overlay}
           <div>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saldo em Caixa</h3>
@@ -728,6 +779,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'expenses') return (
         <div key="expenses" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 3: Saídas (Paid vs Pending) - REDESIGNED */}
+          {overlay}
           <div>
             <div className="flex items-center justify-between mb-2">
                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saídas (Mês)</h3>
@@ -803,6 +855,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'investments') return (
         <div key="investments" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
           {/* Card 4: Investments (Top Assets) */}
+          {overlay}
           <div>
               <div className="flex items-center justify-between mb-3">
                  <div>
@@ -857,18 +910,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
         </div>
           );
 
-          return null;
-        })}
-      </div>
-
-      {/* --- PRODUTIVIDADE --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Target className="w-5 h-5 text-purple-500" /> Produtividade
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {['habits', 'notes'].map((cardId) => {
           if (cardId === 'habits') {
             const todayStr = new Date().toISOString().split('T')[0];
             const activeHabits = data.habits || [];
@@ -878,6 +919,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
 
             return (
               <div key="habits" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+                  {overlay}
                   <div className="flex items-center justify-between mb-3">
                       <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                           <Target className="w-4 h-4" /> Hábitos de Hoje
@@ -950,6 +992,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           if (cardId === 'notes') return (
         <div key="notes" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
             {/* Card 5: Notes Widget */}
+            {overlay}
             <div className="flex items-center justify-between mb-3">
                 <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                     <StickyNote className="w-4 h-4" /> Notas Fixadas
