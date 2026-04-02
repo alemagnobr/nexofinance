@@ -129,8 +129,7 @@ const App: React.FC = () => {
             agendaEvents: [],
             pixKeys: [],
             taskLists: [],
-            tasks: [],
-            habits: []
+            tasks: []
         });
     } else {
         await signOut(auth);
@@ -251,7 +250,6 @@ const App: React.FC = () => {
                 privacyMode={privacyMode} 
                 onUnlockBadge={actions.unlockBadge}
                 onNavigate={(view) => setCurrentView(view)}
-                onToggleHabitDate={actions.toggleHabitDate}
             />
         );
     }
@@ -320,8 +318,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Productivity (Kanban, Notes, Habits)
-    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes)
+    if ([View.KANBAN, View.NOTES].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -376,7 +374,7 @@ const App: React.FC = () => {
     }
 
     // Fallback
-    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} onToggleHabitDate={actions.toggleHabitDate} />;
+    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} />;
   };
 
   if (authLoading) {

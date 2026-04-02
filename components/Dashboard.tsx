@@ -2,14 +2,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
   privacyMode: boolean;
   onUnlockBadge: (id: string) => void;
   onNavigate: (view: View) => void;
-  onToggleHabitDate: (id: string, dateStr: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -122,7 +121,7 @@ const getEffectiveBudget = (budgets: Budget[], category: string, date: Date) => 
   return budgets.find(b => b.category === category && b.isRecurring);
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate, onToggleHabitDate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnlockBadge, onNavigate }) => {
   
   // History Chart State
   const [historyStartMonth, setHistoryStartMonth] = useState(() => {
@@ -138,15 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   // Card Order State
   const [cardOrder, setCardOrder] = useState<string[]>(() => {
     const saved = localStorage.getItem('dashboardCardOrder');
-    const defaultOrder = ['score', 'balance', 'expenses', 'investments', 'habits', 'notes'];
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.includes('habits')) {
-        parsed.splice(4, 0, 'habits'); // Insert habits before notes
-      }
-      return parsed;
-    }
-    return defaultOrder;
+    return saved ? JSON.parse(saved) : ['score', 'balance', 'expenses', 'investments', 'notes'];
   });
   const [isEditMode, setIsEditMode] = useState(false);
 
@@ -909,85 +900,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           </div>
         </div>
           );
-
-          if (cardId === 'habits') {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const activeHabits = data.habits || [];
-            const completedToday = activeHabits.filter(h => h.completedDates.includes(todayStr)).length;
-            const totalHabits = activeHabits.length;
-            const progress = totalHabits > 0 ? (completedToday / totalHabits) * 100 : 0;
-
-            return (
-              <div key="habits" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
-                  {overlay}
-                  <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                          <Target className="w-4 h-4" /> Hábitos de Hoje
-                      </h3>
-                      <button 
-                          onClick={() => onNavigate(View.PRODUCTIVITY)} 
-                          className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
-                          title="Ver todos"
-                      >
-                          <ArrowRight className="w-4 h-4" />
-                      </button>
-                  </div>
-                  
-                  {totalHabits === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                          <Target className="w-6 h-6 opacity-30" />
-                          <p className="text-xs italic text-center">Nenhum hábito criado.</p>
-                      </div>
-                  ) : (
-                      <div className="flex-1 flex flex-col">
-                          <div className="flex items-end justify-between mb-2">
-                              <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
-                                  {completedToday}<span className="text-sm text-slate-400 font-medium">/{totalHabits}</span>
-                              </span>
-                              <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">
-                                  {progress.toFixed(0)}% Concluído
-                              </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
-                              <div 
-                                  className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-500"
-                                  style={{ width: `${progress}%` }}
-                              />
-                          </div>
-                          
-                          <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5">
-                              {activeHabits.slice(0, 4).map(habit => {
-                                  const isCompleted = habit.completedDates.includes(todayStr);
-                                  return (
-                                      <div 
-                                          key={habit.id}
-                                          onClick={() => onToggleHabitDate(habit.id, todayStr)}
-                                          className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
-                                              isCompleted 
-                                              ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30' 
-                                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                          }`}
-                                      >
-                                          <div className="flex items-center gap-2 truncate">
-                                              <span className="text-sm">{habit.icon}</span>
-                                              <span className={`text-xs truncate font-medium ${isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                  {habit.name}
-                                              </span>
-                                          </div>
-                                          {isCompleted ? (
-                                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                                          ) : (
-                                              <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                                          )}
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  )}
-              </div>
-            );
-          }
 
           if (cardId === 'notes') return (
         <div key="notes" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">

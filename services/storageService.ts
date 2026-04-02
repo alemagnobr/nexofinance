@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -51,7 +51,6 @@ const DEFAULT_DATA: AppData = {
   taskLists: [],
   tasks: [],
   pixKeys: [],
-  habits: [],
   unlockedBadges: [],
   walletBalance: 0
 };
@@ -84,7 +83,6 @@ export const loadData = (userId?: string): AppData => {
     if (!data.taskLists) data.taskLists = [];
     if (!data.tasks) data.tasks = [];
     if (!data.pixKeys) data.pixKeys = [];
-    if (!data.habits) data.habits = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
@@ -255,13 +253,6 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar chaves pix");
   });
 
-  const unsubHabits = onSnapshot(query(collection(db, 'users', uid, 'habits'), orderBy('createdAt', 'asc')), (snapshot) => {
-    const habits = snapshot.docs.map(doc => doc.data() as Habit);
-    onUpdate({ habits });
-  }, (error) => {
-    handleFirestoreError(error, "Erro ao assinar hábitos");
-  });
-
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -306,7 +297,6 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubTaskLists();
     unsubTasks();
     unsubPixKeys();
-    unsubHabits();
     unsubCategories();
     unsubUserDoc();
   };
@@ -693,29 +683,6 @@ export const deletePixKeyFire = async (uid: string, id: string) => {
     }
 };
 
-// HABITS
-export const addHabitFire = async (uid: string, habit: Habit) => {
-    try {
-      await setDoc(doc(db, 'users', uid, 'habits', habit.id), habit);
-    } catch (error) {
-      handleFirestoreError(error, "Erro ao adicionar hábito");
-    }
-};
-export const updateHabitFire = async (uid: string, id: string, data: Partial<Habit>) => {
-    try {
-      await updateDoc(doc(db, 'users', uid, 'habits', id), data);
-    } catch (error) {
-      handleFirestoreError(error, "Erro ao atualizar hábito");
-    }
-};
-export const deleteHabitFire = async (uid: string, id: string) => {
-    try {
-      await deleteDoc(doc(db, 'users', uid, 'habits', id));
-    } catch (error) {
-      handleFirestoreError(error, "Erro ao excluir hábito");
-    }
-};
-
 // CATEGORIES
 export const addCategoryFire = async (uid: string, category: Category) => {
     try {
@@ -833,11 +800,6 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
       localData.pixKeys?.forEach(k => {
           const ref = doc(db, 'users', uid, 'pix_keys', k.id);
           batch.set(ref, k);
-      });
-
-      localData.habits?.forEach(h => {
-          const ref = doc(db, 'users', uid, 'habits', h.id);
-          batch.set(ref, h);
       });
 
       // Migrating categories

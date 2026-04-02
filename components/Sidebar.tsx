@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Group Logic Helpers to determine active state
   const isMovementsActive = [View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView);
   const isAssetsActive = [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(currentView);
-  const isProductivityActive = [View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView);
+  const isProductivityActive = [View.KANBAN, View.NOTES].includes(currentView);
   const isUtilitiesActive = [View.SHOPPING_LIST, View.PASSWORDS].includes(currentView);
 
   return (
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <NavItem 
             active={isProductivityActive} 
-            onClick={() => handleNavClick(View.PRODUCTIVITY)} 
+            onClick={() => handleNavClick(View.KANBAN)} 
             icon={Layout} 
             label="Produtividade" 
         />
