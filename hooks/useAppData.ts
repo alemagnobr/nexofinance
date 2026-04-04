@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task, Habit } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task, Habit, Wallet } from '../types';
 import { 
   addTransactionFire, updateTransactionFire, deleteTransactionFire,
   addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
@@ -16,6 +16,7 @@ import {
   addTaskFire, updateTaskFire, deleteTaskFire,
   addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
   addHabitFire, updateHabitFire, deleteHabitFire,
+  addWalletFire, updateWalletFire, deleteWalletFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
@@ -186,15 +187,64 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
   // --- ACTIONS ---
 
+  const adjustWalletBalance = async (walletId: string, amount: number, type: 'income' | 'expense', isRevert: boolean = false) => {
+    const wallet = data.wallets?.find(w => w.id === walletId);
+    if (!wallet) return;
+
+    let adjustment = type === 'income' ? amount : -amount;
+    if (isRevert) adjustment = -adjustment;
+
+    const newBalance = wallet.balance + adjustment;
+
+    if (user) {
+      await updateWalletFire(user.uid, walletId, { balance: newBalance });
+    } else {
+      setData(prev => ({
+        ...prev,
+        wallets: (prev.wallets || []).map(w => w.id === walletId ? { ...w, balance: newBalance } : w)
+      }));
+    }
+  };
+
   const addTransaction = async (t: Omit<Transaction, 'id'>) => {
     const newTransaction: Transaction = { ...t, id: crypto.randomUUID() };
     if (user) await addTransactionFire(user.uid, newTransaction);
     else setData(prev => ({ ...prev, transactions: [...prev.transactions, newTransaction] }));
+
+    if (newTransaction.status === 'paid' && newTransaction.walletId) {
+      await adjustWalletBalance(newTransaction.walletId, newTransaction.amount, newTransaction.type);
+    }
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    const oldTransaction = data.transactions.find(t => t.id === id);
+    if (!oldTransaction) return;
+
     if (user) await updateTransactionFire(user.uid, id, updates);
     else setData(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === id ? { ...t, ...updates } : t) }));
+
+    // Handle wallet balance changes if it was paid or is becoming paid
+    const isNowPaid = updates.status ? updates.status === 'paid' : oldTransaction.status === 'paid';
+    const wasPaid = oldTransaction.status === 'paid';
+    
+    const oldWalletId = oldTransaction.walletId;
+    const newWalletId = updates.walletId !== undefined ? updates.walletId : oldTransaction.walletId;
+    
+    const oldAmount = oldTransaction.amount;
+    const newAmount = updates.amount !== undefined ? updates.amount : oldTransaction.amount;
+    
+    const oldType = oldTransaction.type;
+    const newType = updates.type !== undefined ? updates.type : oldTransaction.type;
+
+    if (wasPaid && oldWalletId) {
+      // Revert old transaction from old wallet
+      await adjustWalletBalance(oldWalletId, oldAmount, oldType, true);
+    }
+
+    if (isNowPaid && newWalletId) {
+      // Apply new transaction to new wallet
+      await adjustWalletBalance(newWalletId, newAmount, newType);
+    }
   };
 
   const deleteTransaction = async (id: string) => {
@@ -240,12 +290,25 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
         if (user) {
             // Delete future ones
-            await Promise.all(toDelete.map(delId => deleteTransactionFire(user.uid, delId)));
+            await Promise.all(toDelete.map(async delId => {
+                const t = data.transactions.find(tx => tx.id === delId);
+                if (t && t.status === 'paid' && t.walletId) {
+                    await adjustWalletBalance(t.walletId, t.amount, t.type, true);
+                }
+                await deleteTransactionFire(user.uid, delId);
+            }));
             // Update past ones to stop recurring
             if (toUpdate.length > 0) {
                 await Promise.all(toUpdate.map(updateId => updateTransactionFire(user.uid, updateId, { isRecurring: false })));
             }
         } else {
+            // Revert balances for deleted transactions in guest mode
+            toDelete.forEach(delId => {
+                const t = data.transactions.find(tx => tx.id === delId);
+                if (t && t.status === 'paid' && t.walletId) {
+                    adjustWalletBalance(t.walletId, t.amount, t.type, true);
+                }
+            });
             setData(prev => {
                 let newTransactions = prev.transactions.filter(t => !toDelete.includes(t.id));
                 if (toUpdate.length > 0) {
@@ -258,19 +321,31 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         }
     } else {
         // Normal deletion
+        if (transactionToDelete.status === 'paid' && transactionToDelete.walletId) {
+            await adjustWalletBalance(transactionToDelete.walletId, transactionToDelete.amount, transactionToDelete.type, true);
+        }
         if (user) await deleteTransactionFire(user.uid, id);
         else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
     }
   };
 
-  const toggleTransactionStatus = async (id: string) => {
+  const toggleTransactionStatus = async (id: string, walletId?: string) => {
     const targetTransaction = data.transactions.find(t => t.id === id);
     if (!targetTransaction) return;
     
     const newStatus: TransactionStatus = targetTransaction.status === 'paid' ? 'pending' : 'paid';
+    const finalWalletId = walletId || targetTransaction.walletId;
 
     if (user) {
-        await updateTransactionFire(user.uid, id, { status: newStatus });
+        await updateTransactionFire(user.uid, id, { status: newStatus, walletId: finalWalletId });
+        
+        if (finalWalletId) {
+            if (newStatus === 'paid') {
+                await adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type);
+            } else {
+                await adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type, true);
+            }
+        }
         
         // Debt Sync Logic
         if (targetTransaction.debtId) {
@@ -290,8 +365,15 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
              }
         }
     } else {
+        if (finalWalletId) {
+            if (newStatus === 'paid') {
+                adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type);
+            } else {
+                adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type, true);
+            }
+        }
         setData(prev => {
-            const updatedTransactions = prev.transactions.map(t => t.id === id ? { ...t, status: newStatus } : t);
+            const updatedTransactions = prev.transactions.map(t => t.id === id ? { ...t, status: newStatus, walletId: finalWalletId } : t);
             
             let updatedDebts = prev.debts;
             if (targetTransaction.debtId) {
@@ -629,6 +711,23 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }
   };
 
+  // --- WALLETS ---
+  const addWallet = async (w: Omit<Wallet, 'id'>) => {
+    const newWallet: Wallet = { ...w, id: crypto.randomUUID() };
+    if (user) await addWalletFire(user.uid, newWallet);
+    else setData(prev => ({ ...prev, wallets: [...(prev.wallets || []), newWallet] }));
+  };
+
+  const updateWallet = async (id: string, updates: Partial<Wallet>) => {
+    if (user) await updateWalletFire(user.uid, id, updates);
+    else setData(prev => ({ ...prev, wallets: (prev.wallets || []).map(w => w.id === id ? { ...w, ...updates } : w) }));
+  };
+
+  const deleteWallet = async (id: string) => {
+    if (user) await deleteWalletFire(user.uid, id);
+    else setData(prev => ({ ...prev, wallets: (prev.wallets || []).filter(w => w.id !== id) }));
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -698,6 +797,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         updateHabit,
         deleteHabit,
         toggleHabitEntry,
+        addWallet,
+        updateWallet,
+        deleteWallet,
         addTaskList,
         updateTaskList,
         deleteTaskList,

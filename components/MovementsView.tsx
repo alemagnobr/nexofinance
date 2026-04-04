@@ -75,6 +75,7 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
             transactions={data.transactions}
             categories={data.categories}
             budgets={data.budgets}
+            wallets={data.wallets}
             onAdd={actions.addTransaction}
             onUpdate={actions.updateTransaction}
             onDelete={actions.deleteTransaction}

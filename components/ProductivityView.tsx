@@ -3,8 +3,9 @@ import { View } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { Notes } from './Notes';
 import { HabitTracker } from './HabitTracker';
+import { EisenhowerMatrix } from './EisenhowerMatrix';
 import { FinancialCalendar } from './FinancialCalendar';
-import { Wallet, StickyNote, Calendar, Target } from 'lucide-react';
+import { Wallet, StickyNote, Calendar, Target, Grid } from 'lucide-react';
 
 interface ProductivityViewProps {
   currentView: View;
@@ -20,6 +21,7 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
   const tabs = [
     { id: View.PRODUCTIVITY, label: 'Hábitos', icon: Target },
     { id: View.KANBAN, label: 'NEXO Flow', icon: Wallet },
+    { id: View.EISENHOWER, label: 'Matriz de Eisenhower', icon: Grid },
     { id: View.NOTES, label: 'NEXO Notes', icon: StickyNote },
   ];
 
@@ -28,7 +30,7 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
       {/* Internal Tabs Navigation */}
       <div>
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Produtividade</p>
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
           {tabs.map(tab => {
             const isActive = currentView === tab.id;
             return (
@@ -74,6 +76,16 @@ export const ProductivityView: React.FC<ProductivityViewProps> = ({
                  onNavigate(View.TRANSACTIONS);
              }}
              privacyMode={privacyMode}
+          />
+        )}
+        {currentView === View.EISENHOWER && (
+          <EisenhowerMatrix 
+             tasks={data.tasks || []}
+             taskLists={data.taskLists || []}
+             onAddTask={actions.addTask}
+             onUpdateTask={actions.updateTask}
+             onDeleteTask={actions.deleteTask}
+             onAddTaskList={actions.addTaskList}
           />
         )}
         {currentView === View.NOTES && (

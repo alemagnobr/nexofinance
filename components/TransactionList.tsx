@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category } from '../types';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 
@@ -8,10 +8,11 @@ interface TransactionListProps {
   transactions: Transaction[];
   budgets: Budget[];
   categories?: Category[]; // New prop
+  wallets?: WalletData[]; // New prop
   onAdd: (t: Omit<Transaction, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
-  onToggleStatus: (id: string) => void;
+  onToggleStatus: (id: string, walletId?: string) => void;
   onNavigate: (view: View) => void;
   privacyMode: boolean;
   hasApiKey: boolean;
@@ -63,7 +64,7 @@ const PaymentIcon = ({ method, className }: { method: string, className?: string
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash', 'boleto'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], wallets = [], onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
@@ -91,6 +92,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [useBusinessDay, setUseBusinessDay] = useState(false);
   const [businessDayOrdinal, setBusinessDayOrdinal] = useState('5');
 
+  // --- WALLET SELECTION MODAL ---
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [walletModalTransactionId, setWalletModalTransactionId] = useState<string | null>(null);
+  const [selectedWalletId, setSelectedWalletId] = useState<string>('');
+
   // Ref for auto-scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +108,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     date: new Date().toISOString().split('T')[0],
     status: 'paid' as TransactionStatus,
     paymentMethod: 'credit_card' as PaymentMethod,
+    walletId: '',
     isRecurring: false,
     autoPay: false, // New
     installments: '',
@@ -327,7 +334,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const resetForm = () => {
-    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', isRecurring: false, autoPay: false, installments: '', observation: '' });
+    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', walletId: wallets && wallets.length > 0 ? wallets[0].id : '', isRecurring: false, autoPay: false, installments: '', observation: '' });
     setEditingId(null);
     setRecurrenceMode('monthly');
     setSelectedDays([]);
@@ -346,6 +353,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         date: t.date || new Date().toISOString().split('T')[0], 
         status: t.status || 'paid', 
         paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), 
+        walletId: t.walletId || '',
         isRecurring: t.isRecurring || false, 
         autoPay: t.autoPay || false,
         installments: '',
@@ -407,6 +415,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       date: newTransaction.date, 
       status: newTransaction.status, 
       paymentMethod: newTransaction.paymentMethod, 
+      walletId: newTransaction.walletId,
       isRecurring: newTransaction.isRecurring,
       autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false, // Reset if changing to paid manually
       observation: finalObservation
@@ -501,6 +510,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       reader.readAsDataURL(file);
   };
 
+  const handleToggleClick = (t: Transaction) => {
+    if (t.status === 'pending' && !t.walletId && wallets && wallets.length > 0) {
+      setWalletModalTransactionId(t.id);
+      setSelectedWalletId(wallets[0].id);
+      setWalletModalOpen(true);
+    } else {
+      onToggleStatus(t.id);
+    }
+  };
+
+  const handleConfirmWalletToggle = () => {
+    if (walletModalTransactionId && selectedWalletId) {
+      onToggleStatus(walletModalTransactionId, selectedWalletId);
+    }
+    setWalletModalOpen(false);
+    setWalletModalTransactionId(null);
+  };
+
   const handleMoveTransaction = (groupDate: string, index: number, direction: 'up' | 'down') => {
       const group = groupedTransactions.find(g => g.date === groupDate);
       if (!group) return;
@@ -536,6 +563,51 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   return (
     <div className="space-y-6">
       
+      {/* Wallet Selection Modal */}
+      {walletModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
+              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-indigo-500" />
+                Selecione a Conta
+              </h3>
+              <button onClick={() => setWalletModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                De qual conta este valor foi debitado/creditado?
+              </p>
+              <select
+                value={selectedWalletId}
+                onChange={e => setSelectedWalletId(e.target.value)}
+                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+              >
+                {wallets?.map(w => (
+                  <option key={w.id} value={w.id}>{w.name} ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(w.balance)})</option>
+                ))}
+              </select>
+            </div>
+            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+              <button
+                onClick={() => setWalletModalOpen(false)}
+                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmWalletToggle}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. TOP BAR: Title, Search, Actions */}
       <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -811,6 +883,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             ))}
           </select>
 
+          {newTransaction.status === 'paid' && wallets.length > 0 && (
+            <select
+              value={newTransaction.walletId || ''}
+              onChange={e => setNewTransaction({ ...newTransaction, walletId: e.target.value })}
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2"
+            >
+              <option value="">Selecione a Conta</option>
+              {wallets.map(w => (
+                <option key={w.id} value={w.id}>{w.name} ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(w.balance)})</option>
+              ))}
+            </select>
+          )}
+
           <div className="md:col-span-2">
             <textarea
                 placeholder="Observações (opcional)"
@@ -1076,7 +1161,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   </div>
                                                   <div className="flex items-center gap-1">
                                                       <button 
-                                                          onClick={() => onToggleStatus(t.id)}
+                                                          onClick={() => handleToggleClick(t)}
                                                           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                                                               t.status === 'paid' 
                                                               ? 'bg-emerald-500 border-emerald-500 text-white' 
@@ -1170,7 +1255,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   {/* Status */}
                                                   <div className="w-8 flex justify-center">
                                                       <button 
-                                                          onClick={() => onToggleStatus(t.id)}
+                                                          onClick={() => handleToggleClick(t)}
                                                           className={`transition-all hover:scale-110 ${
                                                               t.status === 'paid' 
                                                               ? 'text-emerald-500' 

@@ -24,6 +24,7 @@ import { AssetsView } from './components/AssetsView';
 import { ProductivityView } from './components/ProductivityView';
 import { UtilitiesView } from './components/UtilitiesView';
 import { FinancialCalendar } from './components/FinancialCalendar';
+import { WalletsView } from './components/WalletsView';
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -456,7 +457,16 @@ const App: React.FC = () => {
 
         <div className="max-w-7xl mx-auto animate-fade-in">
           {/* Quick Actions Bar - Only visible on Dashboard usually, but keeping global for now as user likes it */}
-          {currentView === View.DASHBOARD && (
+          {currentView === View.WALLETS && (
+        <WalletsView
+          wallets={data.wallets || []}
+          onAdd={actions.addWallet}
+          onUpdate={actions.updateWallet}
+          onDelete={actions.deleteWallet}
+        />
+      )}
+      
+      {currentView === View.DASHBOARD && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 <button 
                     onClick={() => triggerQuickAction(View.TRANSACTIONS)}

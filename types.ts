@@ -3,6 +3,22 @@ export type TransactionType = 'income' | 'expense';
 export type TransactionStatus = 'paid' | 'pending';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'pix' | 'direct_debit' | 'bank_transfer' | 'deposit' | 'boleto';
 
+export enum WalletType {
+  BANK = 'BANK',
+  CREDIT_CARD = 'CREDIT_CARD',
+  MEAL_TICKET = 'MEAL_TICKET', // Vale Refeição/Alimentação
+  OTHER = 'OTHER'
+}
+
+export interface Wallet {
+  id: string;
+  name: string;
+  type: WalletType;
+  balance: number;
+  color?: string;
+  icon?: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -27,6 +43,7 @@ export interface Transaction {
   autoPay?: boolean; // Lançamento automático na data
   order?: number; // Ordem de exibição no dia
   googleEventId?: string; // ID do evento no Google Calendar
+  walletId?: string; // ID da carteira/banco onde foi pago/recebido
 }
 
 export interface InvestmentHistory {
@@ -255,6 +272,7 @@ export interface AppData {
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
   habits: Habit[]; // Novo campo: Hábitos
   unlockedBadges: string[];
+  wallets?: Wallet[]; // Novo campo: Carteiras/Bancos
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
   scoreSerasa?: number;
@@ -279,5 +297,6 @@ export enum View {
   PIX_KEYS = 'PIX_KEYS',
   PRODUCTIVITY = 'PRODUCTIVITY',
   EISENHOWER = 'EISENHOWER', // Matriz de Eisenhower
+  WALLETS = 'WALLETS', // Gerenciamento de Carteiras
   SETTINGS = 'SETTINGS'
 }

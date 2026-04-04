@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -53,6 +53,7 @@ const DEFAULT_DATA: AppData = {
   pixKeys: [],
   habits: [],
   unlockedBadges: [],
+  wallets: [],
   walletBalance: 0
 };
 
@@ -85,6 +86,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.tasks) data.tasks = [];
     if (!data.pixKeys) data.pixKeys = [];
     if (!data.habits) data.habits = [];
+    if (!data.wallets) data.wallets = [];
     if (!data.categories || data.categories.length === 0) data.categories = DEFAULT_CATEGORIES;
     if (data.shoppingBudget === undefined) data.shoppingBudget = 0;
     
@@ -262,6 +264,13 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar hábitos");
   });
 
+  const unsubWallets = onSnapshot(query(collection(db, 'users', uid, 'wallets')), (snapshot) => {
+    const wallets = snapshot.docs.map(doc => doc.data() as Wallet);
+    onUpdate({ wallets });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar carteiras");
+  });
+
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -310,6 +319,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubTasks();
     unsubPixKeys();
     unsubHabits();
+    unsubWallets();
     unsubCategories();
     unsubUserDoc();
   };
@@ -731,6 +741,31 @@ export const deleteHabitFire = async (uid: string, id: string) => {
     } catch (error) {
       handleFirestoreError(error, "Erro ao excluir hábito");
     }
+};
+
+// --- WALLETS ---
+export const addWalletFire = async (uid: string, wallet: Wallet) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'wallets', wallet.id), wallet);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar carteira");
+  }
+};
+
+export const updateWalletFire = async (uid: string, id: string, updates: Partial<Wallet>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'wallets', id), updates);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar carteira");
+  }
+};
+
+export const deleteWalletFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'wallets', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao deletar carteira");
+  }
 };
 
 // CATEGORIES
