@@ -78,6 +78,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   
   // --- EDITING & RECURRENCE STATE ---
   const [editingId, setEditingId] = useState<string | null>(null); // For full form
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [inlineEditingAmount, setInlineEditingAmount] = useState<string>('');
   const [recurrenceMode, setRecurrenceMode] = useState<'monthly' | 'days'>('monthly');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
 
@@ -351,6 +353,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     });
     setEditingId(t.id);
     setIsFormOpen(true);
+  };
+
+  const handleInlineEditStart = (e: React.MouseEvent, t: Transaction) => {
+    e.stopPropagation();
+    setInlineEditingId(t.id);
+    setInlineEditingAmount(t.amount.toString());
+  };
+
+  const handleInlineEditSave = (t: Transaction) => {
+    if (inlineEditingAmount.trim() !== '') {
+      const newAmount = parseFloat(inlineEditingAmount.replace(',', '.'));
+      if (!isNaN(newAmount) && newAmount !== t.amount) {
+        onUpdate(t.id, { amount: newAmount });
+      }
+    }
+    setInlineEditingId(null);
   };
 
   const toggleDay = (day: number) => {
@@ -991,8 +1009,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                               <div className="flex-1 min-w-0" onClick={() => handleEdit(t)}>
                                                   <div className="flex justify-between items-start">
                                                       <h4 className="font-bold text-slate-800 dark:text-white truncate pr-2 text-sm">{t.description}</h4>
-                                                      <span className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                                                          {t.type === 'expense' && '- '}{formatValue(t.amount)}
+                                                      <span 
+                                                          className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}
+                                                          onClick={(e) => handleInlineEditStart(e, t)}
+                                                      >
+                                                          {inlineEditingId === t.id ? (
+                                                              <input 
+                                                                  type="number" 
+                                                                  value={inlineEditingAmount}
+                                                                  onChange={(e) => setInlineEditingAmount(e.target.value)}
+                                                                  onBlur={() => handleInlineEditSave(t)}
+                                                                  onKeyDown={(e) => { if (e.key === 'Enter') handleInlineEditSave(t); }}
+                                                                  className="w-20 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1 py-0.5 text-right text-sm text-slate-900 dark:text-white"
+                                                                  autoFocus
+                                                                  onClick={(e) => e.stopPropagation()}
+                                                              />
+                                                          ) : (
+                                                              <>{t.type === 'expense' && '- '}{formatValue(t.amount)}</>
+                                                          )}
                                                       </span>
                                                   </div>
                                                   
@@ -1115,9 +1149,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   {/* Amount */}
                                                   <div 
                                                       className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
-                                                      onClick={() => handleEdit(t)}
+                                                      onClick={(e) => handleInlineEditStart(e, t)}
                                                   >
-                                                      {formatValue(t.amount)}
+                                                      {inlineEditingId === t.id ? (
+                                                          <input 
+                                                              type="number" 
+                                                              value={inlineEditingAmount}
+                                                              onChange={(e) => setInlineEditingAmount(e.target.value)}
+                                                              onBlur={() => handleInlineEditSave(t)}
+                                                              onKeyDown={(e) => { if (e.key === 'Enter') handleInlineEditSave(t); }}
+                                                              className="w-24 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1 py-0.5 text-right text-sm text-slate-900 dark:text-white"
+                                                              autoFocus
+                                                              onClick={(e) => e.stopPropagation()}
+                                                          />
+                                                      ) : (
+                                                          formatValue(t.amount)
+                                                      )}
                                                   </div>
 
                                                   {/* Status */}
