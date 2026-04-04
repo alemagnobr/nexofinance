@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task } from '../types';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task, View } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown, Grid } from 'lucide-react';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
@@ -643,7 +643,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
        {/* EISENHOWER MATRIX SHORTCUT */}
        {onNavigate && (
          <div 
-           onClick={() => onNavigate('EISENHOWER')}
+           onClick={() => onNavigate(View.EISENHOWER)}
            className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-between group"
          >
            <div className="flex items-center gap-4">

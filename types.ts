@@ -204,6 +204,8 @@ export interface Task {
   description?: string;
   dueDate?: string; // YYYY-MM-DD
   completed: boolean;
+  urgent?: boolean;
+  important?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -276,5 +278,6 @@ export enum View {
   PASSWORDS = 'PASSWORDS',
   PIX_KEYS = 'PIX_KEYS',
   PRODUCTIVITY = 'PRODUCTIVITY',
+  EISENHOWER = 'EISENHOWER', // Matriz de Eisenhower
   SETTINGS = 'SETTINGS'
 }
