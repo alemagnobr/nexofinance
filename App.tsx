@@ -321,8 +321,8 @@ const App: React.FC = () => {
         );
     }
 
-    // 4. Group: Productivity (Kanban, Notes, Habits)
-    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower)
+    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.EISENHOWER].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -356,6 +356,7 @@ const App: React.FC = () => {
                     onUpdateTask={actions.updateTask}
                     onDeleteTask={actions.deleteTask}
                     privacyMode={privacyMode} 
+                    onNavigate={setCurrentView}
                 />
             </div>
         );

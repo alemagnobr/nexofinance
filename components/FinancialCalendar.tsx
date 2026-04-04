@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown, Grid } from 'lucide-react';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
 import { AIAgendaAssistant } from './AIAgendaAssistant';
@@ -24,6 +24,7 @@ interface FinancialCalendarProps {
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDeleteTask?: (id: string) => void;
   privacyMode: boolean;
+  onNavigate?: (view: any) => void;
 }
 
 const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -81,7 +82,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
-  privacyMode 
+  privacyMode,
+  onNavigate
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate());
@@ -638,6 +640,27 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
        
+       {/* EISENHOWER MATRIX SHORTCUT */}
+       {onNavigate && (
+         <div 
+           onClick={() => onNavigate('EISENHOWER')}
+           className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-between group"
+         >
+           <div className="flex items-center gap-4">
+             <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+               <Grid className="w-6 h-6 text-white" />
+             </div>
+             <div>
+               <h3 className="text-white font-bold text-lg">Matriz de Eisenhower</h3>
+               <p className="text-indigo-100 text-sm opacity-90">Priorize suas tarefas e foque no que importa</p>
+             </div>
+           </div>
+           <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
+             <ChevronRight className="w-5 h-5 text-white" />
+           </div>
+         </div>
+       )}
+
        <AIAgendaAssistant 
           onAddEvent={(event) => {
             if (onAddAgendaEvent) {

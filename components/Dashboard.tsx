@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -913,8 +913,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           <Target className="w-5 h-5 text-purple-500" /> Produtividade
         </h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {['habits', 'notes'].map((cardId) => {
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {['habits', 'eisenhower', 'notes'].map((cardId) => {
           if (cardId === 'habits') {
             const todayStr = new Date().toISOString().split('T')[0];
             const activeHabits = data.habits || [];
@@ -1019,6 +1019,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
                                       </div>
                                   );
                               })}
+                          </div>
+                      </div>
+                  )}
+              </div>
+            );
+          }
+
+          if (cardId === 'eisenhower') {
+            const tasks = data.tasks || [];
+            const urgentImportant = tasks.filter((t: any) => !t.completed && t.urgent && t.important).length;
+            const importantNotUrgent = tasks.filter((t: any) => !t.completed && !t.urgent && t.important).length;
+            const urgentNotImportant = tasks.filter((t: any) => !t.completed && t.urgent && !t.important).length;
+            const totalPendingTasks = tasks.filter((t: any) => !t.completed).length;
+
+            return (
+              <div key="eisenhower" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+                  <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                          <Grid className="w-4 h-4" /> Matriz de Eisenhower
+                      </h3>
+                      <button 
+                          onClick={() => onNavigate(View.EISENHOWER)} 
+                          className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
+                          title="Abrir Matriz"
+                      >
+                          <ArrowRight className="w-4 h-4" />
+                      </button>
+                  </div>
+                  
+                  {totalPendingTasks === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                          <Grid className="w-6 h-6 opacity-30" />
+                          <p className="text-xs italic text-center">Nenhuma tarefa pendente.</p>
+                      </div>
+                  ) : (
+                      <div className="flex-1 flex flex-col justify-center gap-2">
+                          <div className="flex items-center justify-between p-2 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30 rounded-lg">
+                              <span className="text-xs font-semibold text-rose-700 dark:text-rose-400">Fazer Agora</span>
+                              <span className="text-sm font-bold text-rose-700 dark:text-rose-400">{urgentImportant}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-lg">
+                              <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-400">Agendar</span>
+                              <span className="text-sm font-bold text-indigo-700 dark:text-indigo-400">{importantNotUrgent}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg">
+                              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Delegar</span>
+                              <span className="text-sm font-bold text-amber-700 dark:text-amber-400">{urgentNotImportant}</span>
                           </div>
                       </div>
                   )}
