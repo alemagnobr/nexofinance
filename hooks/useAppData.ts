@@ -18,7 +18,7 @@ import {
   addHabitFire, updateHabitFire, deleteHabitFire,
   addWalletFire, updateWalletFire, deleteWalletFire,
   addCategoryFire, deleteCategoryFire,
-  unlockBadgeFire, saveWealthProfileFire, subscribeToData, recalculateBalanceFire,
+  unlockBadgeFire, saveWealthProfileFire, saveDriveLinkFire, subscribeToData, recalculateBalanceFire,
   DEFAULT_CATEGORIES
 } from '../services/storageService';
 
@@ -754,6 +754,13 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }
   };
 
+  const setDriveLink = async (link: string) => {
+      if (user) {
+          await saveDriveLinkFire(user.uid, link);
+      }
+      setData(prev => ({ ...prev, driveLink: link }));
+  };
+
   return {
     data,
     setData,
@@ -809,7 +816,8 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addCategory,
         deleteCategory,
         unlockBadge,
-        saveWealthProfile
+        saveWealthProfile,
+        setDriveLink
     }
   };
 };

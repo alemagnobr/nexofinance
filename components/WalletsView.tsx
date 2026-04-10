@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Wallet, WalletType } from '../types';
-import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface WalletsViewProps {
   wallets: Wallet[];
@@ -20,6 +20,7 @@ const COLORS = ['slate', 'red', 'orange', 'amber', 'emerald', 'teal', 'cyan', 'b
 
 export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpdate, onDelete }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Omit<Wallet, 'id'>>({
@@ -62,35 +63,45 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <Landmark className="w-6 h-6 text-indigo-500" />
-            Minhas Contas
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Gerencie seus bancos, cartões e vales.</p>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-indigo-500" />
+              Minhas Contas
+            </h2>
+            {isExpanded && <p className="text-xs text-slate-500 dark:text-slate-400">Gerencie seus bancos, cartões e vales.</p>}
+          </div>
         </div>
-        {!isFormOpen && (
+        {!isFormOpen && isExpanded && (
           <button
             onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold text-sm"
+            className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-bold text-xs"
           >
-            <Plus className="w-4 h-4" /> Nova Conta
+            <Plus className="w-3 h-3" /> Nova Conta
           </button>
         )}
       </div>
 
-      {isFormOpen && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-6 animate-scale-in">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-              {editingId ? 'Editar Conta' : 'Nova Conta'}
-            </h3>
-            <button onClick={resetForm} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      {isExpanded && (
+        <>
+          {isFormOpen && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 animate-scale-in">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-base font-bold text-slate-800 dark:text-white">
+                  {editingId ? 'Editar Conta' : 'Nova Conta'}
+                </h3>
+                <button onClick={resetForm} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -167,57 +178,56 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {wallets.map(wallet => {
-          const TypeIcon = WALLET_TYPES.find(t => t.value === wallet.type)?.icon || MoreHorizontal;
-          const colorClass = wallet.color ? `bg-${wallet.color}-100 text-${wallet.color}-600 dark:bg-${wallet.color}-900/30 dark:text-${wallet.color}-400` : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
-          const borderClass = wallet.color ? `border-${wallet.color}-200 dark:border-${wallet.color}-800/50` : 'border-slate-200 dark:border-slate-700';
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {wallets.map(wallet => {
+              const TypeIcon = WALLET_TYPES.find(t => t.value === wallet.type)?.icon || MoreHorizontal;
+              const colorClass = wallet.color ? `bg-${wallet.color}-100 text-${wallet.color}-600 dark:bg-${wallet.color}-900/30 dark:text-${wallet.color}-400` : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+              const borderClass = wallet.color ? `border-${wallet.color}-200 dark:border-${wallet.color}-800/50` : 'border-slate-200 dark:border-slate-700';
 
-          return (
-            <div key={wallet.id} className={`bg-white dark:bg-slate-800 rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all group ${borderClass}`}>
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-xl ${colorClass}`}>
-                  <TypeIcon className="w-6 h-6" />
+              return (
+                <div key={wallet.id} className={`bg-white dark:bg-slate-800 rounded-xl p-3 border shadow-sm hover:shadow-md transition-all group ${borderClass}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className={`p-2 rounded-lg ${colorClass}`}>
+                      <TypeIcon className="w-4 h-4" />
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => handleEdit(wallet)} className="p-1 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => onDelete(wallet.id)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate" title={wallet.name}>{wallet.name}</h3>
+                    
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700/50">
+                      <p className={`text-sm font-bold ${wallet.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {formatCurrency(wallet.balance)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleEdit(wallet)} className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => onDelete(wallet.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+              );
+            })}
+            
+            {wallets.length === 0 && !isFormOpen && (
+              <div className="col-span-full bg-slate-50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-4 text-center">
+                <Landmark className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nenhuma conta</h3>
+                <button
+                  onClick={() => setIsFormOpen(true)}
+                  className="inline-flex items-center gap-1 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-bold text-xs shadow-sm mt-2"
+                >
+                  <Plus className="w-3 h-3" /> Adicionar
+                </button>
               </div>
-              
-              <div>
-                <h3 className="font-bold text-slate-800 dark:text-white text-lg">{wallet.name}</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{WALLET_TYPES.find(t => t.value === wallet.type)?.label}</p>
-                
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Saldo Atual</p>
-                  <p className={`text-xl font-bold ${wallet.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {formatCurrency(wallet.balance)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        
-        {wallets.length === 0 && !isFormOpen && (
-          <div className="col-span-full bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-8 text-center">
-            <Landmark className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">Nenhuma conta cadastrada</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Adicione suas contas bancárias, cartões e vales para começar a gerenciar.</p>
-            <button
-              onClick={() => setIsFormOpen(true)}
-              className="inline-flex items-center gap-2 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-bold text-sm shadow-sm"
-            >
-              <Plus className="w-4 h-4" /> Adicionar Primeira Conta
-            </button>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };

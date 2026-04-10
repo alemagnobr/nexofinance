@@ -273,6 +273,7 @@ export interface AppData {
   habits: Habit[]; // Novo campo: Hábitos
   unlockedBadges: string[];
   wallets?: Wallet[]; // Novo campo: Carteiras/Bancos
+  driveLink?: string; // Novo campo: Link do Drive
   wealthProfile?: WealthProfile;
   walletBalance?: number; // Saldo calculado e persistido para performance
   scoreSerasa?: number;

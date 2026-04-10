@@ -5,7 +5,7 @@ import {
   MessageSquareMore, ShieldAlert, Hexagon, LogIn, LogOut, 
   Maximize, Minimize, Key, Eye, EyeOff, Moon, Sun, 
   HardDriveDownload, HardDriveUpload, Trash2, Heart, X, ShoppingCart, Github, Linkedin, Copy, Landmark, AppWindow, Wallet, StickyNote,
-  ArrowLeftRight, Layout, Settings, Wrench, Link, Timer, BrainCircuit
+  ArrowLeftRight, Layout, Settings, Wrench, Link, Timer, BrainCircuit, Cloud
 } from 'lucide-react';
 import { View } from '../types';
 import { useFocus } from '../contexts/FocusContext';
@@ -41,12 +41,16 @@ interface SidebarProps {
   // PWA
   canInstall: boolean;
   onInstall: () => void;
+
+  driveLink?: string;
+  onSetDriveLink: (link: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   user, isGuest, mobileMenuOpen, setMobileMenuOpen, currentView, onNavigate, onLogout,
   privacyMode, setPrivacyMode, darkMode, setDarkMode, isFullscreen, toggleFullscreen, hasKey,
-  onOpenKeyModal, onOpenDonateModal, onOpenShortcutsModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall
+  onOpenKeyModal, onOpenDonateModal, onOpenShortcutsModal, onExportBackup, onImportBackup, onFactoryReset, canInstall, onInstall,
+  driveLink, onSetDriveLink
 }) => {
   const { isActive, timeLeft, openModal, focusReason } = useFocus();
   
@@ -156,13 +160,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => handleNavClick(View.CALENDAR)} 
             icon={Calendar} 
             label="Agenda" 
-        />
-
-        <NavItem 
-            active={currentView === View.WALLETS} 
-            onClick={() => handleNavClick(View.WALLETS)} 
-            icon={Wallet} 
-            label="Minhas Contas" 
         />
 
         <NavItem 
@@ -283,6 +280,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Apoiar Projeto"
           >
             <Heart className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => {
+              if (driveLink) {
+                window.open(driveLink, '_blank');
+              } else {
+                const link = window.prompt('Cole o link da sua pasta do Google Drive (ou outro serviço) para salvar seus comprovantes:');
+                if (link) {
+                  onSetDriveLink(link);
+                  window.open(link, '_blank');
+                }
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const link = window.prompt('Editar link da sua pasta de comprovantes:', driveLink || '');
+              if (link !== null) {
+                onSetDriveLink(link);
+              }
+            }}
+            className="flex-1 min-w-[40px] flex items-center justify-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition-all border border-slate-800 hover:border-slate-700"
+            title={driveLink ? "Abrir Pasta de Comprovantes (Botão direito para editar)" : "Configurar Pasta de Comprovantes"}
+          >
+            <Cloud className="w-5 h-5" />
           </button>
         </div>
 

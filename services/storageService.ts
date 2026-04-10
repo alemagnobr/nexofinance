@@ -292,6 +292,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
           
           if (data.unlockedBadges) updates.unlockedBadges = data.unlockedBadges;
           if (data.wealthProfile) updates.wealthProfile = data.wealthProfile;
+          if (data.driveLink) updates.driveLink = data.driveLink;
           if (data.shoppingBudget !== undefined) updates.shoppingBudget = data.shoppingBudget;
           if (data.walletBalance !== undefined) updates.walletBalance = data.walletBalance;
           if (data.scoreSerasa !== undefined) updates.scoreSerasa = data.scoreSerasa;
@@ -820,6 +821,16 @@ export const saveWealthProfileFire = async (uid: string, profile: WealthProfile)
     }
 };
 
+export const saveDriveLinkFire = async (uid: string, link: string) => {
+    try {
+      await setDoc(doc(db, 'users', uid), { 
+          driveLink: link 
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao salvar link do drive");
+    }
+};
+
 export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
     try {
       const batch = writeBatch(db);
@@ -909,6 +920,7 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
           shoppingBudget: localData.shoppingBudget || 0
       };
       if (localData.wealthProfile) userData.wealthProfile = localData.wealthProfile;
+      if (localData.driveLink) userData.driveLink = localData.driveLink;
       
       batch.set(userRef, userData, { merge: true });
 

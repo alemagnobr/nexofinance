@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData } from '../types';
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
+import { WalletsView } from './WalletsView';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -13,6 +14,9 @@ interface TransactionListProps {
   onUpdate: (id: string, updates: Partial<Transaction>) => void;
   onDelete: (id: string) => void;
   onToggleStatus: (id: string, walletId?: string) => void;
+  onAddWallet?: (wallet: Omit<WalletData, 'id'>) => void;
+  onUpdateWallet?: (id: string, updates: Partial<WalletData>) => void;
+  onDeleteWallet?: (id: string) => void;
   onNavigate: (view: View) => void;
   privacyMode: boolean;
   hasApiKey: boolean;
@@ -64,14 +68,14 @@ const PaymentIcon = ({ method, className }: { method: string, className?: string
 const EXPENSE_PAYMENT_METHODS = ['credit_card', 'debit_card', 'direct_debit', 'pix', 'cash', 'boleto'];
 const INCOME_PAYMENT_METHODS = ['pix', 'bank_transfer', 'cash', 'deposit'];
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], wallets = [], onAdd, onUpdate, onDelete, onToggleStatus, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, budgets, categories = [], wallets = [], onAdd, onUpdate, onDelete, onToggleStatus, onAddWallet, onUpdateWallet, onDeleteWallet, onNavigate, privacyMode, hasApiKey, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // --- FILTERS STATE ---
-  const [viewFilter, setViewFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [viewFilter, setViewFilter] = useState<'all' | 'income' | 'expense' | 'late'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
@@ -92,10 +96,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [useBusinessDay, setUseBusinessDay] = useState(false);
   const [businessDayOrdinal, setBusinessDayOrdinal] = useState('5');
 
-  // --- WALLET SELECTION MODAL ---
-  const [walletModalOpen, setWalletModalOpen] = useState(false);
-  const [walletModalTransactionId, setWalletModalTransactionId] = useState<string | null>(null);
-  const [selectedWalletId, setSelectedWalletId] = useState<string>('');
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Ref for auto-scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
@@ -222,16 +223,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // --- FILTERING LOGIC (FOR THE LIST) ---
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
-      // 1. Month Filter
-      const [year, month] = t.date.split('-');
-      const matchesMonth = (
-        parseInt(year) === currentDate.getFullYear() &&
-        parseInt(month) === currentDate.getMonth() + 1
-      );
-      if (!matchesMonth) return false;
+      // 1. Month Filter (Ignore if viewFilter is 'late')
+      if (viewFilter !== 'late') {
+          const [year, month] = t.date.split('-');
+          const matchesMonth = (
+            parseInt(year) === currentDate.getFullYear() &&
+            parseInt(month) === currentDate.getMonth() + 1
+          );
+          if (!matchesMonth) return false;
+      }
 
       // 2. Type Filter
-      if (viewFilter !== 'all' && t.type !== viewFilter) return false;
+      if (viewFilter === 'income' && t.type !== 'income') return false;
+      if (viewFilter === 'expense' && t.type !== 'expense') return false;
+      
+      // 2.5 Late Filter
+      if (viewFilter === 'late') {
+          if (t.status !== 'pending' || t.date >= todayStr) return false;
+      }
 
       // 3. Search Filter
       if (searchQuery && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
@@ -257,9 +266,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           }
           groups[t.date].transactions.push(t);
           
-          // Somar TUDO (Pago ou Pendente) para projeção
-          const val = t.type === 'income' ? t.amount : -t.amount;
-          groups[t.date].total += val;
+          // Somar apenas PENDENTES para projeção
+          if (t.status === 'pending') {
+              const val = t.type === 'income' ? t.amount : -t.amount;
+              groups[t.date].total += val;
+          }
       });
 
       // Sort transactions within each group
@@ -283,7 +294,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
       // 3. Calculate Running Balance (Accumulated)
       const chronological = [...sortedGroups].reverse(); // Oldest first
-      let runningTotal = 0;
+      let runningTotal = wallets.reduce((acc, w) => acc + w.balance, 0);
       
       const chronologicalWithBalance = chronological.map(group => {
           runningTotal += group.total;
@@ -293,7 +304,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       // Reverse back to Newest -> Oldest for display
       return chronologicalWithBalance.reverse();
 
-  }, [filteredTransactions]);
+  }, [filteredTransactions, wallets]);
 
   const formatValue = (val: number) => {
     if (privacyMode) return '••••';
@@ -511,21 +522,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const handleToggleClick = (t: Transaction) => {
-    if (t.status === 'pending' && !t.walletId && wallets && wallets.length > 0) {
-      setWalletModalTransactionId(t.id);
-      setSelectedWalletId(wallets[0].id);
-      setWalletModalOpen(true);
-    } else {
-      onToggleStatus(t.id);
-    }
-  };
-
-  const handleConfirmWalletToggle = () => {
-    if (walletModalTransactionId && selectedWalletId) {
-      onToggleStatus(walletModalTransactionId, selectedWalletId);
-    }
-    setWalletModalOpen(false);
-    setWalletModalTransactionId(null);
+    onToggleStatus(t.id);
   };
 
   const handleMoveTransaction = (groupDate: string, index: number, direction: 'up' | 'down') => {
@@ -563,48 +560,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   return (
     <div className="space-y-6">
       
-      {/* Wallet Selection Modal */}
-      {walletModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
-              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-indigo-500" />
-                Selecione a Conta
-              </h3>
-              <button onClick={() => setWalletModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                De qual conta este valor foi debitado/creditado?
-              </p>
-              <select
-                value={selectedWalletId}
-                onChange={e => setSelectedWalletId(e.target.value)}
-                className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
-                {wallets?.map(w => (
-                  <option key={w.id} value={w.id}>{w.name} ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(w.balance)})</option>
-                ))}
-              </select>
-            </div>
-            <div className="p-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
-              <button
-                onClick={() => setWalletModalOpen(false)}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmWalletToggle}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
+      {/* Wallets Section */}
+      {onAddWallet && onUpdateWallet && onDeleteWallet && (
+        <div className="mb-8">
+          <WalletsView 
+            wallets={wallets}
+            onAdd={onAddWallet}
+            onUpdate={onUpdateWallet}
+            onDelete={onDeleteWallet}
+          />
         </div>
       )}
 
@@ -883,7 +847,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             ))}
           </select>
 
-          {newTransaction.status === 'paid' && wallets.length > 0 && (
+          {wallets.length > 0 && (
             <select
               value={newTransaction.walletId || ''}
               onChange={e => setNewTransaction({ ...newTransaction, walletId: e.target.value })}
@@ -1004,24 +968,30 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       </div>
 
       {/* 5. TABS (View Filter) */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex overflow-x-auto hide-scrollbar">
           <button 
               onClick={() => setViewFilter('all')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'all' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+              className={`flex-1 min-w-[100px] py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'all' ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
               <ListFilter className="w-4 h-4" /> Todas
           </button>
           <button 
               onClick={() => setViewFilter('income')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+              className={`flex-1 min-w-[100px] py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
               <ArrowUpCircle className="w-4 h-4" /> Entradas
           </button>
           <button 
               onClick={() => setViewFilter('expense')}
-              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'expense' ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+              className={`flex-1 min-w-[100px] py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'expense' ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
               <ArrowDownCircle className="w-4 h-4" /> Saídas
+          </button>
+          <button 
+              onClick={() => setViewFilter('late')}
+              className={`flex-1 min-w-[100px] py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'late' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+          >
+              <AlertCircle className="w-4 h-4" /> Atrasadas
           </button>
       </div>
 
@@ -1074,9 +1044,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                           </div>
                                       )}
                                       {showPendingSeparator && (
-                                          <div className="bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 border-b border-amber-100 dark:border-amber-800/50 flex items-center gap-2">
-                                              <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                                              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Pendentes</span>
+                                          <div className={`px-3 py-1.5 border-b flex items-center gap-2 ${group.date < todayStr ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/50' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800/50'}`}>
+                                              <Clock className={`w-3.5 h-3.5 ${group.date < todayStr ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`} />
+                                              <span className={`text-xs font-bold uppercase tracking-wider ${group.date < todayStr ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                                  {group.date < todayStr ? 'Atrasadas' : 'Pendentes'}
+                                              </span>
                                           </div>
                                       )}
                                       <div className="group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -1129,6 +1101,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                           {t.status === 'pending' && t.autoPay && (
                                                               <span className="flex items-center gap-0.5 text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" title="Lançamento Automático">
                                                                   <Zap className="w-3 h-3" /> Auto
+                                                              </span>
+                                                          )}
+                                                          {t.status === 'pending' && t.date < todayStr && (
+                                                              <span className="flex items-center gap-0.5 text-rose-600 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded" title="Atrasada">
+                                                                  <AlertCircle className="w-3 h-3" /> Atrasada
                                                               </span>
                                                           )}
                                                       </div>
@@ -1219,6 +1196,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                           {t.status === 'pending' && t.autoPay && (
                                                               <span className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Lançamento Automático">
                                                                   <Zap className="w-3 h-3" /> Auto
+                                                              </span>
+                                                          )}
+                                                          {t.status === 'pending' && t.date < todayStr && (
+                                                              <span className="text-[10px] text-rose-600 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Atrasada">
+                                                                  <AlertCircle className="w-3 h-3" /> Atrasada
                                                               </span>
                                                           )}
                                                       </div>
