@@ -25,6 +25,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
     { id: 'cat_salario', name: 'Salário', type: 'income', color: 'emerald', isDefault: true },
     { id: 'cat_renda_extra', name: 'Renda Extra', type: 'income', color: 'blue', isDefault: true },
     { id: 'cat_investimentos_in', name: 'Investimentos', type: 'income', color: 'indigo', isDefault: true },
+    { id: 'cat_transferencia_in', name: 'Transferência', type: 'income', color: 'slate', isDefault: true },
     { id: 'cat_casa', name: 'Casa', type: 'expense', color: 'orange', isDefault: true },
     { id: 'cat_mobilidade', name: 'Mobilidade', type: 'expense', color: 'blue', isDefault: true },
     { id: 'cat_alimentos', name: 'Alimentos', type: 'expense', color: 'red', isDefault: true },
@@ -32,6 +33,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
     { id: 'cat_saude', name: 'Saúde', type: 'expense', color: 'teal', isDefault: true },
     { id: 'cat_educacao', name: 'Educação', type: 'expense', color: 'yellow', isDefault: true },
     { id: 'cat_pets', name: 'Pets', type: 'expense', color: 'amber', isDefault: true },
+    { id: 'cat_transferencia_out', name: 'Transferência', type: 'expense', color: 'slate', isDefault: true },
     { id: 'cat_outros', name: 'Outros', type: 'expense', color: 'slate', isDefault: true },
 ];
 

@@ -44,6 +44,7 @@ export interface Transaction {
   order?: number; // Ordem de exibição no dia
   googleEventId?: string; // ID do evento no Google Calendar
   walletId?: string; // ID da carteira/banco onde foi pago/recebido
+  isGhost?: boolean; // Transação futura projetada (não salva no banco)
 }
 
 export interface InvestmentHistory {

@@ -272,6 +272,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
     return pending.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
   }, [data.transactions]);
 
+  const lateBillsCount = useMemo(() => {
+    const today = new Date(new Date().setHours(0,0,0,0));
+    return data.transactions.filter(t => t.type === 'expense' && t.status === 'pending' && new Date(t.date) < today).length;
+  }, [data.transactions]);
+
   // 2. Top Investments (Top 3 by Amount)
   const topInvestments = useMemo(() => {
     return [...data.investments].sort((a, b) => b.amount - a.amount).slice(0, 3);
@@ -755,6 +760,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           </div>
           
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+             {lateBillsCount > 0 && (
+                 <div className="flex items-center justify-between mb-3 bg-rose-50 dark:bg-rose-900/20 p-2 rounded-lg border border-rose-100 dark:border-rose-800/30">
+                     <div className="flex items-center gap-1.5">
+                         <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                         <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider">Contas Atrasadas</span>
+                     </div>
+                     <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                         {lateBillsCount} {lateBillsCount === 1 ? 'conta' : 'contas'}
+                     </span>
+                 </div>
+             )}
              <div className="flex items-center justify-between">
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase">Sobrevivência</span>
                 <span className={`text-xs font-bold ${financialRunway < 1 ? 'text-rose-500' : financialRunway < 3 ? 'text-amber-500' : 'text-emerald-500'}`}>

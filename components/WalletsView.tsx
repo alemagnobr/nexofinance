@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Wallet, WalletType } from '../types';
-import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
 
 interface WalletsViewProps {
   wallets: Wallet[];
   onAdd: (wallet: Omit<Wallet, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<Wallet>) => void;
   onDelete: (id: string) => void;
+  onTransfer?: (sourceWalletId: string, targetWalletId: string, amount: number, date: string, observation?: string) => void;
 }
 
 const WALLET_TYPES: { value: WalletType; label: string; icon: any }[] = [
@@ -18,10 +19,18 @@ const WALLET_TYPES: { value: WalletType; label: string; icon: any }[] = [
 
 const COLORS = ['slate', 'red', 'orange', 'amber', 'emerald', 'teal', 'cyan', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
 
-export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpdate, onDelete }) => {
+export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpdate, onDelete, onTransfer }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Transfer Modal State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferSourceId, setTransferSourceId] = useState<string>('');
+  const [transferTargetId, setTransferTargetId] = useState<string>('');
+  const [transferAmount, setTransferAmount] = useState<number>(0);
+  const [transferDate, setTransferDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [transferObs, setTransferObs] = useState<string>('');
   
   const [formData, setFormData] = useState<Omit<Wallet, 'id'>>({
     name: '',
@@ -56,6 +65,17 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
       onAdd(formData);
     }
     resetForm();
+  };
+
+  const handleTransferSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onTransfer && transferSourceId && transferTargetId && transferAmount > 0) {
+      onTransfer(transferSourceId, transferTargetId, transferAmount, transferDate, transferObs);
+      setIsTransferModalOpen(false);
+      setTransferAmount(0);
+      setTransferObs('');
+      setTransferTargetId('');
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -191,10 +211,18 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
                       <TypeIcon className="w-4 h-4" />
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => handleEdit(wallet)} className="p-1 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors">
+                      {onTransfer && (
+                        <button onClick={() => {
+                          setTransferSourceId(wallet.id);
+                          setIsTransferModalOpen(true);
+                        }} className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Transferir">
+                          <ArrowRightLeft className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button onClick={() => handleEdit(wallet)} className="p-1 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors" title="Editar">
                         <Pencil className="w-3 h-3" />
                       </button>
-                      <button onClick={() => onDelete(wallet.id)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors">
+                      <button onClick={() => onDelete(wallet.id)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors" title="Excluir">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -227,6 +255,108 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
             )}
           </div>
         </>
+      )}
+
+      {/* Transfer Modal */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Nova Transferência</h3>
+              </div>
+              <button 
+                onClick={() => setIsTransferModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleTransferSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Conta de Origem</label>
+                <div className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-xl p-3 opacity-70 flex justify-between items-center">
+                  <span>{wallets.find(w => w.id === transferSourceId)?.name || 'Conta não encontrada'}</span>
+                  <span className="font-bold text-sm">
+                    Saldo: {formatCurrency(wallets.find(w => w.id === transferSourceId)?.balance || 0)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Conta de Destino</label>
+                <select
+                  required
+                  value={transferTargetId}
+                  onChange={e => setTransferTargetId(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Selecione a conta de destino</option>
+                  {wallets.filter(w => w.id !== transferSourceId).map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor</label>
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={transferAmount || ''}
+                  onChange={e => setTransferAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
+                <input
+                  required
+                  type="date"
+                  value={transferDate}
+                  onChange={e => setTransferDate(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observação (Opcional)</label>
+                <input
+                  type="text"
+                  value={transferObs}
+                  onChange={e => setTransferObs(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Ex: Transferência para reserva"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsTransferModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!transferTargetId || transferAmount <= 0}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Transferir
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

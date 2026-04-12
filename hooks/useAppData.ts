@@ -143,7 +143,6 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
                 const existsInCurrentMonth = data.transactions.some(t => {
                     const tDate = new Date(t.date);
                     return t.description === description &&
-                          t.amount === template.amount &&
                           tDate.getMonth() === currentMonth &&
                           tDate.getFullYear() === currentYear;
                 });
@@ -163,7 +162,8 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
                         id: crypto.randomUUID(),
                         date: newDateIso,
                         status: 'pending',
-                        isRecurring: true
+                        isRecurring: true,
+                        observation: 'Valor referente ao mês anterior'
                     });
                 }
             });
@@ -230,20 +230,41 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     const oldWalletId = oldTransaction.walletId;
     const newWalletId = updates.walletId !== undefined ? updates.walletId : oldTransaction.walletId;
     
-    const oldAmount = oldTransaction.amount;
-    const newAmount = updates.amount !== undefined ? updates.amount : oldTransaction.amount;
+    const oldAmount = Number(oldTransaction.amount);
+    const newAmount = updates.amount !== undefined ? Number(updates.amount) : oldAmount;
     
     const oldType = oldTransaction.type;
     const newType = updates.type !== undefined ? updates.type : oldTransaction.type;
 
+    // Calculate net changes per wallet to avoid race conditions when oldWalletId === newWalletId
+    const walletChanges: Record<string, number> = {};
+
     if (wasPaid && oldWalletId) {
-      // Revert old transaction from old wallet
-      await adjustWalletBalance(oldWalletId, oldAmount, oldType, true);
+      const revertAdj = oldType === 'income' ? -oldAmount : oldAmount;
+      walletChanges[oldWalletId] = (walletChanges[oldWalletId] || 0) + revertAdj;
     }
 
     if (isNowPaid && newWalletId) {
-      // Apply new transaction to new wallet
-      await adjustWalletBalance(newWalletId, newAmount, newType);
+      const applyAdj = newType === 'income' ? newAmount : -newAmount;
+      walletChanges[newWalletId] = (walletChanges[newWalletId] || 0) + applyAdj;
+    }
+
+    // Apply changes
+    for (const [wId, change] of Object.entries(walletChanges)) {
+      if (change !== 0) {
+        const wallet = data.wallets?.find(w => w.id === wId);
+        if (wallet) {
+          const newBalance = wallet.balance + change;
+          if (user) {
+            await updateWalletFire(user.uid, wId, { balance: newBalance });
+          } else {
+            setData(prev => ({
+              ...prev,
+              wallets: (prev.wallets || []).map(w => w.id === wId ? { ...w, balance: newBalance } : w)
+            }));
+          }
+        }
+      }
     }
   };
 

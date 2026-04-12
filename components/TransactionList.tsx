@@ -73,9 +73,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const [loadingAutoCat, setLoadingAutoCat] = useState(false);
   const [analyzingReceipt, setAnalyzingReceipt] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const lateBillsCount = useMemo(() => {
+    const today = new Date(new Date().setHours(0,0,0,0));
+    return transactions.filter(t => t.type === 'expense' && t.status === 'pending' && new Date(t.date) < today).length;
+  }, [transactions]);
   
   // --- FILTERS STATE ---
-  const [viewFilter, setViewFilter] = useState<'all' | 'income' | 'expense' | 'late'>('all');
+  const [viewFilter, setViewFilter] = useState<'all' | 'income' | 'expense' | 'late' | 'fixed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
@@ -91,6 +96,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // --- ALIMONY STATE (Pensão) ---
   const [hasAlimony, setHasAlimony] = useState(false);
   const [alimonyPercentage, setAlimonyPercentage] = useState('');
+
+  // --- OTHER DEDUCTIONS STATE ---
+  const [hasOtherDeductions, setHasOtherDeductions] = useState(false);
+  const [otherDeductionsAmount, setOtherDeductionsAmount] = useState('');
+  const [otherDeductionsDesc, setOtherDeductionsDesc] = useState('');
 
   // --- BUSINESS DAY STATE (Salário) ---
   const [useBusinessDay, setUseBusinessDay] = useState(false);
@@ -222,7 +232,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   // --- FILTERING LOGIC (FOR THE LIST) ---
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    const baseFiltered = transactions.filter(t => {
       // 1. Month Filter (Ignore if viewFilter is 'late')
       if (viewFilter !== 'late') {
           const [year, month] = t.date.split('-');
@@ -242,6 +252,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           if (t.status !== 'pending' || t.date >= todayStr) return false;
       }
 
+      // 2.6 Fixed Filter
+      if (viewFilter === 'fixed') {
+          if (!t.isRecurring) return false;
+      }
+
       // 3. Search Filter
       if (searchQuery && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
 
@@ -252,7 +267,65 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       if (paymentFilter !== 'all' && t.paymentMethod !== paymentFilter) return false;
 
       return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+
+    // --- GHOST TRANSACTIONS LOGIC (Future Months) ---
+    const today = new Date();
+    const isFutureMonth = currentDate.getFullYear() > today.getFullYear() || 
+                          (currentDate.getFullYear() === today.getFullYear() && currentDate.getMonth() > today.getMonth());
+
+    if (isFutureMonth && viewFilter !== 'late') {
+        const recurringTemplates = new Map<string, Transaction>();
+        transactions.forEach(t => {
+            if (t.isRecurring) {
+                const existing = recurringTemplates.get(t.description);
+                if (!existing || new Date(t.date) > new Date(existing.date)) {
+                    recurringTemplates.set(t.description, t);
+                }
+            }
+        });
+
+        recurringTemplates.forEach((template, description) => {
+            const exists = transactions.some(t => {
+                const tDate = new Date(t.date);
+                return t.description === description &&
+                       tDate.getMonth() === currentDate.getMonth() &&
+                       tDate.getFullYear() === currentDate.getFullYear();
+            });
+
+            if (!exists) {
+                const tDate = new Date(template.date + 'T00:00:00');
+                const targetDay = tDate.getDate();
+                const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+                const finalDay = Math.min(targetDay, daysInMonth);
+                
+                const newMonthStr = String(currentDate.getMonth() + 1).padStart(2, '0');
+                const newDayStr = String(finalDay).padStart(2, '0');
+                const newDateIso = `${currentDate.getFullYear()}-${newMonthStr}-${newDayStr}`;
+
+                let matches = true;
+                if (viewFilter === 'income' && template.type !== 'income') matches = false;
+                if (viewFilter === 'expense' && template.type !== 'expense') matches = false;
+                if (viewFilter === 'fixed' && !template.isRecurring) matches = false;
+                if (searchQuery && !template.description.toLowerCase().includes(searchQuery.toLowerCase())) matches = false;
+                if (categoryFilter !== 'all' && template.category !== categoryFilter) matches = false;
+                if (paymentFilter !== 'all' && template.paymentMethod !== paymentFilter) matches = false;
+
+                if (matches) {
+                    baseFiltered.push({
+                        ...template,
+                        id: `ghost-${template.id}-${newDateIso}`,
+                        date: newDateIso,
+                        status: 'pending',
+                        isGhost: true,
+                        observation: 'Valor referente ao mês anterior'
+                    });
+                }
+            }
+        });
+    }
+
+    return baseFiltered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, currentDate, viewFilter, searchQuery, categoryFilter, paymentFilter]);
 
   // --- GROUPING LOGIC (By Date) with ACCUMULATED BALANCE ---
@@ -266,8 +339,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           }
           groups[t.date].transactions.push(t);
           
-          // Somar apenas PENDENTES para projeção
-          if (t.status === 'pending') {
+          // Somar apenas PENDENTES para projeção, ignorando Ghosts
+          if (t.status === 'pending' && !t.isGhost) {
               const val = t.type === 'income' ? t.amount : -t.amount;
               groups[t.date].total += val;
           }
@@ -351,6 +424,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     setSelectedDays([]);
     setHasAlimony(false);
     setAlimonyPercentage('');
+    setHasOtherDeductions(false);
+    setOtherDeductionsAmount('');
+    setOtherDeductionsDesc('');
     setUseBusinessDay(false);
     setBusinessDayOrdinal('5');
   }
@@ -400,27 +476,15 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     e.preventDefault();
     
     // Prepare Data
-    let finalAmount = parseFloat(newTransaction.amount);
-    let finalObservation = newTransaction.observation;
+    let baseAmount = parseFloat(newTransaction.amount);
+    let baseObservation = newTransaction.observation;
 
-    // --- ALIMONY LOGIC (Pensão) ---
-    // Only applies for Income + Salary + Checkbox checked
-    if (newTransaction.type === 'income' && newTransaction.category === 'Salário' && hasAlimony) {
-        const pct = parseFloat(alimonyPercentage);
-        if (!isNaN(pct) && pct > 0 && pct < 100) {
-            const deduction = finalAmount * (pct / 100);
-            const originalGross = finalAmount;
-            finalAmount = finalAmount - deduction;
-            
-            // Append info to observation so user knows what happened
-            const note = `(Salário Bruto: R$ ${originalGross.toFixed(2)} | Desc. Pensão: ${pct}%)`;
-            finalObservation = finalObservation ? `${finalObservation} ${note}` : note;
-        }
-    }
+    const baseTransactions: Omit<Transaction, 'id'>[] = [];
 
-    const transactionData = {
+    // Main Transaction (Gross Salary or regular transaction)
+    baseTransactions.push({
       description: newTransaction.description, 
-      amount: finalAmount,
+      amount: baseAmount,
       type: newTransaction.type, 
       category: newTransaction.category, 
       date: newTransaction.date, 
@@ -428,70 +492,113 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       paymentMethod: newTransaction.paymentMethod, 
       walletId: newTransaction.walletId,
       isRecurring: newTransaction.isRecurring,
-      autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false, // Reset if changing to paid manually
-      observation: finalObservation
-    };
+      autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
+      observation: baseObservation
+    });
 
-    // LOGIC FOR RECURRENCE
-    if (newTransaction.isRecurring) {
-        
-        // Mode 1: Daily Recurrence (Specific Days in Month)
-        if (recurrenceMode === 'days' && selectedDays.length > 0) {
-            const [year, month] = newTransaction.date.split('-').map(Number);
-            // Limit to valid days in selected month
-            const daysInMonth = new Date(year, month, 0).getDate();
-            
-            selectedDays.forEach(day => {
-                if (day <= daysInMonth) {
-                    const dayStr = String(day).padStart(2, '0');
-                    const monthStr = String(month).padStart(2, '0');
-                    const isoDate = `${year}-${monthStr}-${dayStr}`;
-                    
-                    onAdd({
-                        ...transactionData,
-                        description: `${newTransaction.description} (Dia ${day})`,
-                        date: isoDate,
-                        isRecurring: false // Individual entries are not recurring themselves
-                    });
-                }
-            });
-        } 
-        // Mode 2: Standard Monthly / Installments
-        else {
-            const numInstallments = parseInt(newTransaction.installments);
-            if (!isNaN(numInstallments) && numInstallments > 1) {
-                // Determine Start Date Context
-                const [startYear, startMonth, startDay] = newTransaction.date.split('-').map(Number);
-                const businessOrdinal = parseInt(businessDayOrdinal) || 5;
-
-                for(let i=0; i < numInstallments; i++) {
-                     // Determine Next Date
-                     let isoDate;
-                     
-                     // SPECIAL LOGIC: Business Days for Salary
-                     if (useBusinessDay && newTransaction.category === 'Salário' && newTransaction.type === 'income') {
-                         isoDate = getNthBusinessDay(startYear, (startMonth - 1) + i, businessOrdinal);
-                     } else {
-                         // Standard: Same calendar day
-                         const nextDate = new Date(startYear, (startMonth - 1) + i, startDay);
-                         isoDate = nextDate.toISOString().split('T')[0];
-                     }
-
-                     const desc = `${newTransaction.description} (${i+1}/${numInstallments})`;
-                     onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
-                }
-            } else {
-                // Just marked as Recurring (Infinite Subscription)
-                if (editingId) onUpdate(editingId, transactionData);
-                else onAdd(transactionData);
+    // --- DEDUCTIONS LOGIC (Only for Income + Salary + Not Editing) ---
+    if (newTransaction.type === 'income' && newTransaction.category === 'Salário' && !editingId) {
+        // 1. Alimony (Pensão)
+        if (hasAlimony) {
+            const pct = parseFloat(alimonyPercentage);
+            if (!isNaN(pct) && pct > 0 && pct < 100) {
+                const deductionAmount = baseAmount * (pct / 100);
+                baseTransactions.push({
+                    description: `Pensão (${pct}%) - ${newTransaction.description}`,
+                    amount: deductionAmount,
+                    type: 'expense',
+                    category: 'Outros',
+                    date: newTransaction.date,
+                    status: newTransaction.status,
+                    paymentMethod: newTransaction.paymentMethod,
+                    walletId: newTransaction.walletId,
+                    isRecurring: newTransaction.isRecurring,
+                    autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
+                    observation: `Desconto automático de pensão referente a: ${newTransaction.description}`
+                });
             }
         }
-    } 
-    // NO RECURRENCE
-    else {
-        if (editingId) onUpdate(editingId, transactionData);
-        else onAdd(transactionData);
+
+        // 2. Other Deductions
+        if (hasOtherDeductions) {
+            const otherAmt = parseFloat(otherDeductionsAmount);
+            if (!isNaN(otherAmt) && otherAmt > 0) {
+                baseTransactions.push({
+                    description: otherDeductionsDesc || `Desconto - ${newTransaction.description}`,
+                    amount: otherAmt,
+                    type: 'expense',
+                    category: 'Outros',
+                    date: newTransaction.date,
+                    status: newTransaction.status,
+                    paymentMethod: newTransaction.paymentMethod,
+                    walletId: newTransaction.walletId,
+                    isRecurring: newTransaction.isRecurring,
+                    autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
+                    observation: `Desconto automático referente a: ${newTransaction.description}`
+                });
+            }
+        }
     }
+
+    // Apply Recurrence to ALL base transactions
+    baseTransactions.forEach((transactionData, index) => {
+        const isMainTransaction = index === 0; // Only the main transaction can be edited
+
+        // LOGIC FOR RECURRENCE
+        if (newTransaction.isRecurring) {
+            
+            // Mode 1: Daily Recurrence (Specific Days in Month)
+            if (recurrenceMode === 'days' && selectedDays.length > 0) {
+                const [year, month] = newTransaction.date.split('-').map(Number);
+                const daysInMonth = new Date(year, month, 0).getDate();
+                
+                selectedDays.forEach(day => {
+                    if (day <= daysInMonth) {
+                        const dayStr = String(day).padStart(2, '0');
+                        const monthStr = String(month).padStart(2, '0');
+                        const isoDate = `${year}-${monthStr}-${dayStr}`;
+                        
+                        onAdd({
+                            ...transactionData,
+                            description: `${transactionData.description} (Dia ${day})`,
+                            date: isoDate,
+                            isRecurring: false
+                        });
+                    }
+                });
+            } 
+            // Mode 2: Standard Monthly / Installments
+            else {
+                const numInstallments = parseInt(newTransaction.installments);
+                if (!isNaN(numInstallments) && numInstallments > 1) {
+                    const [startYear, startMonth, startDay] = newTransaction.date.split('-').map(Number);
+                    const businessOrdinal = parseInt(businessDayOrdinal) || 5;
+
+                    for(let i=0; i < numInstallments; i++) {
+                         let isoDate;
+                         if (useBusinessDay && newTransaction.category === 'Salário' && newTransaction.type === 'income') {
+                             isoDate = getNthBusinessDay(startYear, (startMonth - 1) + i, businessOrdinal);
+                         } else {
+                             const nextDate = new Date(startYear, (startMonth - 1) + i, startDay);
+                             isoDate = nextDate.toISOString().split('T')[0];
+                         }
+
+                         const desc = `${transactionData.description} (${i+1}/${numInstallments})`;
+                         onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
+                    }
+                } else {
+                    // Infinite Subscription
+                    if (editingId && isMainTransaction) onUpdate(editingId, transactionData);
+                    else onAdd(transactionData);
+                }
+            }
+        } 
+        // NO RECURRENCE
+        else {
+            if (editingId && isMainTransaction) onUpdate(editingId, transactionData);
+            else onAdd(transactionData);
+        }
+    });
     
     resetForm();
     setIsFormOpen(false);
@@ -557,6 +664,43 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       });
   };
 
+  const handleTransfer = (sourceWalletId: string, targetWalletId: string, amount: number, date: string, observation?: string) => {
+      const sourceWallet = wallets?.find(w => w.id === sourceWalletId);
+      const targetWallet = wallets?.find(w => w.id === targetWalletId);
+      
+      if (!sourceWallet || !targetWallet) return;
+
+      // Create Expense (Saída) on source wallet
+      onAdd({
+        description: `Transferência para ${targetWallet.name}`,
+        amount: amount,
+        type: 'expense',
+        category: 'cat_transferencia_out',
+        date: date,
+        status: 'paid',
+        walletId: sourceWalletId,
+        observation: observation,
+        paymentMethod: 'bank_transfer',
+        isRecurring: false,
+        autoPay: false
+      });
+
+      // Create Income (Entrada) on target wallet
+      onAdd({
+        description: `Transferência de ${sourceWallet.name}`,
+        amount: amount,
+        type: 'income',
+        category: 'cat_transferencia_in',
+        date: date,
+        status: 'paid',
+        walletId: targetWalletId,
+        observation: observation,
+        paymentMethod: 'bank_transfer',
+        isRecurring: false,
+        autoPay: false
+      });
+  };
+
   return (
     <div className="space-y-6">
       
@@ -564,16 +708,36 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       {onAddWallet && onUpdateWallet && onDeleteWallet && (
         <div className="mb-8">
           <WalletsView 
-            wallets={wallets}
+            wallets={wallets || []}
             onAdd={onAddWallet}
             onUpdate={onUpdateWallet}
             onDelete={onDeleteWallet}
+            onTransfer={handleTransfer}
           />
         </div>
       )}
 
       {/* 1. TOP BAR: Title, Search, Actions */}
       <div className="flex flex-col gap-4">
+          {lateBillsCount > 0 && (
+              <div className="flex items-center justify-between bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-800/30 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-rose-500" />
+                      <div>
+                          <span className="text-sm text-rose-700 dark:text-rose-400 font-bold block">Atenção: Contas Atrasadas</span>
+                          <span className="text-xs text-rose-600 dark:text-rose-400/80">
+                              Você possui {lateBillsCount} {lateBillsCount === 1 ? 'conta atrasada' : 'contas atrasadas'}.
+                          </span>
+                      </div>
+                  </div>
+                  <button 
+                      onClick={() => setViewFilter('late')}
+                      className="px-3 py-1.5 bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg hover:bg-rose-200 dark:hover:bg-rose-900/60 transition-colors"
+                  >
+                      Ver Atrasadas
+                  </button>
+              </div>
+          )}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white hidden md:block">Transações</h2>
             
@@ -721,34 +885,69 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 outline-none"
               />
               
-              {/* DISCREET ALIMONY OPTION */}
+              {/* DISCREET ALIMONY AND OTHER DEDUCTIONS OPTION */}
               {newTransaction.type === 'income' && newTransaction.category === 'Salário' && !editingId && (
-                  <div className="flex items-center gap-2 mt-1 px-1 animate-fade-in">
-                      <div 
-                          className="flex items-center gap-2 cursor-pointer group select-none"
-                          onClick={() => setHasAlimony(!hasAlimony)}
-                      >
-                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${hasAlimony ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
-                              {hasAlimony && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                  <div className="flex flex-col gap-2 mt-1 px-1 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                          <div 
+                              className="flex items-center gap-2 cursor-pointer group select-none"
+                              onClick={() => setHasAlimony(!hasAlimony)}
+                          >
+                              <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${hasAlimony ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                                  {hasAlimony && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                              </div>
+                              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
+                                  <Baby className="w-3 h-3" /> Descontar Pensão?
+                              </span>
                           </div>
-                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
-                              <Baby className="w-3 h-3" /> Descontar Pensão?
-                          </span>
+                          
+                          {hasAlimony && (
+                              <div className="flex items-center gap-1 animate-scale-in ml-auto">
+                                  <input 
+                                      autoFocus
+                                      type="number" 
+                                      placeholder="%" 
+                                      className="w-12 py-0.5 px-1 text-xs border border-slate-300 rounded text-center outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
+                                      value={alimonyPercentage}
+                                      onChange={(e) => setAlimonyPercentage(e.target.value)}
+                                  />
+                                  <span className="text-[10px] text-slate-400 font-bold">%</span>
+                              </div>
+                          )}
                       </div>
-                      
-                      {hasAlimony && (
-                          <div className="flex items-center gap-1 animate-scale-in ml-auto">
-                              <input 
-                                  autoFocus
-                                  type="number" 
-                                  placeholder="%" 
-                                  className="w-12 py-0.5 px-1 text-xs border border-slate-300 rounded text-center outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
-                                  value={alimonyPercentage}
-                                  onChange={(e) => setAlimonyPercentage(e.target.value)}
-                              />
-                              <span className="text-[10px] text-slate-400 font-bold">%</span>
+
+                      <div className="flex flex-col gap-2">
+                          <div 
+                              className="flex items-center gap-2 cursor-pointer group select-none"
+                              onClick={() => setHasOtherDeductions(!hasOtherDeductions)}
+                          >
+                              <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${hasOtherDeductions ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                                  {hasOtherDeductions && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                              </div>
+                              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 group-hover:text-indigo-500 transition-colors flex items-center gap-1">
+                                  <Layers className="w-3 h-3" /> Outros Descontos?
+                              </span>
                           </div>
-                      )}
+                          
+                          {hasOtherDeductions && (
+                              <div className="flex items-center gap-2 animate-scale-in">
+                                  <input 
+                                      type="text" 
+                                      placeholder="Descrição (ex: Plano de Saúde)" 
+                                      className="flex-1 py-1 px-2 text-xs border border-slate-300 rounded outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                      value={otherDeductionsDesc}
+                                      onChange={(e) => setOtherDeductionsDesc(e.target.value)}
+                                  />
+                                  <input 
+                                      type="number" 
+                                      placeholder="R$" 
+                                      className="w-20 py-1 px-2 text-xs border border-slate-300 rounded outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
+                                      value={otherDeductionsAmount}
+                                      onChange={(e) => setOtherDeductionsAmount(e.target.value)}
+                                  />
+                              </div>
+                          )}
+                      </div>
                   </div>
               )}
           </div>
@@ -993,6 +1192,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           >
               <AlertCircle className="w-4 h-4" /> Atrasadas
           </button>
+          <button 
+              onClick={() => setViewFilter('fixed')}
+              className={`flex-1 min-w-[100px] py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${viewFilter === 'fixed' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+          >
+              <Infinity className="w-4 h-4" /> Fixas
+          </button>
       </div>
 
       {/* 6. LIST AREA (Grouped by Date) */}
@@ -1051,7 +1256,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                               </span>
                                           </div>
                                       )}
-                                      <div className="group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                      <div className={`group hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${t.isGhost ? 'opacity-50 grayscale' : ''}`}>
                                           
                                           {/* --- MOBILE VIEW (< md) --- */}
                                           <div className="md:hidden p-4 flex items-center gap-3 relative">
@@ -1063,12 +1268,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                               </div>
 
                                               {/* Main Content */}
-                                              <div className="flex-1 min-w-0" onClick={() => handleEdit(t)}>
+                                              <div className="flex-1 min-w-0" onClick={() => !t.isGhost && handleEdit(t)}>
                                                   <div className="flex justify-between items-start">
                                                       <h4 className="font-bold text-slate-800 dark:text-white truncate pr-2 text-sm">{t.description}</h4>
                                                       <span 
                                                           className={`font-bold text-sm whitespace-nowrap ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-200'}`}
-                                                          onClick={(e) => handleInlineEditStart(e, t)}
+                                                          onClick={(e) => !t.isGhost && handleInlineEditStart(e, t)}
                                                       >
                                                           {inlineEditingId === t.id ? (
                                                               <input 
@@ -1138,21 +1343,26 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   </div>
                                                   <div className="flex items-center gap-1">
                                                       <button 
-                                                          onClick={() => handleToggleClick(t)}
+                                                          onClick={() => !t.isGhost && handleToggleClick(t)}
+                                                          disabled={t.isGhost}
                                                           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                                                               t.status === 'paid' 
                                                               ? 'bg-emerald-500 border-emerald-500 text-white' 
                                                               : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
-                                                          }`}
+                                                          } ${t.isGhost ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                       >
                                                           <CheckCircle className="w-3.5 h-3.5" />
                                                       </button>
-                                                      <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                            <Pencil className="w-4 h-4" />
-                                                      </button>
-                                                      <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                            <Trash2 className="w-4 h-4" />
-                                                      </button>
+                                                      {!t.isGhost && (
+                                                          <>
+                                                              <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                                    <Pencil className="w-4 h-4" />
+                                                              </button>
+                                                              <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                                    <Trash2 className="w-4 h-4" />
+                                                              </button>
+                                                          </>
+                                                      )}
                                                   </div>
                                               </div>
                                           </div>
@@ -1182,9 +1392,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
                                                   {/* Description */}
                                                   <div 
-                                                      className="flex-1 font-medium text-slate-700 dark:text-slate-200 truncate cursor-pointer hover:text-indigo-500 flex flex-col justify-center"
-                                                      onClick={() => handleEdit(t)}
-                                                      title="Clique para editar"
+                                                      className={`flex-1 font-medium text-slate-700 dark:text-slate-200 truncate flex flex-col justify-center ${t.isGhost ? 'cursor-default' : 'cursor-pointer hover:text-indigo-500'}`}
+                                                      onClick={() => !t.isGhost && handleEdit(t)}
+                                                      title={t.isGhost ? "Lançamento Futuro" : "Clique para editar"}
                                                   >
                                                       <div className="flex items-center gap-2">
                                                           {t.description}
@@ -1215,8 +1425,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
                                                   {/* Amount */}
                                                   <div 
-                                                      className={`w-28 text-right font-bold cursor-pointer hover:text-indigo-500 ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
-                                                      onClick={(e) => handleInlineEditStart(e, t)}
+                                                      className={`w-28 text-right font-bold ${t.isGhost ? 'cursor-default' : 'cursor-pointer hover:text-indigo-500'} ${t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}
+                                                      onClick={(e) => !t.isGhost && handleInlineEditStart(e, t)}
                                                   >
                                                       {inlineEditingId === t.id ? (
                                                           <input 
@@ -1237,13 +1447,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   {/* Status */}
                                                   <div className="w-8 flex justify-center">
                                                       <button 
-                                                          onClick={() => handleToggleClick(t)}
+                                                          onClick={() => !t.isGhost && handleToggleClick(t)}
+                                                          disabled={t.isGhost}
                                                           className={`transition-all hover:scale-110 ${
                                                               t.status === 'paid' 
                                                               ? 'text-emerald-500' 
                                                               : 'text-slate-300 hover:text-emerald-400'
-                                                          }`}
-                                                          title={t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
+                                                          } ${t.isGhost ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                          title={t.isGhost ? "Lançamento Futuro" : (t.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago')}
                                                       >
                                                           <CheckCircle className="w-5 h-5" />
                                                       </button>
@@ -1254,25 +1465,29 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       <div className="flex flex-col mr-1">
                                                           <button 
                                                               onClick={() => handleMoveTransaction(group.date, index, 'up')}
-                                                              disabled={isFirstInStatus}
-                                                              className={`p-0.5 rounded ${isFirstInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                              disabled={isFirstInStatus || t.isGhost}
+                                                              className={`p-0.5 rounded ${isFirstInStatus || t.isGhost ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                                                           >
                                                               <ChevronUp className="w-3 h-3" />
                                                           </button>
                                                           <button 
                                                               onClick={() => handleMoveTransaction(group.date, index, 'down')}
-                                                              disabled={isLastInStatus}
-                                                              className={`p-0.5 rounded ${isLastInStatus ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                                              disabled={isLastInStatus || t.isGhost}
+                                                              className={`p-0.5 rounded ${isLastInStatus || t.isGhost ? 'text-slate-200 dark:text-slate-700' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                                                           >
                                                               <ChevronDown className="w-3 h-3" />
                                                           </button>
                                                       </div>
-                                                      <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                          <Pencil className="w-4 h-4" />
-                                                      </button>
-                                                      <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
-                                                          <Trash2 className="w-4 h-4" />
-                                                      </button>
+                                                      {!t.isGhost && (
+                                                          <>
+                                                              <button onClick={() => handleEdit(t)} className="p-1.5 text-slate-400 hover:text-indigo-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                                  <Pencil className="w-4 h-4" />
+                                                              </button>
+                                                              <button onClick={() => onDelete(t.id)} className="p-1.5 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700">
+                                                                  <Trash2 className="w-4 h-4" />
+                                                              </button>
+                                                          </>
+                                                      )}
                                                   </div>
                                               </>
                                           </div>
