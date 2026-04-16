@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData, WalletType } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown, Utensils } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 import { WalletsView } from './WalletsView';
 
@@ -337,37 +337,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   // --- GROUPING LOGIC (By Date) with ACCUMULATED BALANCE ---
   const groupedTransactions = useMemo(() => {
-      const groups: Record<string, { 
-          transactions: Transaction[], 
-          totals: Record<WalletType, { daily: number, dailyPending: number }>
-      }> = {};
+      const groups: Record<string, { transactions: Transaction[], total: number }> = {};
       
-      const walletTypeCache = new Map<string, WalletType>();
-      wallets.forEach(w => walletTypeCache.set(w.id, w.type));
-
       // 1. Group transactions by date
       filteredTransactions.forEach(t => {
           if (!groups[t.date]) {
-              groups[t.date] = { 
-                  transactions: [], 
-                  totals: {
-                      [WalletType.BANK]: { daily: 0, dailyPending: 0 },
-                      [WalletType.CREDIT_CARD]: { daily: 0, dailyPending: 0 },
-                      [WalletType.MEAL_TICKET]: { daily: 0, dailyPending: 0 },
-                      [WalletType.OTHER]: { daily: 0, dailyPending: 0 },
-                  }
-              };
+              groups[t.date] = { transactions: [], total: 0 };
           }
           groups[t.date].transactions.push(t);
           
-          const wType = (t.walletId ? walletTypeCache.get(t.walletId) : undefined) || WalletType.OTHER;
-          const val = t.type === 'income' ? t.amount : -t.amount;
-          
-          groups[t.date].totals[wType].daily += val;
-
           // Somar apenas PENDENTES para projeção, ignorando Ghosts
-          if (t.status === 'pending' && !t.isGhost) {
-              groups[t.date].totals[wType].dailyPending += val;
+          const isMealTicket = wallets.find(w => w.id === t.walletId)?.type === WalletType.MEAL_TICKET;
+          if (t.status === 'pending' && !t.isGhost && !isMealTicket) {
+              const val = t.type === 'income' ? t.amount : -t.amount;
+              groups[t.date].total += val;
           }
       });
 
@@ -392,24 +375,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
       // 3. Calculate Running Balance (Accumulated)
       const chronological = [...sortedGroups].reverse(); // Oldest first
-      
-      const currentBalances = {
-          [WalletType.BANK]: wallets.filter(w => w.type === WalletType.BANK).reduce((a, b) => a + b.balance, 0),
-          [WalletType.CREDIT_CARD]: wallets.filter(w => w.type === WalletType.CREDIT_CARD).reduce((a, b) => a + b.balance, 0),
-          [WalletType.MEAL_TICKET]: wallets.filter(w => w.type === WalletType.MEAL_TICKET).reduce((a, b) => a + b.balance, 0),
-          [WalletType.OTHER]: wallets.filter(w => w.type === WalletType.OTHER).reduce((a, b) => a + b.balance, 0),
-      };
+      let runningTotal = wallets.filter(w => w.type !== WalletType.MEAL_TICKET).reduce((acc, w) => acc + w.balance, 0);
       
       const chronologicalWithBalance = chronological.map(group => {
-          currentBalances[WalletType.BANK] += group.totals[WalletType.BANK].dailyPending;
-          currentBalances[WalletType.CREDIT_CARD] += group.totals[WalletType.CREDIT_CARD].dailyPending;
-          currentBalances[WalletType.MEAL_TICKET] += group.totals[WalletType.MEAL_TICKET].dailyPending;
-          currentBalances[WalletType.OTHER] += group.totals[WalletType.OTHER].dailyPending;
-          
-          return { 
-              ...group, 
-              runningTotals: { ...currentBalances }
-          };
+          runningTotal += group.total;
+          return { ...group, runningBalance: runningTotal };
       });
 
       // Reverse back to Newest -> Oldest for display
@@ -1373,58 +1343,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
               groupedTransactions.map((group) => (
                   <div key={group.date} className="animate-fade-in">
                       {/* Date Header with Running Balance */}
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between px-3 py-2 mb-1 sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg border-b border-slate-100 dark:border-slate-800">
-                          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2 md:mb-0">
+                      <div className="flex items-center justify-between px-3 py-2 mb-1 sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg border-b border-slate-100 dark:border-slate-800">
+                          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                               <Calendar className="w-3 h-3" />
                               {formatDateFriendly(group.date)}
                           </h3>
-                          <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
-                              {[WalletType.BANK, WalletType.CREDIT_CARD, WalletType.MEAL_TICKET].map(type => {
-                                  const dTotal = group.totals[type].daily;
-                                  const rTotal = group.runningTotals[type];
-                                  
-                                  // 1. Mostrar se houve gasto/ganho NO DIA para esta carteira (daily != 0)
-                                  // 2. Ou se essa carteira teve pelo menos UMA transação (pode ser gasto 0 ou ghost)
-                                  const hasTransactionToday = group.transactions.some(t => {
-                                      const wType = wallets.find(w => w.id === t.walletId)?.type || WalletType.OTHER;
-                                      return wType === type && !t.isGhost;
-                                  });
-
-                                  if (dTotal === 0 && !hasTransactionToday) return null;
-
-                                  let icon; let colorClass; let runningColor;
-                                  if (type === WalletType.BANK) {
-                                      icon = <Landmark className="w-3 h-3" />;
-                                      colorClass = dTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500';
-                                      runningColor = 'text-indigo-500 dark:text-indigo-400';
-                                  } else if (type === WalletType.CREDIT_CARD) {
-                                      icon = <CreditCard className="w-3 h-3" />;
-                                      colorClass = dTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500';
-                                      runningColor = 'text-amber-600 dark:text-amber-400';
-                                  } else {
-                                      icon = <Utensils className="w-3 h-3" />;
-                                      colorClass = dTotal >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500';
-                                      runningColor = 'text-teal-600 dark:text-teal-400';
-                                  }
-                                  
-                                  return (
-                                      <div key={type} className="flex items-center gap-1.5 bg-white/60 dark:bg-slate-800/60 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/50 shadow-sm">
-                                         <span className={`${dTotal < 0 && type === WalletType.CREDIT_CARD ? 'text-amber-500' : 'text-slate-400'}`} title={type === WalletType.BANK ? 'Contas' : type === WalletType.CREDIT_CARD ? 'Cartões' : 'Vale Alimentação'}>
-                                             {icon}
-                                         </span>
-                                         {dTotal !== 0 && (
-                                            <span className={`text-[10px] font-bold ${colorClass}`}>
-                                                {dTotal > 0 ? '+' : ''}{formatValue(dTotal)}
-                                            </span>
-                                         )}
-                                         <div className="h-3 w-px bg-slate-300 dark:bg-slate-700 mx-0.5"></div>
-                                         <span className={`text-[9.5px] font-bold flex items-center gap-0.5 ${runningColor}`} title="Saldo acumulado / Fatura">
-                                             <Sigma className="w-2.5 h-2.5" />
-                                             {formatValue(rTotal)}
-                                         </span>
-                                      </div>
-                                  );
-                              })}
+                          <div className="flex items-center gap-3">
+                              <span className={`text-xs font-bold ${group.total >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                  {group.total !== 0 && (group.total > 0 ? '+' : '') + formatValue(group.total)}
+                              </span>
+                              <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
+                              <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-1" title="Saldo acumulado até este dia">
+                                  <Sigma className="w-3 h-3" />
+                                  {formatValue(group.runningBalance)}
+                              </span>
                           </div>
                       </div>
 
@@ -1490,21 +1422,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   </div>
                                                   
                                                   <div className="flex justify-between items-center mt-1">
-                                                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                                                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(t.category)}`}>
                                                               {t.category}
                                                           </span>
-                                                          {t.paymentMethod && (
-                                                              <span className="flex items-center gap-0.5 text-[10px] bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded" title="Forma de Pagamento">
-                                                                  <PaymentIcon method={t.paymentMethod} className="w-2.5 h-2.5" />
-                                                                  {PAYMENT_LABELS[t.paymentMethod]}
-                                                              </span>
-                                                          )}
-                                                          {t.walletId && (
-                                                              <span className="text-[10px] text-slate-400 truncate max-w-[80px]" title="Conta/Carteira">
-                                                                  {wallets.find(w => w.id === t.walletId)?.name || 'Conta Removida'}
-                                                              </span>
-                                                          )}
                                                           {t.isRecurring && (
                                                               <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded" title="Recorrente Infinito">
                                                                   <Infinity className="w-3 h-3" /> 
@@ -1625,17 +1546,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                                   </div>
 
-                                                  {/* Payment Method & Wallet */}
-                                                  <div className="w-28 flex flex-col justify-center">
-                                                      <div className="text-xs text-slate-500 flex items-center gap-1">
-                                                          <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
-                                                          <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
-                                                      </div>
-                                                      {t.walletId && (
-                                                          <span className="text-[10px] text-slate-400 truncate">
-                                                              {wallets.find(w => w.id === t.walletId)?.name || 'Conta Removida'}
-                                                          </span>
-                                                      )}
+                                                  {/* Payment Method */}
+                                                  <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
+                                                      <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
+                                                      <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
                                                   </div>
 
                                                   {/* Amount */}
