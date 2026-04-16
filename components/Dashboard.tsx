@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppData, Badge, Budget, View } from '../types';
+import { AppData, Badge, Budget, View, WalletType } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
 import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid } from 'lucide-react';
 
@@ -215,11 +215,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   };
 
   // Calculations
-  const totalIncome = data.transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-  const totalExpense = data.transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
-  const totalPending = data.transactions.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+  const mealWalletIds = useMemo(() => new Set((data.wallets || []).filter(w => w.type === WalletType.MEAL_TICKET).map(w => w.id)), [data.wallets]);
+  const dashboardTxs = useMemo(() => data.transactions.filter(t => !t.walletId || !mealWalletIds.has(t.walletId)), [data.transactions, mealWalletIds]);
+
+  const totalIncome = dashboardTxs.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalExpense = dashboardTxs.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalPending = dashboardTxs.filter(t => t.type === 'expense' && t.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
   
-  const currentMonthPendingExpense = data.transactions
+  const currentMonthPendingExpense = dashboardTxs
       .filter(t => {
           if (t.status !== 'pending' || t.type !== 'expense') return false;
           const tDate = new Date(t.date);
@@ -230,26 +233,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
   
   // FIX: Lógica de saldo aprimorada
   // 1. Calcula o saldo real baseado puramente nas transações carregadas agora (Pago/Recebido)
-  const realTimeBalance = data.transactions
+  const realTimeBalance = dashboardTxs
       .filter(t => t.status === 'paid')
       .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
 
   // 2. Decide qual saldo exibir:
   // - Se NÃO tem transações, o saldo É ZERO (ignora cache que pode estar sujo).
   // - Se tem poucas transações (<300), usa o realTimeBalance para garantir precisão.
-  // - Se tem muitas, usa o walletBalance (cache do Firestore) se disponível.
+  // - Se tem muitas, usa o walletBalance descontando os meal tickets.
+  const mealWalletsSum = (data.wallets || []).filter(w => w.type === WalletType.MEAL_TICKET).reduce((a, b) => a + b.balance, 0);
   const currentBalance = (data.transactions.length === 0) 
       ? 0 
       : (data.transactions.length < 300) 
           ? realTimeBalance 
-          : (data.walletBalance !== undefined ? data.walletBalance : realTimeBalance);
+          : (data.walletBalance !== undefined ? data.walletBalance - mealWalletsSum : realTimeBalance);
   
   // 3. Calcula APENAS a SOMA das ENTRADAS pendentes (conforme solicitado)
-  const pendingIncome = data.transactions
+  const pendingIncome = dashboardTxs
       .filter(t => t.status === 'pending' && t.type === 'income')
       .reduce((acc, t) => acc + t.amount, 0);
 
-  const currentMonthPendingIncome = data.transactions
+  const currentMonthPendingIncome = dashboardTxs
       .filter(t => {
           if (t.status !== 'pending' || t.type !== 'income') return false;
           const tDate = new Date(t.date);
@@ -640,7 +644,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {['score', 'balance', 'expenses', 'investments'].map((cardId) => {
           if (cardId === 'score') return (
-        <div key="score" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div key="score" onClick={() => onNavigate(View.DEBTS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
           {/* Card 1: Health Score */}
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Scale className="w-20 h-20 text-slate-400" />
@@ -723,7 +727,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           );
 
           if (cardId === 'balance') return (
-        <div key="balance" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div key="balance" onClick={() => onNavigate(View.TRANSACTIONS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
           {/* Card 2: Current Balance & Pending Income */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -788,7 +792,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           );
 
           if (cardId === 'expenses') return (
-        <div key="expenses" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div key="expenses" onClick={() => onNavigate(View.TRANSACTIONS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
           {/* Card 3: Saídas (Paid vs Pending) - REDESIGNED */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -863,7 +867,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           );
 
           if (cardId === 'investments') return (
-        <div key="investments" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div key="investments" onClick={() => onNavigate(View.INVESTMENTS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
           {/* Card 4: Investments (Top Assets) */}
           <div>
               <div className="flex items-center justify-between mb-3">
@@ -972,7 +976,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             };
 
             return (
-              <div key="habits" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+              <div key="habits" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; onNavigate(View.PRODUCTIVITY); }} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
                   <div className="flex items-center justify-between mb-3">
                       <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                           <Target className="w-4 h-4" /> Hábitos de Hoje
@@ -1050,13 +1054,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
             const totalPendingTasks = tasks.filter((t: any) => !t.completed).length;
 
             return (
-              <div key="eisenhower" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+              <div key="eisenhower" onClick={() => onNavigate(View.EISENHOWER)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
                   <div className="flex items-center justify-between mb-3">
                       <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                           <Grid className="w-4 h-4" /> Matriz de Eisenhower
                       </h3>
                       <button 
-                          onClick={() => onNavigate(View.EISENHOWER)} 
+                          onClick={(e) => { e.stopPropagation(); onNavigate(View.EISENHOWER); }}
                           className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
                           title="Abrir Matriz"
                       >
@@ -1090,14 +1094,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ data, privacyMode, onUnloc
           }
 
           if (cardId === 'notes') return (
-        <div key="notes" className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px]">
+        <div key="notes" onClick={() => onNavigate(View.NOTES)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
             {/* Card 5: Notes Widget */}
             <div className="flex items-center justify-between mb-3">
                 <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
                     <StickyNote className="w-4 h-4" /> Notas Fixadas
                 </h3>
                 <button 
-                    onClick={() => onNavigate(View.NOTES)} 
+                    onClick={(e) => { e.stopPropagation(); onNavigate(View.NOTES); }}
                     className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
                     title="Ver todas"
                 >

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData, WalletType } from '../types';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown, Utensils } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 import { WalletsView } from './WalletsView';
 
@@ -111,6 +111,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   // Ref for auto-scrolling to form
   const formRef = useRef<HTMLDivElement>(null);
 
+  const [transactionError, setTransactionError] = useState<string>('');
+  const [showNegativeBalanceWarning, setShowNegativeBalanceWarning] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<any>(null);
+
   const [newTransaction, setNewTransaction] = useState({
     description: '',
     amount: '',
@@ -211,9 +215,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   // --- DYNAMIC TOTALS (MONTHLY VIEW) ---
   const monthlyTotals = useMemo(() => {
+      const mealWalletIds = new Set(wallets.filter(w => w.type === WalletType.MEAL_TICKET).map(w => w.id));
+      
       const currentMonthTransactions = transactions.filter(t => {
           const [year, month] = t.date.split('-');
           return (
+              (!t.walletId || !mealWalletIds.has(t.walletId)) &&
               parseInt(year) === currentDate.getFullYear() &&
               parseInt(month) === currentDate.getMonth() + 1
           );
@@ -228,7 +235,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           .reduce((sum, t) => sum + t.amount, 0);
 
       return { income, expense, balance: income - expense };
-  }, [transactions, currentDate]);
+  }, [transactions, currentDate, wallets]);
 
   // --- FILTERING LOGIC (FOR THE LIST) ---
   const filteredTransactions = useMemo(() => {
@@ -330,19 +337,37 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
   // --- GROUPING LOGIC (By Date) with ACCUMULATED BALANCE ---
   const groupedTransactions = useMemo(() => {
-      const groups: Record<string, { transactions: Transaction[], total: number }> = {};
+      const groups: Record<string, { 
+          transactions: Transaction[], 
+          totals: Record<WalletType, { daily: number, dailyPending: number }>
+      }> = {};
       
+      const walletTypeCache = new Map<string, WalletType>();
+      wallets.forEach(w => walletTypeCache.set(w.id, w.type));
+
       // 1. Group transactions by date
       filteredTransactions.forEach(t => {
           if (!groups[t.date]) {
-              groups[t.date] = { transactions: [], total: 0 };
+              groups[t.date] = { 
+                  transactions: [], 
+                  totals: {
+                      [WalletType.BANK]: { daily: 0, dailyPending: 0 },
+                      [WalletType.CREDIT_CARD]: { daily: 0, dailyPending: 0 },
+                      [WalletType.MEAL_TICKET]: { daily: 0, dailyPending: 0 },
+                      [WalletType.OTHER]: { daily: 0, dailyPending: 0 },
+                  }
+              };
           }
           groups[t.date].transactions.push(t);
           
+          const wType = (t.walletId ? walletTypeCache.get(t.walletId) : undefined) || WalletType.OTHER;
+          const val = t.type === 'income' ? t.amount : -t.amount;
+          
+          groups[t.date].totals[wType].daily += val;
+
           // Somar apenas PENDENTES para projeção, ignorando Ghosts
           if (t.status === 'pending' && !t.isGhost) {
-              const val = t.type === 'income' ? t.amount : -t.amount;
-              groups[t.date].total += val;
+              groups[t.date].totals[wType].dailyPending += val;
           }
       });
 
@@ -367,11 +392,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
 
       // 3. Calculate Running Balance (Accumulated)
       const chronological = [...sortedGroups].reverse(); // Oldest first
-      let runningTotal = wallets.reduce((acc, w) => acc + w.balance, 0);
+      
+      const currentBalances = {
+          [WalletType.BANK]: wallets.filter(w => w.type === WalletType.BANK).reduce((a, b) => a + b.balance, 0),
+          [WalletType.CREDIT_CARD]: wallets.filter(w => w.type === WalletType.CREDIT_CARD).reduce((a, b) => a + b.balance, 0),
+          [WalletType.MEAL_TICKET]: wallets.filter(w => w.type === WalletType.MEAL_TICKET).reduce((a, b) => a + b.balance, 0),
+          [WalletType.OTHER]: wallets.filter(w => w.type === WalletType.OTHER).reduce((a, b) => a + b.balance, 0),
+      };
       
       const chronologicalWithBalance = chronological.map(group => {
-          runningTotal += group.total;
-          return { ...group, runningBalance: runningTotal };
+          currentBalances[WalletType.BANK] += group.totals[WalletType.BANK].dailyPending;
+          currentBalances[WalletType.CREDIT_CARD] += group.totals[WalletType.CREDIT_CARD].dailyPending;
+          currentBalances[WalletType.MEAL_TICKET] += group.totals[WalletType.MEAL_TICKET].dailyPending;
+          currentBalances[WalletType.OTHER] += group.totals[WalletType.OTHER].dailyPending;
+          
+          return { 
+              ...group, 
+              runningTotals: { ...currentBalances }
+          };
       });
 
       // Reverse back to Newest -> Oldest for display
@@ -461,6 +499,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       const newAmount = parseFloat(inlineEditingAmount.replace(',', '.'));
       if (!isNaN(newAmount) && newAmount !== t.amount) {
         onUpdate(t.id, { amount: newAmount });
+        
+        // Update future transactions in the same group
+        if (t.groupId) {
+            const futureTxs = transactions.filter(tx => 
+                tx.groupId === t.groupId && 
+                tx.id !== t.id && 
+                tx.date >= t.date
+            );
+            
+            futureTxs.forEach(ft => {
+                onUpdate(ft.id, { amount: newAmount });
+            });
+        }
       }
     }
     setInlineEditingId(null);
@@ -475,46 +526,73 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prepare Data
     let baseAmount = parseFloat(newTransaction.amount);
-    let baseObservation = newTransaction.observation;
+    if (isNaN(baseAmount) || baseAmount <= 0) {
+      setTransactionError('O valor deve ser maior que zero.');
+      return;
+    }
+
+    // Check future date
+    const today = new Date(new Date().setHours(0,0,0,0));
+    const txDate = new Date(newTransaction.date);
+    let finalStatus = newTransaction.status;
+    if (txDate > today && finalStatus === 'paid') {
+      finalStatus = 'pending';
+    }
+
+    // Negative balance warning
+    if (finalStatus === 'paid' && newTransaction.type === 'expense' && newTransaction.walletId) {
+      const wallet = wallets.find(w => w.id === newTransaction.walletId);
+      if (wallet && baseAmount > wallet.balance) {
+         setPendingSubmitData({ ...newTransaction, status: finalStatus, amount: String(baseAmount) });
+         setShowNegativeBalanceWarning(true);
+         return;
+      }
+    }
+
+    executeSubmit({ ...newTransaction, status: finalStatus, amount: String(baseAmount) });
+  };
+
+  const executeSubmit = (txData: any) => {
+    let baseAmount = parseFloat(txData.amount);
+    let baseObservation = txData.observation;
 
     const baseTransactions: Omit<Transaction, 'id'>[] = [];
 
     // Main Transaction (Gross Salary or regular transaction)
     baseTransactions.push({
-      description: newTransaction.description, 
+      description: txData.description, 
       amount: baseAmount,
-      type: newTransaction.type, 
-      category: newTransaction.category, 
-      date: newTransaction.date, 
-      status: newTransaction.status, 
-      paymentMethod: newTransaction.paymentMethod, 
-      walletId: newTransaction.walletId,
-      isRecurring: newTransaction.isRecurring,
-      autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
+      type: txData.type, 
+      category: txData.category, 
+      date: txData.date, 
+      status: txData.status, 
+      paymentMethod: txData.paymentMethod, 
+      walletId: txData.walletId,
+      isRecurring: txData.isRecurring,
+      autoPay: txData.status === 'pending' ? txData.autoPay : false,
       observation: baseObservation
     });
 
     // --- DEDUCTIONS LOGIC (Only for Income + Salary + Not Editing) ---
-    if (newTransaction.type === 'income' && newTransaction.category === 'Salário' && !editingId) {
+    if (txData.type === 'income' && txData.category === 'Salário' && !editingId) {
         // 1. Alimony (Pensão)
         if (hasAlimony) {
             const pct = parseFloat(alimonyPercentage);
             if (!isNaN(pct) && pct > 0 && pct < 100) {
                 const deductionAmount = baseAmount * (pct / 100);
                 baseTransactions.push({
-                    description: `Pensão (${pct}%) - ${newTransaction.description}`,
+                    description: `Pensão (${pct}%) - ${txData.description}`,
                     amount: deductionAmount,
                     type: 'expense',
                     category: 'Outros',
-                    date: newTransaction.date,
-                    status: newTransaction.status,
-                    paymentMethod: newTransaction.paymentMethod,
-                    walletId: newTransaction.walletId,
-                    isRecurring: newTransaction.isRecurring,
-                    autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
-                    observation: `Desconto automático de pensão referente a: ${newTransaction.description}`
+                    date: txData.date,
+                    status: txData.status,
+                    paymentMethod: txData.paymentMethod,
+                    walletId: txData.walletId,
+                    isRecurring: txData.isRecurring,
+                    autoPay: txData.status === 'pending' ? txData.autoPay : false,
+                    observation: `Desconto automático de pensão referente a: ${txData.description}`
                 });
             }
         }
@@ -524,17 +602,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             const otherAmt = parseFloat(otherDeductionsAmount);
             if (!isNaN(otherAmt) && otherAmt > 0) {
                 baseTransactions.push({
-                    description: otherDeductionsDesc || `Desconto - ${newTransaction.description}`,
+                    description: otherDeductionsDesc || `Desconto - ${txData.description}`,
                     amount: otherAmt,
                     type: 'expense',
                     category: 'Outros',
-                    date: newTransaction.date,
-                    status: newTransaction.status,
-                    paymentMethod: newTransaction.paymentMethod,
-                    walletId: newTransaction.walletId,
-                    isRecurring: newTransaction.isRecurring,
-                    autoPay: newTransaction.status === 'pending' ? newTransaction.autoPay : false,
-                    observation: `Desconto automático referente a: ${newTransaction.description}`
+                    date: txData.date,
+                    status: txData.status,
+                    paymentMethod: txData.paymentMethod,
+                    walletId: txData.walletId,
+                    isRecurring: txData.isRecurring,
+                    autoPay: txData.status === 'pending' ? txData.autoPay : false,
+                    observation: `Desconto automático referente a: ${txData.description}`
                 });
             }
         }
@@ -545,11 +623,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         const isMainTransaction = index === 0; // Only the main transaction can be edited
 
         // LOGIC FOR RECURRENCE
-        if (newTransaction.isRecurring) {
+        if (txData.isRecurring) {
+            const groupId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             
             // Mode 1: Daily Recurrence (Specific Days in Month)
             if (recurrenceMode === 'days' && selectedDays.length > 0) {
-                const [year, month] = newTransaction.date.split('-').map(Number);
+                const [year, month] = txData.date.split('-').map(Number);
                 const daysInMonth = new Date(year, month, 0).getDate();
                 
                 selectedDays.forEach(day => {
@@ -562,21 +641,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                             ...transactionData,
                             description: `${transactionData.description} (Dia ${day})`,
                             date: isoDate,
-                            isRecurring: false
+                            isRecurring: false,
+                            groupId
                         });
                     }
                 });
             } 
             // Mode 2: Standard Monthly / Installments
             else {
-                const numInstallments = parseInt(newTransaction.installments);
+                const numInstallments = parseInt(txData.installments);
                 if (!isNaN(numInstallments) && numInstallments > 1) {
-                    const [startYear, startMonth, startDay] = newTransaction.date.split('-').map(Number);
+                    const [startYear, startMonth, startDay] = txData.date.split('-').map(Number);
                     const businessOrdinal = parseInt(businessDayOrdinal) || 5;
 
                     for(let i=0; i < numInstallments; i++) {
                          let isoDate;
-                         if (useBusinessDay && newTransaction.category === 'Salário' && newTransaction.type === 'income') {
+                         if (useBusinessDay && txData.category === 'Salário' && txData.type === 'income') {
                              isoDate = getNthBusinessDay(startYear, (startMonth - 1) + i, businessOrdinal);
                          } else {
                              const nextDate = new Date(startYear, (startMonth - 1) + i, startDay);
@@ -584,7 +664,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                          }
 
                          const desc = `${transactionData.description} (${i+1}/${numInstallments})`;
-                         onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false });
+                         onAdd({ ...transactionData, description: desc, date: isoDate, isRecurring: false, groupId });
                     }
                 } else {
                     // Infinite Subscription
@@ -595,13 +675,35 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         } 
         // NO RECURRENCE
         else {
-            if (editingId && isMainTransaction) onUpdate(editingId, transactionData);
+            if (editingId && isMainTransaction) {
+                const originalTx = transactions.find(t => t.id === editingId);
+                onUpdate(editingId, transactionData);
+                
+                // Update future transactions in the same group
+                if (originalTx && originalTx.groupId) {
+                    const futureTxs = transactions.filter(t => 
+                        t.groupId === originalTx.groupId && 
+                        t.id !== editingId && 
+                        t.date >= originalTx.date
+                    );
+                    
+                    futureTxs.forEach(ft => {
+                        onUpdate(ft.id, {
+                            amount: transactionData.amount,
+                            category: transactionData.category,
+                            walletId: transactionData.walletId,
+                            paymentMethod: transactionData.paymentMethod
+                        });
+                    });
+                }
+            }
             else onAdd(transactionData);
         }
     });
     
     resetForm();
     setIsFormOpen(false);
+    setTransactionError('');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -704,6 +806,57 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   return (
     <div className="space-y-6">
       
+      {/* Negative Balance Warning Modal */}
+      {showNegativeBalanceWarning && pendingSubmitData && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
+            <div className="p-4 border-b border-rose-100 dark:border-rose-900/30 flex justify-between items-center bg-rose-50 dark:bg-rose-900/20">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400 rounded-lg">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Aviso de Saldo</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowNegativeBalanceWarning(false);
+                  setPendingSubmitData(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600 dark:text-slate-300 mb-4">
+                Essa transação deixará sua conta com saldo negativo. Deseja continuar mesmo assim?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowNegativeBalanceWarning(false);
+                    setPendingSubmitData(null);
+                  }}
+                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    executeSubmit(pendingSubmitData);
+                    setShowNegativeBalanceWarning(false);
+                    setPendingSubmitData(null);
+                  }}
+                  className="px-6 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-colors shadow-lg shadow-rose-500/30 font-bold"
+                >
+                  Continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Wallets Section */}
       {onAddWallet && onUpdateWallet && onDeleteWallet && (
         <div className="mb-8">
@@ -854,6 +1007,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 {editingId ? 'Editar Transação' : 'Adicionar Transação'}
             </h3>
+            {transactionError && (
+              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-sm font-medium flex items-start gap-2 mb-2 animate-fade-in">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <p>{transactionError}</p>
+              </div>
+            )}
           </div>
           
           <div className="relative">
@@ -1214,20 +1373,58 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
               groupedTransactions.map((group) => (
                   <div key={group.date} className="animate-fade-in">
                       {/* Date Header with Running Balance */}
-                      <div className="flex items-center justify-between px-3 py-2 mb-1 sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg border-b border-slate-100 dark:border-slate-800">
-                          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between px-3 py-2 mb-1 sticky top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-lg border-b border-slate-100 dark:border-slate-800">
+                          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2 mb-2 md:mb-0">
                               <Calendar className="w-3 h-3" />
                               {formatDateFriendly(group.date)}
                           </h3>
-                          <div className="flex items-center gap-3">
-                              <span className={`text-xs font-bold ${group.total >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                                  {group.total !== 0 && (group.total > 0 ? '+' : '') + formatValue(group.total)}
-                              </span>
-                              <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
-                              <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 flex items-center gap-1" title="Saldo acumulado até este dia">
-                                  <Sigma className="w-3 h-3" />
-                                  {formatValue(group.runningBalance)}
-                              </span>
+                          <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
+                              {[WalletType.BANK, WalletType.CREDIT_CARD, WalletType.MEAL_TICKET].map(type => {
+                                  const dTotal = group.totals[type].daily;
+                                  const rTotal = group.runningTotals[type];
+                                  
+                                  // 1. Mostrar se houve gasto/ganho NO DIA para esta carteira (daily != 0)
+                                  // 2. Ou se essa carteira teve pelo menos UMA transação (pode ser gasto 0 ou ghost)
+                                  const hasTransactionToday = group.transactions.some(t => {
+                                      const wType = wallets.find(w => w.id === t.walletId)?.type || WalletType.OTHER;
+                                      return wType === type && !t.isGhost;
+                                  });
+
+                                  if (dTotal === 0 && !hasTransactionToday) return null;
+
+                                  let icon; let colorClass; let runningColor;
+                                  if (type === WalletType.BANK) {
+                                      icon = <Landmark className="w-3 h-3" />;
+                                      colorClass = dTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500';
+                                      runningColor = 'text-indigo-500 dark:text-indigo-400';
+                                  } else if (type === WalletType.CREDIT_CARD) {
+                                      icon = <CreditCard className="w-3 h-3" />;
+                                      colorClass = dTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500';
+                                      runningColor = 'text-amber-600 dark:text-amber-400';
+                                  } else {
+                                      icon = <Utensils className="w-3 h-3" />;
+                                      colorClass = dTotal >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-500';
+                                      runningColor = 'text-teal-600 dark:text-teal-400';
+                                  }
+                                  
+                                  return (
+                                      <div key={type} className="flex items-center gap-1.5 bg-white/60 dark:bg-slate-800/60 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/50 shadow-sm">
+                                         <span className={`${dTotal < 0 && type === WalletType.CREDIT_CARD ? 'text-amber-500' : 'text-slate-400'}`} title={type === WalletType.BANK ? 'Contas' : type === WalletType.CREDIT_CARD ? 'Cartões' : 'Vale Alimentação'}>
+                                             {icon}
+                                         </span>
+                                         {dTotal !== 0 && (
+                                            <span className={`text-[10px] font-bold ${colorClass}`}>
+                                                {dTotal > 0 ? '+' : ''}{formatValue(dTotal)}
+                                            </span>
+                                         )}
+                                         <div className="h-3 w-px bg-slate-300 dark:bg-slate-700 mx-0.5"></div>
+                                         <span className={`text-[9.5px] font-bold flex items-center gap-0.5 ${runningColor}`} title="Saldo acumulado / Fatura">
+                                             <Sigma className="w-2.5 h-2.5" />
+                                             {formatValue(rTotal)}
+                                         </span>
+                                      </div>
+                                  );
+                              })}
                           </div>
                       </div>
 
@@ -1293,10 +1490,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                   </div>
                                                   
                                                   <div className="flex justify-between items-center mt-1">
-                                                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                                                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getCategoryStyle(t.category)}`}>
                                                               {t.category}
                                                           </span>
+                                                          {t.paymentMethod && (
+                                                              <span className="flex items-center gap-0.5 text-[10px] bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded" title="Forma de Pagamento">
+                                                                  <PaymentIcon method={t.paymentMethod} className="w-2.5 h-2.5" />
+                                                                  {PAYMENT_LABELS[t.paymentMethod]}
+                                                              </span>
+                                                          )}
+                                                          {t.walletId && (
+                                                              <span className="text-[10px] text-slate-400 truncate max-w-[80px]" title="Conta/Carteira">
+                                                                  {wallets.find(w => w.id === t.walletId)?.name || 'Conta Removida'}
+                                                              </span>
+                                                          )}
                                                           {t.isRecurring && (
                                                               <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded" title="Recorrente Infinito">
                                                                   <Infinity className="w-3 h-3" /> 
@@ -1417,10 +1625,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                                   </div>
 
-                                                  {/* Payment Method */}
-                                                  <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
-                                                      <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
-                                                      <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                                  {/* Payment Method & Wallet */}
+                                                  <div className="w-28 flex flex-col justify-center">
+                                                      <div className="text-xs text-slate-500 flex items-center gap-1">
+                                                          <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
+                                                          <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                                      </div>
+                                                      {t.walletId && (
+                                                          <span className="text-[10px] text-slate-400 truncate">
+                                                              {wallets.find(w => w.id === t.walletId)?.name || 'Conta Removida'}
+                                                          </span>
+                                                      )}
                                                   </div>
 
                                                   {/* Amount */}
@@ -1501,10 +1716,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           )}
       </div>
 
-      {/* Floating Add Button (Mobile Only) */}
+      {/* Floating Add Button (All Screens) */}
       <button 
           onClick={() => { resetForm(); setIsFormOpen(true); }}
-          className="md:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 flex items-center justify-center z-40 hover:scale-105 transition-transform"
+          className="fixed bottom-20 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/40 flex items-center justify-center z-40 hover:bg-indigo-700 hover:scale-110 active:scale-95 transition-all"
+          title="Nova Transação"
       >
           <Plus className="w-7 h-7" />
       </button>

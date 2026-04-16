@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Wallet, WalletType } from '../types';
-import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Wallet, WalletType, Transaction } from '../types';
+import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle } from 'lucide-react';
 
 interface WalletsViewProps {
   wallets: Wallet[];
+  transactions?: Transaction[];
   onAdd: (wallet: Omit<Wallet, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<Wallet>) => void;
   onDelete: (id: string) => void;
@@ -19,11 +20,25 @@ const WALLET_TYPES: { value: WalletType; label: string; icon: any }[] = [
 
 const COLORS = ['slate', 'red', 'orange', 'amber', 'emerald', 'teal', 'cyan', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
 
-export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpdate, onDelete, onTransfer }) => {
+export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions = [], onAdd, onUpdate, onDelete, onTransfer }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string>('');
   
+  const totals = useMemo(() => {
+    return wallets.reduce(
+      (acc, wallet) => {
+        if (wallet.type === WalletType.BANK) acc.bank += wallet.balance;
+        else if (wallet.type === WalletType.CREDIT_CARD) acc.credit += wallet.balance;
+        else if (wallet.type === WalletType.MEAL_TICKET) acc.meal += wallet.balance;
+        else if (wallet.type === WalletType.OTHER) acc.other += wallet.balance;
+        return acc;
+      },
+      { bank: 0, credit: 0, meal: 0, other: 0 }
+    );
+  }, [wallets]);
+
   // Transfer Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferSourceId, setTransferSourceId] = useState<string>('');
@@ -31,6 +46,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
   const [transferAmount, setTransferAmount] = useState<number>(0);
   const [transferDate, setTransferDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [transferObs, setTransferObs] = useState<string>('');
+  const [transferError, setTransferError] = useState<string>('');
   
   const [formData, setFormData] = useState<Omit<Wallet, 'id'>>({
     name: '',
@@ -43,6 +59,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
     setFormData({ name: '', type: WalletType.BANK, balance: 0, color: 'indigo' });
     setEditingId(null);
     setIsFormOpen(false);
+    setWalletError('');
   };
 
   const handleEdit = (wallet: Wallet) => {
@@ -55,6 +72,19 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
     });
     setEditingId(wallet.id);
     setIsFormOpen(true);
+    setWalletError('');
+  };
+
+  const handleDelete = (id: string) => {
+    const hasLinkedTransactions = transactions.some(t => t.walletId === id);
+    if (hasLinkedTransactions) {
+      setWalletError('Não é possível excluir esta conta pois existem transações vinculadas a ela. Exclua as transações primeiro ou edite-as para outra conta.');
+      // Auto clear error after 5s
+      setTimeout(() => setWalletError(''), 5000);
+      return;
+    }
+    setWalletError('');
+    onDelete(id);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -69,12 +99,30 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
 
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (transferAmount <= 0) {
+      setTransferError('O valor da transferência deve ser maior que zero.');
+      return;
+    }
+    
+    if (transferSourceId === transferTargetId) {
+      setTransferError('A conta de destino deve ser diferente da conta de origem.');
+      return;
+    }
+    
+    const sourceWallet = wallets.find(w => w.id === transferSourceId);
+    if (sourceWallet && transferAmount > sourceWallet.balance) {
+      setTransferError('Saldo insuficiente para esta transferência.');
+      return;
+    }
+    
     if (onTransfer && transferSourceId && transferTargetId && transferAmount > 0) {
       onTransfer(transferSourceId, transferTargetId, transferAmount, transferDate, transferObs);
       setIsTransferModalOpen(false);
       setTransferAmount(0);
       setTransferObs('');
       setTransferTargetId('');
+      setTransferError('');
     }
   };
 
@@ -198,7 +246,43 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
         </div>
       )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      {walletError && (
+        <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-sm font-medium flex items-start gap-2 mb-4 animate-fade-in">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p>{walletError}</p>
+        </div>
+      )}
+
+      {isExpanded && !isFormOpen && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Contas</div>
+            <div className="font-bold text-slate-700 dark:text-slate-200">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.bank)}
+            </div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Cartões</div>
+            <div className="font-bold text-slate-700 dark:text-slate-200">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.credit)}
+            </div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Alimentação</div>
+            <div className="font-bold text-slate-700 dark:text-slate-200">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.meal)}
+            </div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Outros</div>
+            <div className="font-bold text-slate-700 dark:text-slate-200">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.other)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {wallets.map(wallet => {
               const TypeIcon = WALLET_TYPES.find(t => t.value === wallet.type)?.icon || MoreHorizontal;
               const colorClass = wallet.color ? `bg-${wallet.color}-100 text-${wallet.color}-600 dark:bg-${wallet.color}-900/30 dark:text-${wallet.color}-400` : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
@@ -214,6 +298,11 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
                       {onTransfer && (
                         <button onClick={() => {
                           setTransferSourceId(wallet.id);
+                          setTransferTargetId('');
+                          setTransferAmount(0);
+                          setTransferDate(new Date().toISOString().split('T')[0]);
+                          setTransferObs('');
+                          setTransferError('');
                           setIsTransferModalOpen(true);
                         }} className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Transferir">
                           <ArrowRightLeft className="w-3 h-3" />
@@ -222,7 +311,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
                       <button onClick={() => handleEdit(wallet)} className="p-1 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded transition-colors" title="Editar">
                         <Pencil className="w-3 h-3" />
                       </button>
-                      <button onClick={() => onDelete(wallet.id)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors" title="Excluir">
+                      <button onClick={() => handleDelete(wallet.id)} className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded transition-colors" title="Excluir">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -275,6 +364,13 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, onAdd, onUpda
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
+            {transferError && (
+              <div className="mx-4 mt-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-sm font-medium flex items-start gap-2 animate-fade-in">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <p>{transferError}</p>
+              </div>
+            )}
             
             <form onSubmit={handleTransferSubmit} className="p-4 space-y-4">
               <div>
