@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Wallet, WalletType, Transaction } from '../types';
-import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle, Utensils, Wallet as WalletIcon } from 'lucide-react';
 
 interface WalletsViewProps {
   wallets: Wallet[];
@@ -52,11 +52,12 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
     name: '',
     type: WalletType.BANK,
     balance: 0,
-    color: 'indigo'
+    color: 'indigo',
+    observation: ''
   });
 
   const resetForm = () => {
-    setFormData({ name: '', type: WalletType.BANK, balance: 0, color: 'indigo' });
+    setFormData({ name: '', type: WalletType.BANK, balance: 0, color: 'indigo', observation: '' });
     setEditingId(null);
     setIsFormOpen(false);
     setWalletError('');
@@ -68,7 +69,8 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
       type: wallet.type,
       balance: wallet.balance,
       color: wallet.color || 'indigo',
-      icon: wallet.icon
+      icon: wallet.icon,
+      observation: wallet.observation || ''
     });
     setEditingId(wallet.id);
     setIsFormOpen(true);
@@ -210,7 +212,17 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
+                <textarea
+                  value={formData.observation || ''}
+                  onChange={e => setFormData({ ...formData, observation: e.target.value })}
+                  placeholder="Ex: Cartão vence dia 10, conta conjunta..."
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-20"
+                />
+              </div>
+
+              <div className="md:col-span-3">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cor</label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {COLORS.map(color => (
@@ -254,28 +266,28 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
       )}
 
       {isExpanded && !isFormOpen && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Contas</div>
-            <div className="font-bold text-slate-700 dark:text-slate-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><Landmark className="w-3 h-3" /> Contas</div>
+            <div className="text-lg font-bold text-slate-800 dark:text-white">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.bank)}
             </div>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Cartões</div>
-            <div className="font-bold text-slate-700 dark:text-slate-200">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><CreditCard className="w-3 h-3" /> Cartões</div>
+            <div className="text-lg font-bold text-slate-800 dark:text-white">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.credit)}
             </div>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Alimentação</div>
-            <div className="font-bold text-slate-700 dark:text-slate-200">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><Utensils className="w-3 h-3" /> Alimentação</div>
+            <div className="text-lg font-bold text-slate-800 dark:text-white">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.meal)}
             </div>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Outros</div>
-            <div className="font-bold text-slate-700 dark:text-slate-200">
+          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><WalletIcon className="w-3 h-3" /> Outros</div>
+            <div className="text-lg font-bold text-slate-800 dark:text-white">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.other)}
             </div>
           </div>
@@ -325,6 +337,11 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                         {formatCurrency(wallet.balance)}
                       </p>
                     </div>
+                    {wallet.observation && (
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 line-clamp-2 italic leading-tight">
+                        {wallet.observation}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
