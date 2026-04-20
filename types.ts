@@ -17,6 +17,7 @@ export interface Wallet {
   balance: number;
   color?: string;
   icon?: string;
+  observation?: string; // Observação opcional para a carteira
 }
 
 export interface Category {
@@ -45,6 +46,7 @@ export interface Transaction {
   googleEventId?: string; // ID do evento no Google Calendar
   walletId?: string; // ID da carteira/banco onde foi pago/recebido
   isGhost?: boolean; // Transação futura projetada (não salva no banco)
+  groupId?: string; // ID de agrupamento para transações parceladas/recorrentes
 }
 
 export interface InvestmentHistory {

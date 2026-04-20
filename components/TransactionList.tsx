@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, View, Category, Wallet as WalletData, WalletType } from '../types';
-import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown, ArrowDown, ArrowUp, TrendingUp } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 import { WalletsView } from './WalletsView';
 
@@ -952,20 +952,43 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       )}
 
       {/* 3. DYNAMIC SUMMARY CARDS (MONTHLY TOTALS) */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
-        <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Entradas</p>
-          <p className="text-sm md:text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatValue(monthlyTotals.income)}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Saídas</p>
-          <p className="text-sm md:text-lg font-bold text-rose-600 dark:text-rose-400 truncate">{formatValue(monthlyTotals.expense)}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-wider">Resultado (Mês)</p>
-          <p className={`text-sm md:text-lg font-bold truncate ${monthlyTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'}`}>
-            {formatValue(monthlyTotals.balance)}
-          </p>
+      <div className="rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700">
+          <div className="p-4 md:p-5 flex items-center gap-3 md:gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center shrink-0">
+              <ArrowDown className="w-5 h-5 md:w-6 md:h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Entradas</span>
+              <span className="text-lg md:text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-none truncate">
+                {formatValue(monthlyTotals.income)}
+              </span>
+            </div>
+          </div>
+          
+          <div className="p-4 md:p-5 flex items-center gap-3 md:gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-rose-200 dark:border-rose-500/30 flex items-center justify-center shrink-0">
+              <ArrowUp className="w-5 h-5 md:w-6 md:h-6 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Saídas</span>
+              <span className="text-lg md:text-xl font-bold text-rose-600 dark:text-rose-400 leading-none truncate">
+                {formatValue(monthlyTotals.expense)}
+              </span>
+            </div>
+          </div>
+          
+          <div className="p-4 md:p-5 flex items-center gap-3 md:gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Resultado do Mês</span>
+              <span className={`text-lg md:text-xl font-bold leading-none truncate ${monthlyTotals.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatValue(monthlyTotals.balance)}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1546,10 +1569,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       {t.observation && <span className="text-[10px] text-slate-400 font-normal truncate max-w-[300px]">{t.observation}</span>}
                                                   </div>
 
-                                                  {/* Payment Method */}
-                                                  <div className="w-24 text-xs text-slate-500 flex items-center gap-1">
-                                                      <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
-                                                      <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                                  {/* Payment Method & Wallet */}
+                                                  <div className="w-32 text-xs text-slate-500 flex flex-col justify-center">
+                                                      <div className="flex items-center gap-1" title="Forma de Pagamento">
+                                                          <PaymentIcon method={t.paymentMethod || ''} className="w-3 h-3" />
+                                                          <span className="truncate">{PAYMENT_LABELS[t.paymentMethod || ''] || '-'}</span>
+                                                      </div>
+                                                      {t.walletId && (
+                                                          <div className="flex items-center gap-1 mt-0.5 text-[10px] text-slate-400" title="Conta/Carteira">
+                                                              <Wallet className="w-2.5 h-2.5" />
+                                                              <span className="truncate">
+                                                                  {wallets.find(w => w.id === t.walletId)?.name || 'Conta apagada'}
+                                                              </span>
+                                                          </div>
+                                                      )}
                                                   </div>
 
                                                   {/* Amount */}

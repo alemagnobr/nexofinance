@@ -266,29 +266,54 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
       )}
 
       {isExpanded && !isFormOpen && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><Landmark className="w-3 h-3" /> Contas</div>
-            <div className="text-lg font-bold text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.bank)}
+        <div className="mb-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700">
+            <div className="p-4 md:p-5 flex items-center gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-100/50 dark:border-indigo-500/20">
+                <Landmark className="w-5 h-5 md:w-6 md:h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Contas</span>
+                <span className="text-lg md:text-xl font-bold text-indigo-600 dark:text-indigo-400 leading-none">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.bank)}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><CreditCard className="w-3 h-3" /> Cartões</div>
-            <div className="text-lg font-bold text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.credit)}
+            
+            <div className="p-4 md:p-5 flex items-center gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0 border border-indigo-100/50 dark:border-indigo-500/20">
+                <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Cartões</span>
+                <span className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-300 leading-none">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.credit)}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><Utensils className="w-3 h-3" /> Alimentação</div>
-            <div className="text-lg font-bold text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.meal)}
+            
+            <div className="p-4 md:p-5 flex items-center gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-100/50 dark:border-emerald-500/20">
+                <Utensils className="w-5 h-5 md:w-6 md:h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Alimentação</span>
+                <span className="text-lg md:text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-none">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.meal)}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1"><WalletIcon className="w-3 h-3" /> Outros</div>
-            <div className="text-lg font-bold text-slate-800 dark:text-white">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.other)}
+            
+            <div className="p-4 md:p-5 flex items-center gap-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center shrink-0 border border-slate-200/50 dark:border-slate-600/50">
+                <MoreHorizontal className="w-5 h-5 md:w-6 md:h-6 text-slate-500 dark:text-slate-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider mb-0.5">Outros</span>
+                <span className="text-lg md:text-xl font-bold text-slate-600 dark:text-slate-300 leading-none">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totals.other)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
