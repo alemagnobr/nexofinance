@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
 import { AIAgendaAssistant } from './AIAgendaAssistant';
+import { CurrencyInput } from './CurrencyInput';
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
@@ -744,13 +745,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Valor (R$)</label>
                                <div className="relative">
                                    <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                                   <input 
+                                   <CurrencyInput 
                                        required
-                                       type="number"
-                                       step="0.01"
                                        placeholder="0,00"
                                        value={formData.amount}
-                                       onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                                       onChangeValue={(val) => setFormData({...formData, amount: val})}
                                        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                    />
                                </div>

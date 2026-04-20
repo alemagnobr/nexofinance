@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Wallet, WalletType, Transaction } from '../types';
 import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle, Utensils, Wallet as WalletIcon } from 'lucide-react';
+import { CurrencyInput } from './CurrencyInput';
 
 interface WalletsViewProps {
   wallets: Wallet[];
@@ -202,12 +203,10 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Saldo Atual</label>
-                <input
+                <CurrencyInput
                   required
-                  type="number"
-                  step="0.01"
                   value={formData.balance}
-                  onChange={e => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
+                  onChangeValue={val => setFormData({ ...formData, balance: parseFloat(val) || 0 })}
                   className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
@@ -442,13 +441,10 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor</label>
-                <input
+                <CurrencyInput
                   required
-                  type="number"
-                  step="0.01"
-                  min="0.01"
                   value={transferAmount || ''}
-                  onChange={e => setTransferAmount(parseFloat(e.target.value) || 0)}
+                  onChangeValue={val => setTransferAmount(parseFloat(val) || 0)}
                   className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="0,00"
                 />

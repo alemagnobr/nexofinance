@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, ShoppingCategory } from '../types';
 import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { generateShoppingListFromRecipe } from '../services/geminiService';
+import { CurrencyInput } from './CurrencyInput';
 
 interface ShoppingListProps {
   items: ShoppingItem[];
@@ -455,13 +456,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                      
                      {isEditingBudget ? (
                          <div className="flex items-center gap-2 justify-end">
-                             <span className="text-sm font-bold text-slate-500">R$</span>
-                             <input 
+                             <CurrencyInput 
                                 autoFocus
-                                type="number" 
                                 className="w-24 p-1 text-right font-bold border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                 value={tempBudget}
-                                onChange={(e) => setTempBudget(e.target.value)}
+                                onChangeValue={(val) => setTempBudget(val)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveBudget()}
                                 onBlur={handleSaveBudget}
                              />
@@ -629,11 +628,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                     <div className="relative flex flex-col items-end">
                                        <div className="relative">
                                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                                          <input 
-                                             type="text" 
+                                          <CurrencyInput 
                                              placeholder="0,00"
-                                             value={item.actualPrice === 0 ? '' : item.actualPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                             onChange={(e) => onUpdate(item.id, { actualPrice: parseCurrencyInput(e.target.value) })}
+                                             value={item.actualPrice === 0 ? '' : item.actualPrice.toString()}
+                                             onChangeValue={(val) => onUpdate(item.id, { actualPrice: parseFloat(val) || 0 })}
                                              className={`w-28 pl-8 pr-2 py-2 rounded-lg border outline-none font-bold text-right transition-colors ${
                                                 item.actualPrice > 0 
                                                 ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 

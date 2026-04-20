@@ -4,6 +4,7 @@ import { AppData, WealthProfile, RiskProfile } from '../types';
 import { Landmark, TrendingUp, ShieldCheck, Target, Lock, BrainCircuit, Sparkles, AlertCircle, ChevronRight, Gem } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, ReferenceLine, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import { analyzeWealthPortfolio, WealthAnalysisResult } from '../services/geminiService';
+import { CurrencyInput } from './CurrencyInput';
 
 interface WealthPlannerProps {
   data: AppData;
@@ -187,12 +188,11 @@ export const WealthPlanner: React.FC<WealthPlannerProps> = ({ data, onSaveProfil
                   </div>
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase">Aporte Mensal (Simulado)</label>
-                      <input 
-                         type="number" 
+                      <CurrencyInput 
                          placeholder={`Atual: R$ ${monthlyMetrics.savings.toFixed(0)}`}
                          value={profile.monthlyContributionOverride || ''}
-                         onChange={(e) => setProfile({...profile, monthlyContributionOverride: Number(e.target.value)})}
-                         className="w-full mt-1 p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
+                         onChangeValue={(val) => setProfile({...profile, monthlyContributionOverride: parseFloat(val) || undefined })}
+                         className="w-full mt-1 p-3 border rounded-lg dark:bg-slate-700 dark:border-slate-600 outline-none"
                       />
                   </div>
               </div>

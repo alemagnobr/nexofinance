@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Budget, Transaction, Investment, View, Category } from '../types';
 import { Plus, Trash2, Target, AlertTriangle, CheckCircle, Edit2, AlertCircle, ChevronLeft, Calendar, ChevronRight, Repeat, CalendarClock, Info, TrendingUp, BarChart3, ArrowRight, Save, X, Ghost, Medal, LineChart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+import { CurrencyInput } from './CurrencyInput';
 
 interface BudgetListProps {
   budgets: Budget[];
@@ -349,12 +350,11 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
 
           <div className="flex flex-col gap-1">
              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Valor Teto (R$)</label>
-             <input
+             <CurrencyInput
                 required
-                type="number"
                 placeholder="Ex: 1000.00"
                 value={newBudget.limit}
-                onChange={e => setNewBudget({ ...newBudget, limit: e.target.value })}
+                onChangeValue={val => setNewBudget({ ...newBudget, limit: val })}
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-pink-500"
               />
           </div>
@@ -442,12 +442,11 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
                       {/* Inline Edit Trigger */}
                       {editingId === budget.id ? (
                           <div className="flex items-center gap-1 animate-fade-in">
-                             <input 
+                             <CurrencyInput 
                                 autoFocus
-                                type="number"
                                 className="w-20 p-1 text-sm border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChangeValue={(val) => setEditValue(val)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(budget.id)}
                              />
                              <button onClick={() => handleSaveEdit(budget.id)} className="p-1 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"><Save className="w-3 h-3"/></button>

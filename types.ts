@@ -85,8 +85,10 @@ export interface Debt {
   creditor: string; // Nome do banco/loja
   originalAmount: number; // Valor original da dívida
   currentAmount: number; // Valor atual com juros abusivos
-  targetAmount: number; // Quanto você quer pagar (acordo)
+  targetAmount: number; // Quanto você quer pagar (acordo) ou dívida negociada
   agreedAmount?: number; // Valor final fechado no acordo
+  hasDownPayment?: boolean; // Se teve entrada na negociação
+  downPaymentAmount?: number; // Valor da entrada
   dueDate: string; // Data original do vencimento (para prescrição)
   status: 'open' | 'negotiating' | 'agreement' | 'paid';
   platform?: string; // Onde está sendo negociado (Serasa, Desenrola, etc)

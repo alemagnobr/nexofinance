@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard, KanbanTag, KanbanComment, KanbanAttachment } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, ChevronLeft, ChevronRight, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink, ArrowUp, ArrowDown, GripHorizontal } from 'lucide-react';
+import { CurrencyInput } from './CurrencyInput';
 
 interface KanbanBoardProps {
   boards: IKanbanBoard[];
@@ -108,6 +109,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
 
   // Drag State
   const [draggedCard, setDraggedCard] = useState<{ cardId: string, sourceColId: string } | null>(null);
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   // Initialize Active Board
@@ -414,7 +416,75 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
 
   // --- DRAG AND DROP LOGIC ---
 
+  const handleMoveColumnLeft = (colId: string) => {
+      if (!activeBoard) return;
+      const sorted = [...activeBoard.columns].sort((a,b) => a.order - b.order);
+      const index = sorted.findIndex(c => c.id === colId);
+      if (index > 0) {
+          const temp = sorted[index];
+          sorted[index] = sorted[index - 1];
+          sorted[index - 1] = temp;
+          
+          const updatedCols = sorted.map((c, idx) => ({ ...c, order: idx }));
+          saveColumns(updatedCols);
+      }
+  };
+
+  const handleMoveColumnRight = (colId: string) => {
+      if (!activeBoard) return;
+      const sorted = [...activeBoard.columns].sort((a,b) => a.order - b.order);
+      const index = sorted.findIndex(c => c.id === colId);
+      if (index !== -1 && index < sorted.length - 1) {
+          const temp = sorted[index];
+          sorted[index] = sorted[index + 1];
+          sorted[index + 1] = temp;
+          
+          const updatedCols = sorted.map((c, idx) => ({ ...c, order: idx }));
+          saveColumns(updatedCols);
+      }
+  };
+
+  const handleColDragStart = (e: React.DragEvent, colId: string) => {
+      // Allow only column dragging if no card is being dragged
+      if (draggedCard) {
+          e.preventDefault();
+          return;
+      }
+      setDraggedColumnId(colId);
+      e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleColDragEnd = (e: React.DragEvent) => {
+      setDraggedColumnId(null);
+  };
+
+  const handleColDrop = (e: React.DragEvent, targetColId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (draggedCard) {
+          handleDrop(e, targetColId);
+          return;
+      }
+
+      if (!draggedColumnId || draggedColumnId === targetColId || !activeBoard) return;
+
+      const newCols = [...activeBoard.columns].sort((a,b) => a.order - b.order);
+      const sourceIdx = newCols.findIndex(c => c.id === draggedColumnId);
+      const targetIdx = newCols.findIndex(c => c.id === targetColId);
+
+      if (sourceIdx !== -1 && targetIdx !== -1) {
+          const [movedCol] = newCols.splice(sourceIdx, 1);
+          newCols.splice(targetIdx, 0, movedCol);
+          
+          const updatedCols = newCols.map((c, idx) => ({ ...c, order: idx }));
+          saveColumns(updatedCols);
+      }
+      setDraggedColumnId(null);
+  };
+
   const handleDragStart = (e: React.DragEvent, cardId: string, sourceColId: string) => {
+      e.stopPropagation();
       setDraggedCard({ cardId, sourceColId });
       e.dataTransfer.effectAllowed = 'move';
   };
@@ -633,13 +703,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                   return (
                   <div 
                       key={col.id} 
-                      className={`w-72 flex flex-col rounded-xl border backdrop-blur-sm transition-colors ${theme.wrapper} ${draggedCard && draggedCard.sourceColId !== col.id ? 'opacity-50 border-dashed' : 'shadow-sm'}`}
+                      draggable={!isTouchDevice && editingColumn?.id !== col.id}
+                      onDragStart={(e) => handleColDragStart(e, col.id)}
+                      onDragEnd={handleColDragEnd}
+                      className={`w-72 flex flex-col rounded-xl border backdrop-blur-sm transition-colors ${theme.wrapper} ${draggedCard && draggedCard.sourceColId !== col.id ? 'opacity-50 border-dashed' : 'shadow-sm'} ${draggedColumnId === col.id ? 'opacity-30 border-dashed' : ''}`}
                       onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, col.id)}
+                      onDrop={(e) => handleColDrop(e, col.id)}
                   >
                       {/* Column Header */}
-                      <div className={`p-3 border-b flex justify-between items-center group/header rounded-t-xl ${theme.header} ${theme.wrapper.split(' ')[2]}`}>
+                      <div className={`p-3 border-b flex justify-between items-center group/header rounded-t-xl ${theme.header} ${theme.wrapper.split(' ')[2]} ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                           <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <GripHorizontal className="w-4 h-4 text-slate-400 opacity-50 hover:opacity-100 flex-shrink-0 cursor-grab" />
                               {col.isConclusion && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
                               
                               {editingColumn?.id === col.id ? (
@@ -686,15 +760,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                               })()}
                           </div>
                           
-                          {!col.isConclusion && (
-                              <button 
-                                  onClick={() => { if(confirm('Excluir coluna?')) onDeleteColumn(col.id) }} 
-                                  className="text-slate-400 hover:text-rose-500 ml-2 opacity-100 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity"
-                                  title="Excluir Coluna"
-                              >
-                                  <X className="w-4 h-4" />
-                              </button>
-                          )}
+                          <div className="flex items-center">
+                              {index > 0 && (
+                                  <button 
+                                      onClick={() => handleMoveColumnLeft(col.id)} 
+                                      className="text-slate-400 hover:text-indigo-500 mx-0.5 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity bg-white/50 dark:bg-slate-800/50 rounded p-1"
+                                      title="Mover para esquerda"
+                                  >
+                                      <ChevronLeft className="w-3.5 h-3.5" />
+                                  </button>
+                              )}
+                              {index < sortedColumns.length - 1 && (
+                                  <button 
+                                      onClick={() => handleMoveColumnRight(col.id)} 
+                                      className="text-slate-400 hover:text-indigo-500 mx-0.5 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity bg-white/50 dark:bg-slate-800/50 rounded p-1"
+                                      title="Mover para direita"
+                                  >
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                              )}
+                              {!col.isConclusion && (
+                                  <button 
+                                      onClick={() => { if(confirm('Excluir coluna?')) onDeleteColumn(col.id) }} 
+                                      className="text-slate-400 hover:text-rose-500 ml-1 md:opacity-0 md:group-hover/header:opacity-100 transition-opacity p-1"
+                                      title="Excluir Coluna"
+                                  >
+                                      <X className="w-4 h-4" />
+                                  </button>
+                              )}
+                          </div>
                       </div>
 
                       {/* Cards Area */}
@@ -723,10 +817,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                   className="w-full text-sm p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
                                                   placeholder="Título"
                                               />
-                                              <input 
-                                                  type="number" 
+                                              <CurrencyInput 
                                                   value={editingCard.amount}
-                                                  onChange={(e) => setEditingCard({ ...editingCard, amount: e.target.value })}
+                                                  onChangeValue={(val) => setEditingCard({ ...editingCard, amount: val })}
                                                   className="w-full text-sm p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
                                                   placeholder="Valor (R$)"
                                               />
@@ -1014,12 +1107,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       onChange={e => setNewCardTitle(e.target.value)}
                                   />
                                   <div className="flex gap-1">
-                                      <input 
-                                          type="number" 
+                                      <CurrencyInput 
                                           className="w-20 p-2 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                           placeholder="R$"
                                           value={newCardAmount}
-                                          onChange={e => setNewCardAmount(e.target.value)}
+                                          onChangeValue={val => setNewCardAmount(val)}
                                       />
                                       <div className="flex-1 flex justify-end gap-1">
                                           {COLORS.map(c => (

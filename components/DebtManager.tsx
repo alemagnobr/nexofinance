@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Debt, Transaction } from '../types';
-import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon, TrendingUp, Calculator, Layers, Globe, Link } from 'lucide-react';
+import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon, TrendingUp, Calculator, Layers, Globe, Link, Edit2 } from 'lucide-react';
+import { CurrencyInput } from './CurrencyInput';
 
 interface DebtManagerProps {
   debts: Debt[];
@@ -27,6 +28,7 @@ const NEGOTIATION_PLATFORMS = [
 
 export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode, quickActionSignal }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
   const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'prescribed'>('all');
 
   // Modal State for Agreement
@@ -38,7 +40,9 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
   const [agreementDetails, setAgreementDetails] = useState({
     date: new Date().toISOString().split('T')[0],
     amount: '',
-    installments: 1
+    installments: 1,
+    hasDownPayment: false,
+    downPaymentAmount: ''
   });
 
   // Modal State for Interest
@@ -58,14 +62,21 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     status: 'open' as Debt['status'],
     platform: 'Serasa Limpa Nome',
     customPlatform: '', // Campo auxiliar para "Outros"
-    notes: ''
+    notes: '',
+    hasDownPayment: false,
+    downPaymentAmount: ''
   });
+
+  const resetForm = () => {
+    setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', platform: 'Serasa Limpa Nome', customPlatform: '', notes: '', hasDownPayment: false, downPaymentAmount: '' });
+    setEditingDebtId(null);
+  };
 
   // Effect to listen for Quick Action triggers
   useEffect(() => {
     if (quickActionSignal && Date.now() - quickActionSignal < 2000) {
         setIsFormOpen(true);
-        setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', platform: 'Serasa Limpa Nome', customPlatform: '', notes: '' });
+        resetForm();
     }
   }, [quickActionSignal]);
 
@@ -116,13 +127,11 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic: If targetAmount is empty, save as 0 (Sem Meta)
     const target = newDebt.targetAmount ? parseFloat(newDebt.targetAmount) : 0;
-    
-    // Define a plataforma final
     const finalPlatform = newDebt.platform === 'Outros' ? newDebt.customPlatform : newDebt.platform;
+    const downPayment = newDebt.hasDownPayment && newDebt.downPaymentAmount ? parseFloat(newDebt.downPaymentAmount) : 0;
 
-    onAdd({
+    const debtData = {
       creditor: newDebt.creditor,
       originalAmount: parseFloat(newDebt.originalAmount),
       currentAmount: parseFloat(newDebt.currentAmount),
@@ -130,10 +139,37 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
       dueDate: newDebt.dueDate,
       status: newDebt.status,
       platform: finalPlatform,
-      notes: newDebt.notes
-    });
-    setNewDebt({ creditor: '', originalAmount: '', currentAmount: '', targetAmount: '', dueDate: '', status: 'open', platform: 'Serasa Limpa Nome', customPlatform: '', notes: '' });
+      notes: newDebt.notes,
+      hasDownPayment: newDebt.hasDownPayment,
+      downPaymentAmount: downPayment
+    };
+
+    if (editingDebtId) {
+      onUpdate(editingDebtId, debtData);
+    } else {
+      onAdd(debtData);
+    }
+    
+    resetForm();
     setIsFormOpen(false);
+  };
+
+  const handleEditDebt = (debt: Debt) => {
+    setNewDebt({
+      creditor: debt.creditor,
+      originalAmount: debt.originalAmount.toString(),
+      currentAmount: debt.currentAmount.toString(),
+      targetAmount: debt.targetAmount ? debt.targetAmount.toString() : '',
+      dueDate: debt.dueDate,
+      status: debt.status,
+      platform: NEGOTIATION_PLATFORMS.includes(debt.platform || '') ? (debt.platform || 'Serasa Limpa Nome') : 'Outros',
+      customPlatform: !NEGOTIATION_PLATFORMS.includes(debt.platform || '') ? (debt.platform || '') : '',
+      notes: debt.notes || '',
+      hasDownPayment: debt.hasDownPayment || false,
+      downPaymentAmount: debt.downPaymentAmount ? debt.downPaymentAmount.toString() : ''
+    });
+    setEditingDebtId(debt.id);
+    setIsFormOpen(true);
   };
 
   const handleStatusChange = (debt: Debt, newStatus: string) => {
@@ -148,7 +184,9 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
       setAgreementDetails({
         date: new Date().toISOString().split('T')[0],
         amount: suggestedAmount.toString(),
-        installments: 1
+        installments: 1,
+        hasDownPayment: false,
+        downPaymentAmount: ''
       });
     } else {
       onUpdate(debt.id, { status: newStatus as Debt['status'] });
@@ -161,39 +199,61 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
     if (!debt) return;
 
     const totalAmount = parseFloat(agreementDetails.amount);
+    const hasDownPayment = agreementDetails.hasDownPayment;
+    const downPaymentAmount = hasDownPayment && agreementDetails.downPaymentAmount ? parseFloat(agreementDetails.downPaymentAmount) : 0;
+    
+    const remainingAmount = Math.max(0, totalAmount - downPaymentAmount);
     const installments = Math.max(1, Math.floor(agreementDetails.installments));
-    const installmentValue = totalAmount / installments;
+    const installmentValue = remainingAmount > 0 ? remainingAmount / installments : 0;
 
     // 1. Update Debt Status AND save the Agreed Amount
     onUpdate(debt.id, { 
       status: 'agreement',
-      agreedAmount: totalAmount 
+      agreedAmount: totalAmount,
+      hasDownPayment: hasDownPayment,
+      downPaymentAmount: downPaymentAmount
     });
 
     // 2. Add Transactions to Calendar/Expenses LINKED to the debt
     const startDate = new Date(agreementDetails.date);
     
-    for (let i = 0; i < installments; i++) {
-        const currentDate = new Date(startDate);
-        currentDate.setMonth(startDate.getMonth() + i);
-        
-        const description = installments > 1 
-            ? `Acordo: ${debt.creditor} (${i + 1}/${installments})` 
-            : `Acordo: ${debt.creditor}`;
-
+    if (hasDownPayment && downPaymentAmount > 0) {
         onAddTransaction({
-            description: description,
-            amount: parseFloat(installmentValue.toFixed(2)), // Ensure 2 decimal places
+            description: `Acordo: ${debt.creditor} (Entrada)`,
+            amount: parseFloat(downPaymentAmount.toFixed(2)),
             type: 'expense',
             category: 'Outros', 
-            date: currentDate.toISOString().split('T')[0],
+            date: startDate.toISOString().split('T')[0],
             status: 'pending', 
             paymentMethod: 'pix',
             debtId: debt.id
         });
     }
+    
+    if (remainingAmount > 0) {
+        for (let i = 0; i < installments; i++) {
+            const currentDate = new Date(startDate);
+            const monthOffset = hasDownPayment ? i + 1 : i;
+            currentDate.setMonth(startDate.getMonth() + monthOffset);
+            
+            const description = installments > 1 
+                ? `Acordo: ${debt.creditor} (${i + 1}/${installments})` 
+                : `Acordo: ${debt.creditor}`;
 
-    alert(`Acordo registrado! ${installments > 1 ? `${installments} parcelas agendadas` : 'Pagamento agendado'}. A dívida será quitada automaticamente quando todas as parcelas forem pagas.`);
+            onAddTransaction({
+                description: description,
+                amount: parseFloat(installmentValue.toFixed(2)), // Ensure 2 decimal places
+                type: 'expense',
+                category: 'Outros', 
+                date: currentDate.toISOString().split('T')[0],
+                status: 'pending', 
+                paymentMethod: 'pix',
+                debtId: debt.id
+            });
+        }
+    }
+
+    alert(`Acordo registrado! ${installments > 1 || hasDownPayment ? 'Parcelas agendadas' : 'Pagamento agendado'}. A dívida será quitada automaticamente quando todas as parcelas forem pagas.`);
     setAgreementModal({ isOpen: false, debtId: ''});
   };
 
@@ -288,16 +348,40 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
              <form onSubmit={confirmAgreement} className="space-y-4">
                 <div>
                    <label className="text-xs font-bold text-slate-500 uppercase">Valor Total Fechado (R$)</label>
-                   <input 
-                      type="number" 
+                   <CurrencyInput 
                       required
-                      step="0.01"
                       placeholder="Valor total a pagar"
                       value={agreementDetails.amount}
-                      onChange={e => setAgreementDetails({...agreementDetails, amount: e.target.value})}
+                      onChangeValue={(val) => setAgreementDetails({...agreementDetails, amount: val})}
                       className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-bold text-lg outline-none focus:ring-2 focus:ring-emerald-500"
                    />
                 </div>
+                
+                <div className="flex items-center gap-2 mb-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded border border-slate-200 dark:border-slate-600">
+                    <input 
+                        type="checkbox" 
+                        id="hasDownPayment" 
+                        checked={agreementDetails.hasDownPayment}
+                        onChange={(e) => setAgreementDetails({...agreementDetails, hasDownPayment: e.target.checked})}
+                        className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
+                    />
+                    <label htmlFor="hasDownPayment" className="text-sm font-medium text-slate-700 dark:text-slate-300 select-none">
+                        Teve valor de entrada?
+                    </label>
+                </div>
+
+                {agreementDetails.hasDownPayment && (
+                    <div className="animate-fade-in mb-4">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Valor da Entrada (R$)</label>
+                        <CurrencyInput 
+                            required
+                            placeholder="Valor pago na entrada"
+                            value={agreementDetails.downPaymentAmount}
+                            onChangeValue={(val) => setAgreementDetails({...agreementDetails, downPaymentAmount: val})}
+                            className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white font-bold text-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                    </div>
+                )}
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -409,22 +493,20 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
 
           <div>
              <label className="text-xs font-semibold text-slate-500 mb-1 block">Valor Original (R$)</label>
-             <input
+             <CurrencyInput
                 required
-                type="number"
                 value={newDebt.originalAmount}
-                onChange={e => setNewDebt({ ...newDebt, originalAmount: e.target.value })}
+                onChangeValue={val => setNewDebt({ ...newDebt, originalAmount: val })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none"
              />
           </div>
 
           <div>
              <label className="text-xs font-semibold text-slate-500 mb-1 block">Valor Atual c/ Juros (R$)</label>
-             <input
+             <CurrencyInput
                 required
-                type="number"
                 value={newDebt.currentAmount}
-                onChange={e => setNewDebt({ ...newDebt, currentAmount: e.target.value })}
+                onChangeValue={val => setNewDebt({ ...newDebt, currentAmount: val })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none"
              />
           </div>
@@ -443,11 +525,10 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
 
           <div>
              <label className="text-xs font-semibold text-slate-500 mb-1 block">Meta de Acordo (Opcional)</label>
-             <input
-                type="number"
+             <CurrencyInput
                 placeholder="Deixe em branco se não houver meta"
                 value={newDebt.targetAmount}
-                onChange={e => setNewDebt({ ...newDebt, targetAmount: e.target.value })}
+                onChangeValue={val => setNewDebt({ ...newDebt, targetAmount: val })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500"
              />
           </div>
@@ -620,7 +701,14 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{debt.creditor}</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        {debt.creditor}
+                        {!isPaid && !isAgreement && (
+                            <button onClick={() => handleEditDebt(debt)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-indigo-500 transition-colors">
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </h3>
                     
                     <div className="mt-3 flex flex-wrap gap-4 text-sm">
                        <div>

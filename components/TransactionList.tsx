@@ -4,6 +4,7 @@ import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget,
 import { Plus, Trash2, CheckCircle, Clock, ArrowUpCircle, ArrowDownCircle, Wallet, Wand2, Loader2, Camera, Repeat, ChevronLeft, ChevronRight, Calendar, Pencil, ListFilter, AlertTriangle, AlertCircle, Layers, Bell, Search, Filter, X, Smartphone, CreditCard, Banknote, Landmark, Save, MoreHorizontal, Sigma, CalendarDays, StickyNote, Baby, Briefcase, Infinity, Zap, ChevronUp, ChevronDown, ArrowDown, ArrowUp, TrendingUp } from 'lucide-react';
 import { suggestCategory, analyzeReceipt } from '../services/geminiService';
 import { WalletsView } from './WalletsView';
+import { CurrencyInput } from './CurrencyInput';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -1028,12 +1029,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </div>
           
           <div className="flex flex-col gap-1">
-              <input
+              <CurrencyInput
                 required
-                type="number"
                 placeholder="Valor (R$)"
                 value={newTransaction.amount}
-                onChange={e => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                onChangeValue={val => setNewTransaction({ ...newTransaction, amount: val })}
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 outline-none"
               />
               
@@ -1090,12 +1090,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                       value={otherDeductionsDesc}
                                       onChange={(e) => setOtherDeductionsDesc(e.target.value)}
                                   />
-                                  <input 
-                                      type="number" 
+                                  <CurrencyInput 
                                       placeholder="R$" 
                                       className="w-20 py-1 px-2 text-xs border border-slate-300 rounded outline-none focus:border-indigo-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
                                       value={otherDeductionsAmount}
-                                      onChange={(e) => setOtherDeductionsAmount(e.target.value)}
+                                      onChangeValue={(val) => setOtherDeductionsAmount(val)}
                                   />
                               </div>
                           )}
@@ -1428,15 +1427,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                           onClick={(e) => !t.isGhost && handleInlineEditStart(e, t)}
                                                       >
                                                           {inlineEditingId === t.id ? (
-                                                              <input 
-                                                                  type="number" 
+                                                              <CurrencyInput 
                                                                   value={inlineEditingAmount}
-                                                                  onChange={(e) => setInlineEditingAmount(e.target.value)}
+                                                                  onChangeValue={(val) => setInlineEditingAmount(val)}
                                                                   onBlur={() => handleInlineEditSave(t)}
                                                                   onKeyDown={(e) => { if (e.key === 'Enter') handleInlineEditSave(t); }}
                                                                   className="w-20 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1 py-0.5 text-right text-sm text-slate-900 dark:text-white"
                                                                   autoFocus
-                                                                  onClick={(e) => e.stopPropagation()}
+                                                                  onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
                                                               />
                                                           ) : (
                                                               <>{t.type === 'expense' && '- '}{formatValue(t.amount)}</>
@@ -1591,10 +1589,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                       onClick={(e) => !t.isGhost && handleInlineEditStart(e, t)}
                                                   >
                                                       {inlineEditingId === t.id ? (
-                                                          <input 
-                                                              type="number" 
+                                                          <CurrencyInput 
                                                               value={inlineEditingAmount}
-                                                              onChange={(e) => setInlineEditingAmount(e.target.value)}
+                                                              onChangeValue={(val) => setInlineEditingAmount(val)}
                                                               onBlur={() => handleInlineEditSave(t)}
                                                               onKeyDown={(e) => { if (e.key === 'Enter') handleInlineEditSave(t); }}
                                                               className="w-24 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-1 py-0.5 text-right text-sm text-slate-900 dark:text-white"

@@ -4,6 +4,7 @@ import { Investment, View } from '../types';
 import { Plus, Trash2, TrendingUp, DollarSign, Target, PlusCircle, X, Sparkles, Loader2, ExternalLink, BrainCircuit, ChevronDown, ChevronUp, BookOpen, Compass, TrendingDown, PieChart as PieChartIcon, Edit2, Save, History } from 'lucide-react';
 import { getInvestmentAdvice, InvestmentAdviceResult } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { CurrencyInput } from './CurrencyInput';
 
 interface InvestmentListProps {
   investments: Investment[];
@@ -467,22 +468,20 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
               <>
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase">Valor Atual (Mercado)</label>
-                      <input
+                      <CurrencyInput
                         required
-                        type="number"
                         placeholder="R$"
                         value={newInvest.amount}
-                        onChange={e => setNewInvest({ ...newInvest, amount: e.target.value })}
+                        onChangeValue={val => setNewInvest({ ...newInvest, amount: val })}
                         className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
                       />
                   </div>
                   <div>
                       <label className="text-xs font-bold text-slate-500 uppercase">Valor Investido (Custo)</label>
-                      <input
-                        type="number"
+                      <CurrencyInput
                         placeholder="Igual ao atual se vazio"
                         value={newInvest.investedAmount}
-                        onChange={e => setNewInvest({ ...newInvest, investedAmount: e.target.value })}
+                        onChangeValue={val => setNewInvest({ ...newInvest, investedAmount: val })}
                         className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
                   </div>
@@ -491,11 +490,10 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
 
           <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Objetivo Final (Meta)</label>
-              <input
-                type="number"
+              <CurrencyInput
                 placeholder="R$"
                 value={newInvest.targetAmount}
-                onChange={e => setNewInvest({ ...newInvest, targetAmount: e.target.value })}
+                onChangeValue={val => setNewInvest({ ...newInvest, targetAmount: val })}
                 className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none"
               />
           </div>
@@ -564,15 +562,12 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">VALOR DO APORTE</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2 text-slate-400">R$</span>
-                  <input
+                  <CurrencyInput
                     autoFocus
                     required
-                    type="number"
-                    step="0.01"
-                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg py-2 pl-8 pr-3 focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-medium"
+                    className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg py-2 pl-3 pr-3 focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-medium"
                     value={contributionAmount}
-                    onChange={(e) => setContributionAmount(e.target.value)}
+                    onChangeValue={(val) => setContributionAmount(val)}
                   />
                 </div>
               </div>
@@ -649,12 +644,11 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                         {/* Inline Edit for Current Price */}
                         {editingPriceId === inv.id ? (
                             <div className="flex items-center justify-end gap-1 mt-1">
-                                <input 
+                                <CurrencyInput 
                                     autoFocus
-                                    type="number"
                                     className="w-24 p-1 text-sm border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600 text-right"
                                     value={editingPriceValue}
-                                    onChange={(e) => setEditingPriceValue(e.target.value)}
+                                    onChangeValue={(val) => setEditingPriceValue(val)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSavePriceEdit(inv.id)}
                                     onBlur={() => handleSavePriceEdit(inv.id)}
                                 />
@@ -747,12 +741,11 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase flex items-center gap-1">
                                 <Target className="w-3 h-3" /> Meta: 
                                 {editingTargetId === inv.id ? (
-                                    <input 
+                                    <CurrencyInput 
                                         autoFocus
-                                        type="number"
                                         className="w-20 p-0.5 text-[10px] border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
                                         value={editingTargetValue}
-                                        onChange={(e) => setEditingTargetValue(e.target.value)}
+                                        onChangeValue={(val) => setEditingTargetValue(val)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleSaveTargetEdit(inv.id)}
                                         onBlur={() => handleSaveTargetEdit(inv.id)}
                                     />
@@ -791,12 +784,11 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                 {editingTargetId === inv.id && inv.targetAmount === 0 && (
                     <div className="mt-2 flex justify-end items-center gap-2">
                         <span className="text-[10px] text-slate-500 uppercase font-bold">Nova Meta:</span>
-                        <input 
+                        <CurrencyInput 
                             autoFocus
-                            type="number"
                             className="w-24 p-1 text-sm border rounded bg-white dark:bg-slate-900 dark:text-white dark:border-slate-600"
                             value={editingTargetValue}
-                            onChange={(e) => setEditingTargetValue(e.target.value)}
+                            onChangeValue={(val) => setEditingTargetValue(val)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSaveTargetEdit(inv.id)}
                             onBlur={() => handleSaveTargetEdit(inv.id)}
                         />
@@ -910,31 +902,30 @@ export const InvestmentList: React.FC<InvestmentListProps> = ({ investments, onA
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Atual (R$)</label>
-                      <input 
-                        type="number" step="0.01" required
+                      <CurrencyInput 
+                        required
                         className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
                         value={editingFullInvestment.amount}
-                        onChange={e => setEditingFullInvestment({...editingFullInvestment, amount: parseFloat(e.target.value) || 0})}
+                        onChangeValue={val => setEditingFullInvestment({...editingFullInvestment, amount: parseFloat(val) || 0})}
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Investido (R$)</label>
-                      <input 
-                        type="number" step="0.01" required
+                      <CurrencyInput 
+                        required
                         className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
                         value={editingFullInvestment.investedAmount || editingFullInvestment.amount}
-                        onChange={e => setEditingFullInvestment({...editingFullInvestment, investedAmount: parseFloat(e.target.value) || 0})}
+                        onChangeValue={val => setEditingFullInvestment({...editingFullInvestment, investedAmount: parseFloat(val) || 0})}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Meta (R$)</label>
-                      <input 
-                        type="number" step="0.01"
+                      <CurrencyInput 
                         className="w-full p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-white"
                         value={editingFullInvestment.targetAmount}
-                        onChange={e => setEditingFullInvestment({...editingFullInvestment, targetAmount: parseFloat(e.target.value) || 0})}
+                        onChangeValue={val => setEditingFullInvestment({...editingFullInvestment, targetAmount: parseFloat(val) || 0})}
                       />
                     </div>
                     <div>
