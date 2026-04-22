@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task, View } from '../types';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown, Grid } from 'lucide-react';
+import { Transaction, TransactionType, TransactionStatus, PaymentMethod, Budget, AgendaEvent, TaskList, Task, View, DailyRoutine } from '../types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowUp, ArrowDown, Clock, Filter, Plus, CalendarClock, Download, Layers, X, Check, CreditCard, Tag, AlignLeft, DollarSign, Bell, RefreshCw, ExternalLink, Edit2, Trash2, ListTodo, ChevronUp, ChevronDown, Grid, Repeat } from 'lucide-react';
 import { updateTransactionFire } from '../services/storageService';
 import { auth } from '../services/firebase';
 import { AIAgendaAssistant } from './AIAgendaAssistant';
 import { CurrencyInput } from './CurrencyInput';
+import { DailyRoutines } from './DailyRoutines';
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
@@ -13,6 +14,7 @@ interface FinancialCalendarProps {
   agendaEvents?: AgendaEvent[];
   taskLists?: TaskList[];
   tasks?: Task[];
+  dailyRoutines?: DailyRoutine[];
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
   onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
   onAddAgendaEvent?: (e: Omit<AgendaEvent, 'id' | 'updatedAt'>) => void;
@@ -24,6 +26,9 @@ interface FinancialCalendarProps {
   onAddTask?: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDeleteTask?: (id: string) => void;
+  onAddDailyRoutine?: (title: string) => void;
+  onToggleDailyRoutine?: (id: string, dateStr: string) => void;
+  onDeleteDailyRoutine?: (id: string) => void;
   privacyMode: boolean;
   onNavigate?: (view: any) => void;
 }
@@ -83,6 +88,10 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  dailyRoutines = [],
+  onAddDailyRoutine,
+  onToggleDailyRoutine,
+  onDeleteDailyRoutine,
   privacyMode,
   onNavigate
 }) => {
@@ -102,7 +111,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       description: '',
       startTime: '',
       endTime: '',
-      allDay: true
+      allDay: true,
+      isRecurring: false,
+      recurrencePeriod: 'daily' as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom_days',
+      recurrenceDays: [] as number[],
+      recurrenceEndDate: ''
   });
   const [taskFormData, setTaskFormData] = useState({
       id: '',
@@ -246,14 +259,65 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
 
   // Agenda Events for this month
   const displayedAgendaEvents = useMemo(() => {
-      return agendaEvents.filter(e => {
+      const allEvents: AgendaEvent[] = [];
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+
+      agendaEvents.forEach(e => {
           const eStart = new Date(e.startDate);
           const eEnd = new Date(e.endDate);
-          const monthStart = new Date(year, month, 1);
-          const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+          const duration = eEnd.getTime() - eStart.getTime();
+
+          if (!e.isRecurring) {
+              if (eStart <= monthEnd && eEnd >= monthStart) {
+                  allEvents.push(e);
+              }
+              return;
+          }
+
+          // Handle recurrence
+          const recEnd = e.recurrenceEndDate ? new Date(`${e.recurrenceEndDate}T23:59:59`) : new Date(monthEnd.getFullYear() + 5, 11, 31);
           
-          return eStart <= monthEnd && eEnd >= monthStart;
+          let currentInstanceStart = new Date(eStart);
+          while (currentInstanceStart <= monthEnd && currentInstanceStart <= recEnd) {
+              const currentInstanceEnd = new Date(currentInstanceStart.getTime() + duration);
+
+              if (currentInstanceEnd >= monthStart) {
+                  if (e.recurrencePeriod === 'custom_days' && e.recurrenceDays && e.recurrenceDays.length > 0) {
+                      if (e.recurrenceDays.includes(currentInstanceStart.getDay())) {
+                           allEvents.push({
+                              ...e,
+                              startDate: currentInstanceStart.toISOString(),
+                              endDate: currentInstanceEnd.toISOString(),
+                              isGhost: currentInstanceStart.getTime() !== eStart.getTime()
+                          });
+                      }
+                  } else {
+                      allEvents.push({
+                          ...e,
+                          startDate: currentInstanceStart.toISOString(),
+                          endDate: currentInstanceEnd.toISOString(),
+                          isGhost: currentInstanceStart.getTime() !== eStart.getTime()
+                      });
+                  }
+              }
+
+              // Advance to next instance
+              if (e.recurrencePeriod === 'daily' || e.recurrencePeriod === 'custom_days') {
+                  currentInstanceStart.setDate(currentInstanceStart.getDate() + 1);
+              } else if (e.recurrencePeriod === 'weekly') {
+                  currentInstanceStart.setDate(currentInstanceStart.getDate() + 7);
+              } else if (e.recurrencePeriod === 'monthly') {
+                  currentInstanceStart.setMonth(currentInstanceStart.getMonth() + 1);
+              } else if (e.recurrencePeriod === 'yearly') {
+                  currentInstanceStart.setFullYear(currentInstanceStart.getFullYear() + 1);
+              } else {
+                  break; // failsafe
+              }
+          }
       });
+
+      return allEvents;
   }, [agendaEvents, year, month]);
 
   // Selected Day Transactions and Events
@@ -386,7 +450,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
           description: '',
           startTime: '09:00',
           endTime: '10:00',
-          allDay: true
+          allDay: true,
+          isRecurring: false,
+          recurrencePeriod: 'daily',
+          recurrenceDays: [],
+          recurrenceEndDate: ''
       });
       setIsAgendaModalOpen(true);
   };
@@ -400,7 +468,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
           description: event.description || '',
           startTime: start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           endTime: end.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          allDay: event.allDay
+          allDay: event.allDay,
+          isRecurring: event.isRecurring || false,
+          recurrencePeriod: event.recurrencePeriod || 'daily',
+          recurrenceDays: event.recurrenceDays || [],
+          recurrenceEndDate: event.recurrenceEndDate || ''
       });
       setIsAgendaModalOpen(true);
   };
@@ -437,7 +509,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               description: agendaFormData.description,
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
-              allDay: agendaFormData.allDay
+              allDay: agendaFormData.allDay,
+              isRecurring: agendaFormData.isRecurring,
+              recurrencePeriod: agendaFormData.recurrencePeriod,
+              recurrenceDays: agendaFormData.recurrenceDays,
+              recurrenceEndDate: agendaFormData.recurrenceEndDate
           });
       } else {
           await onAddAgendaEvent({
@@ -445,7 +521,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               description: agendaFormData.description,
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
-              allDay: agendaFormData.allDay
+              allDay: agendaFormData.allDay,
+              isRecurring: agendaFormData.isRecurring,
+              recurrencePeriod: agendaFormData.recurrencePeriod,
+              recurrenceDays: agendaFormData.recurrenceDays,
+              recurrenceEndDate: agendaFormData.recurrenceEndDate
           });
       }
 
@@ -641,26 +721,12 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
        
-       {/* EISENHOWER MATRIX SHORTCUT */}
-       {onNavigate && (
-         <div 
-           onClick={() => onNavigate(View.EISENHOWER)}
-           className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-between group"
-         >
-           <div className="flex items-center gap-4">
-             <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-               <Grid className="w-6 h-6 text-white" />
-             </div>
-             <div>
-               <h3 className="text-white font-bold text-lg">Matriz de Eisenhower</h3>
-               <p className="text-indigo-100 text-sm opacity-90">Priorize suas tarefas e foque no que importa</p>
-             </div>
-           </div>
-           <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
-             <ChevronRight className="w-5 h-5 text-white" />
-           </div>
-         </div>
-       )}
+       <DailyRoutines 
+          routines={dailyRoutines || []}
+          onAddRoutine={onAddDailyRoutine || (() => {})}
+          onToggleRoutine={onToggleDailyRoutine || (() => {})}
+          onDeleteRoutine={onDeleteDailyRoutine || (() => {})}
+       />
 
        <AIAgendaAssistant 
           onAddEvent={(event) => {
@@ -910,6 +976,79 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                            </div>
                        )}
 
+                        <div className="mt-4">
+                            <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                <input 
+                                    type="checkbox" 
+                                    checked={agendaFormData.isRecurring}
+                                    onChange={(e) => setAgendaFormData({...agendaFormData, isRecurring: e.target.checked})}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                                />
+                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                    <Repeat className="w-4 h-4" /> Repetir evento
+                                </span>
+                            </label>
+
+                            {agendaFormData.isRecurring && (
+                                <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 mb-4 text-left">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Frequência</label>
+                                        <select
+                                            value={agendaFormData.recurrencePeriod}
+                                            onChange={(e) => setAgendaFormData({...agendaFormData, recurrencePeriod: e.target.value as any})}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        >
+                                            <option value="daily">Todos os dias</option>
+                                            <option value="weekly">Semanalmente</option>
+                                            <option value="monthly">Mensalmente</option>
+                                            <option value="yearly">Anualmente</option>
+                                            <option value="custom_days">Dias Específicos da Semana</option>
+                                        </select>
+                                    </div>
+
+                                    {agendaFormData.recurrencePeriod === 'custom_days' && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Dias da Semana</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                                                    <button
+                                                        key={index}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            const currentlySelected = (agendaFormData.recurrenceDays || []).includes(index);
+                                                            const newDays = currentlySelected 
+                                                                ? (agendaFormData.recurrenceDays || []).filter((d: number) => d !== index)
+                                                                : [...(agendaFormData.recurrenceDays || []), index];
+                                                            setAgendaFormData({...agendaFormData, recurrenceDays: newDays});
+                                                        }}
+                                                        className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold border transition-colors ${
+                                                            (agendaFormData.recurrenceDays || []).includes(index)
+                                                                ? 'bg-blue-600 border-blue-600 text-white'
+                                                                : 'bg-white border-slate-300 text-slate-500 hover:border-blue-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300'
+                                                        }`}
+                                                    >
+                                                        {day}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Término em (Opcional)</label>
+                                        <input
+                                            type="date"
+                                            value={agendaFormData.recurrenceEndDate || ''}
+                                            onChange={(e) => setAgendaFormData({...agendaFormData, recurrenceEndDate: e.target.value})}
+                                            min={new Date().toISOString().split('T')[0]}
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div>
                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Descrição (Opcional)</label>
                            <textarea 
@@ -1134,10 +1273,10 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <CalendarIcon className="w-7 h-7 text-indigo-600" />
-            Agenda Financeira
+            Agenda
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Previsão de gastos e controle de vencimentos.
+            Rotinas diárias, eventos e controle de vencimentos.
           </p>
         </div>
         
@@ -1171,16 +1310,16 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                 <Download className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex-1 md:flex-none justify-center">
-                <button onClick={handlePrev} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+            <div className="flex items-center bg-indigo-50 dark:bg-indigo-900/30 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-1 flex-1 md:flex-none justify-center">
+                <button onClick={handlePrev} className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400">
                 <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="px-4 font-semibold text-slate-700 dark:text-slate-200 capitalize min-w-[140px] text-center">
+                <div className="px-4 text-sm md:text-base font-black text-indigo-800 dark:text-indigo-300 min-w-[140px] text-center capitalize">
                 {viewMode === 'day' 
                     ? new Date(year, month, selectedDay || 1).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
-                    : currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                    : `${currentDate.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + currentDate.toLocaleDateString('pt-BR', { month: 'long' }).slice(1)}/${currentDate.getFullYear().toString().slice(-2)}`}
                 </div>
-                <button onClick={handleNext} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+                <button onClick={handleNext} className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400">
                 <ChevronRight className="w-5 h-5" />
                 </button>
             </div>

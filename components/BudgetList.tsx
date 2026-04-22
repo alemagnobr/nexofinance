@@ -264,15 +264,15 @@ export const BudgetList: React.FC<BudgetListProps> = ({ budgets, transactions, i
              </button>
 
              {/* Month Selector */}
-            <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-1">
-                <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+            <div className="flex items-center bg-indigo-50 dark:bg-indigo-900/30 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-1 h-full">
+                <button onClick={handlePrevMonth} className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400">
                 <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="px-4 font-semibold text-slate-700 dark:text-slate-200 capitalize min-w-[140px] text-center flex items-center justify-center gap-2">
-                <Calendar className="w-4 h-4 text-pink-500" />
-                {formatMonth(currentDate)}
+                <div className="px-3 text-sm font-black text-indigo-800 dark:text-indigo-300 min-w-[90px] text-center flex items-center justify-center gap-1.5">
+                <Calendar className="w-4 h-4 text-indigo-500 hidden md:block" />
+                {currentDate.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + currentDate.toLocaleDateString('pt-BR', { month: 'long' }).slice(1)}/{currentDate.getFullYear().toString().slice(-2)}
                 </div>
-                <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-600 dark:text-slate-300">
+                <button onClick={handleNextMonth} className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400">
                 <ChevronRight className="w-5 h-5" />
                 </button>
             </div>

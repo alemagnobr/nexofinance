@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { KanbanColumn, KanbanCard, Transaction, TransactionType, KanbanBoard as IKanbanBoard, KanbanTag, KanbanComment, KanbanAttachment } from '../types';
-import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, ChevronLeft, ChevronRight, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink, ArrowUp, ArrowDown, GripHorizontal } from 'lucide-react';
+import { Plus, X, GripVertical, CheckCircle2, MoreHorizontal, Flag, Wallet, Edit2, Sparkles, Layout, Trash2, ChevronDown, ChevronLeft, ChevronRight, Tag, Calendar, MessageSquare, Clock, Send, AlertCircle, Link as LinkIcon, ExternalLink, ArrowUp, ArrowDown, GripHorizontal, AlignLeft, CheckSquare } from 'lucide-react';
 import { CurrencyInput } from './CurrencyInput';
 
 interface KanbanBoardProps {
@@ -137,6 +137,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
   }, [boards, activeBoardId]);
 
   const activeBoard = boards.find(b => b.id === activeBoardId);
+
+  const activeExpandedData = (() => {
+      if (!activeBoard || !expandedCardId) return null;
+      for (const col of activeBoard.columns) {
+          const card = col.cards.find(c => c.id === expandedCardId);
+          if (card) return { col, card };
+      }
+      return null;
+  })();
 
   const handleCreateBoard = (e: React.FormEvent) => {
       e.preventDefault();
@@ -327,10 +336,76 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
       saveColumns(newCols);
   };
 
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const handleAddSubtask = (columnId: string, cardId: string) => {
+      if (!activeBoard || !newSubtaskTitle.trim()) return;
+      
+      const newSubtask = {
+          id: crypto.randomUUID(),
+          title: newSubtaskTitle.trim(),
+          completed: false
+      };
+
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { ...x, subtasks: [...(x.subtasks || []), newSubtask] } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+      setNewSubtaskTitle('');
+  };
+
+  const handleToggleSubtask = (columnId: string, cardId: string, subtaskId: string) => {
+      if (!activeBoard) return;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { 
+                  ...x, 
+                  subtasks: (x.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s)
+              } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleDeleteSubtask = (columnId: string, cardId: string, subtaskId: string) => {
+      if (!activeBoard) return;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { 
+                  ...x, 
+                  subtasks: (x.subtasks || []).filter(s => s.id !== subtaskId)
+              } : x) 
+          } : c
+      );
+      saveColumns(newCols);
+  };
+
   const handleDeleteCard = (columnId: string, cardId: string) => {
       if (!activeBoard) return;
       const newCols = activeBoard.columns.map(c => 
           c.id === columnId ? { ...c, cards: c.cards.filter(card => card.id !== cardId) } : c
+      );
+      saveColumns(newCols);
+  };
+
+  const handleSaveCardDescription = (columnId: string, cardId: string, description: string) => {
+      if (!activeBoard) return;
+      
+      const newCols = activeBoard.columns.map(c => 
+          c.id === columnId ? { 
+              ...c, 
+              cards: c.cards.map(x => x.id === cardId ? { 
+                  ...x, 
+                  description
+              } : x) 
+          } : c
       );
       saveColumns(newCols);
   };
@@ -804,11 +879,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                       onDragOver={handleDragOver}
                                       onDrop={(e) => handleDrop(e, col.id, card.id)}
                                       onContextMenu={(e) => e.preventDefault()}
-                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : ''} hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] ${colorTheme.border.replace('border', 'border-l')}`}
+                                      onClick={() => setExpandedCardId(card.id)}
+                                      className={`bg-white dark:bg-slate-700 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : ''} hover:shadow-md transition-all group relative border-l-4 select-none [-webkit-touch-callout:none] hover:border-r-indigo-500 ${colorTheme.border.replace('border', 'border-l')}`}
                                       style={{ borderLeftColor: `var(--${card.color}-500)` }} // Fallback
                                   >
                                       {editingCard?.id === card.id ? (
-                                          <div className="space-y-2">
+                                          <div className="space-y-2" onClick={e => e.stopPropagation()}>
                                               <input 
                                                   autoFocus
                                                   type="text" 
@@ -858,28 +934,28 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                   <p className="font-semibold text-slate-800 dark:text-white text-sm pr-2">{card.title}</p>
                                                   <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                                                       <button 
-                                                          onClick={() => handleMoveCardUp(col.id, card.id)}
+                                                          onClick={(e) => { e.stopPropagation(); handleMoveCardUp(col.id, card.id); }}
                                                           className="text-slate-400 hover:text-indigo-500 p-0.5"
                                                           title="Mover para cima"
                                                       >
                                                           <ArrowUp className="w-3 h-3" />
                                                       </button>
                                                       <button 
-                                                          onClick={() => handleMoveCardDown(col.id, card.id)}
+                                                          onClick={(e) => { e.stopPropagation(); handleMoveCardDown(col.id, card.id); }}
                                                           className="text-slate-400 hover:text-indigo-500 p-0.5"
                                                           title="Mover para baixo"
                                                       >
                                                           <ArrowDown className="w-3 h-3" />
                                                       </button>
                                                       <button 
-                                                          onClick={() => setEditingCard({ id: card.id, title: card.title, amount: card.amount.toString() })}
+                                                          onClick={(e) => { e.stopPropagation(); setEditingCard({ id: card.id, title: card.title, amount: card.amount.toString() }); }}
                                                           className="text-slate-400 hover:text-indigo-500 p-0.5"
-                                                          title="Editar Card"
+                                                          title="Editar Titulo do Card"
                                                       >
                                                           <Edit2 className="w-3 h-3" />
                                                       </button>
                                                       <button 
-                                                          onClick={() => handleDeleteCard(col.id, card.id)}
+                                                          onClick={(e) => { e.stopPropagation(); handleDeleteCard(col.id, card.id); }}
                                                           className="text-slate-400 hover:text-rose-500 p-0.5"
                                                           title="Excluir Card"
                                                       >
@@ -895,8 +971,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                       </span>
                                                       
                                                       <button 
-                                                          onClick={(e) => { e.stopPropagation(); setEditingCardTags(editingCardTags === card.id ? null : card.id); }}
-                                                          className={`p-1 rounded transition-colors ${editingCardTags === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
+                                                          onClick={(e) => { e.stopPropagation(); setExpandedCardId(card.id); setTimeout(() => setEditingCardTags(card.id), 50); }}
+                                                          className="p-1 rounded transition-colors text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600"
                                                           title="Adicionar Etiqueta"
                                                       >
                                                           <Tag className="w-3 h-3" />
@@ -905,13 +981,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                       <button 
                                                           onClick={(e) => { e.stopPropagation(); setExpandedCardId(expandedCardId === card.id ? null : card.id); }}
                                                           className={`p-1 rounded transition-colors ${expandedCardId === card.id ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-300 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-600'}`}
-                                                          title="Detalhes (Data e Comentários)"
+                                                          title="Detalhes"
                                                       >
                                                           <MoreHorizontal className="w-3 h-3" />
                                                       </button>
                                                   </div>
                                                   
                                                   <div className="flex items-center gap-2">
+                                                      {card.subtasks && card.subtasks.length > 0 && (
+                                                          <div className={`flex items-center gap-1 text-[10px] font-medium ${card.subtasks.filter(s => s.completed).length === card.subtasks.length ? 'text-emerald-500' : 'text-slate-400'}`} title="Tarefas">
+                                                              <CheckCircle2 className="w-3 h-3" />
+                                                              {card.subtasks.filter(s => s.completed).length}/{card.subtasks.length}
+                                                          </div>
+                                                      )}
                                                       {card.dueDate && (
                                                           <div className={`flex items-center gap-1 text-[10px] font-medium ${new Date(card.dueDate) < new Date() ? 'text-rose-500' : 'text-slate-400'}`} title="Data de Vencimento">
                                                               <Clock className="w-3 h-3" />
@@ -947,147 +1029,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
                                                       ))}
                                                   </select>
                                               </div>
-
-                                              {/* Inline Tag Selector */}
-                                              {editingCardTags === card.id && (
-                                                  <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in">
-                                                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Adicionar Etiqueta:</p>
-                                                      <div className="flex flex-wrap gap-1.5">
-                                                          {AVAILABLE_TAGS.map(tag => {
-                                                              const isSelected = card.tags?.some(t => t.id === tag.id);
-                                                              const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
-                                                              return (
-                                                                  <button
-                                                                      key={tag.id}
-                                                                      onClick={() => handleToggleTag(col.id, card.id, tag)}
-                                                                      className={`text-[10px] px-2 py-1 rounded border transition-all flex items-center gap-1 ${isSelected ? `${tagColor.bg} ${tagColor.text} ${tagColor.border}` : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-500 hover:border-slate-300'}`}
-                                                                  >
-                                                                      {tag.name}
-                                                                      {isSelected && <CheckCircle2 className="w-2.5 h-2.5" />}
-                                                                  </button>
-                                                              );
-                                                          })}
-                                                      </div>
-                                                  </div>
-                                              )}
-
-                                              {/* Expanded Details (Date & Comments & Attachments) */}
-                                              {expandedCardId === card.id && (
-                                                  <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-600 animate-fade-in space-y-3">
-                                                      
-                                                      {/* Date Picker */}
-                                                      <div>
-                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                              <Calendar className="w-3 h-3" /> Data de Vencimento
-                                                          </label>
-                                                          <input 
-                                                              type="date" 
-                                                              value={card.dueDate || ''}
-                                                              onChange={(e) => handleSetDueDate(col.id, card.id, e.target.value)}
-                                                              className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 dark:text-white outline-none focus:border-indigo-500"
-                                                          />
-                                                      </div>
-
-                                                      {/* Attachments Section */}
-                                                      <div>
-                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                              <LinkIcon className="w-3 h-3" /> Anexos ({card.attachments?.length || 0})
-                                                          </label>
-                                                          
-                                                          {/* Attachment List */}
-                                                          <div className="space-y-1 mb-2">
-                                                              {card.attachments?.map(att => (
-                                                                  <div key={att.id} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-1.5 rounded text-xs group/att">
-                                                                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:underline truncate flex-1">
-                                                                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                                                                          <span className="truncate">{att.name}</span>
-                                                                      </a>
-                                                                      <button 
-                                                                          onClick={() => handleDeleteAttachment(col.id, card.id, att.id)}
-                                                                          className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/att:opacity-100 transition-opacity p-0.5"
-                                                                      >
-                                                                          <X className="w-3 h-3" />
-                                                                      </button>
-                                                                  </div>
-                                                              ))}
-                                                          </div>
-
-                                                          {/* Add Attachment Inputs */}
-                                                          <div className="space-y-1">
-                                                              <input 
-                                                                  type="text" 
-                                                                  placeholder="Nome do arquivo (opcional)" 
-                                                                  value={newAttachmentName}
-                                                                  onChange={(e) => setNewAttachmentName(e.target.value)}
-                                                                  className="w-full text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                              />
-                                                              <div className="flex gap-1">
-                                                                  <input 
-                                                                      type="text" 
-                                                                      placeholder="https://..." 
-                                                                      value={newAttachmentUrl}
-                                                                      onChange={(e) => setNewAttachmentUrl(e.target.value)}
-                                                                      className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                                  />
-                                                                  <button 
-                                                                      onClick={() => handleAddAttachment(col.id, card.id)}
-                                                                      disabled={!newAttachmentUrl.trim()}
-                                                                      className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                  >
-                                                                      <Plus className="w-3 h-3" />
-                                                                  </button>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-
-                                                      {/* Comments Section */}
-                                                      <div>
-                                                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
-                                                              <MessageSquare className="w-3 h-3" /> Comentários ({card.comments?.length || 0})
-                                                          </label>
-                                                          
-                                                          {/* Comment List */}
-                                                          <div className="space-y-2 mb-2 max-h-32 overflow-y-auto">
-                                                              {card.comments?.map(comment => (
-                                                                  <div key={comment.id} className="bg-slate-50 dark:bg-slate-800 p-2 rounded text-xs relative group/comment">
-                                                                      <p className="text-slate-700 dark:text-slate-300 pr-4 break-words">{comment.text}</p>
-                                                                      <span className="text-[9px] text-slate-400 mt-1 block">
-                                                                          {new Date(comment.createdAt).toLocaleString('pt-BR')}
-                                                                      </span>
-                                                                      <button 
-                                                                          onClick={() => handleDeleteComment(col.id, card.id, comment.id)}
-                                                                          className="absolute top-1 right-1 text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/comment:opacity-100 transition-opacity"
-                                                                      >
-                                                                          <X className="w-3 h-3" />
-                                                                      </button>
-                                                                  </div>
-                                                              ))}
-                                                              {(!card.comments || card.comments.length === 0) && (
-                                                                  <p className="text-xs text-slate-400 italic">Nenhum comentário ainda.</p>
-                                                              )}
-                                                          </div>
-
-                                                          {/* Add Comment Input */}
-                                                          <div className="flex gap-1">
-                                                              <input 
-                                                                  type="text" 
-                                                                  placeholder="Escreva um comentário..." 
-                                                                  value={newCommentText}
-                                                                  onChange={(e) => setNewCommentText(e.target.value)}
-                                                                  onKeyDown={(e) => e.key === 'Enter' && handleAddComment(col.id, card.id)}
-                                                                  className="flex-1 text-xs p-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white outline-none focus:border-indigo-500"
-                                                              />
-                                                              <button 
-                                                                  onClick={() => handleAddComment(col.id, card.id)}
-                                                                  disabled={!newCommentText.trim()}
-                                                                  className="bg-indigo-600 text-white p-1.5 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                              >
-                                                                  <Send className="w-3 h-3" />
-                                                              </button>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              )}
                                           </>
                                       )}
                                   </div>
@@ -1142,6 +1083,343 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boards, onSaveBoard, o
 
           </div>
       </div>
+
+      {/* Trello-like Card Modal */}
+      {activeExpandedData && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-4 py-10 md:p-10 overflow-y-auto" onClick={() => setExpandedCardId(null)}>
+              <div 
+                  className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-2xl my-auto shadow-2xl relative animate-scale-in"
+                  onClick={e => e.stopPropagation()}
+              >
+                  {/* Header */}
+                  <div className="p-6 pb-4 md:px-8 md:pt-8 bg-slate-50/50 dark:bg-slate-800/20 rounded-t-xl border-b border-slate-100 dark:border-slate-800">
+                      <button onClick={() => setExpandedCardId(null)} className="absolute top-4 right-4 md:top-6 md:right-6 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors bg-white dark:bg-slate-800 shadow-sm">
+                          <X className="w-5 h-5" />
+                      </button>
+
+                      <div className="flex items-start gap-4">
+                          <div className={`mt-1 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 ${COLORS.find(c => c.value === activeExpandedData.card.color)?.border || ''} ${COLORS.find(c => c.value === activeExpandedData.card.color)?.bg || ''}`}>
+                              <Layout className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 pr-8">
+                              {editingCard?.id === activeExpandedData.card.id ? (
+                                  <input 
+                                      autoFocus 
+                                      className="w-full text-xl font-black bg-white dark:bg-slate-800 text-slate-800 dark:text-white p-1 rounded-lg border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900 outline-none transition-all"
+                                      value={editingCard.title} 
+                                      onChange={e => setEditingCard({...editingCard, title: e.target.value})} 
+                                      onBlur={() => handleSaveCardEdit(activeExpandedData.col.id)} 
+                                      onKeyDown={e => e.key === 'Enter' && handleSaveCardEdit(activeExpandedData.col.id)}
+                                  />
+                              ) : (
+                                  <h2 onClick={() => setEditingCard({ id: activeExpandedData.card.id, title: activeExpandedData.card.title, amount: activeExpandedData.card.amount.toString() })} className="text-xl font-black text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-800 p-1 -ml-1 rounded cursor-pointer transition-colors max-w-fit">{activeExpandedData.card.title}</h2>
+                              )}
+                              
+                              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 ml-1">
+                                  Na lista <span className="font-semibold underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 cursor-pointer">{activeExpandedData.col.title}</span>
+                              </p>
+                          </div>
+                      </div>
+
+                      {/* Action Buttons (Horizontal) */}
+                      <div className="flex flex-wrap gap-2 mt-5 ml-12">
+                          <button 
+                              onClick={() => setEditingCardTags(editingCardTags === activeExpandedData.card.id ? null : activeExpandedData.card.id)} 
+                              className={`px-3 py-1.5 rounded font-semibold text-xs flex items-center gap-1.5 transition-colors ${editingCardTags === activeExpandedData.card.id ? 'bg-indigo-100 text-indigo-700 shadow-inner dark:bg-indigo-900/50 dark:text-indigo-300' : 'bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                          >
+                              <Tag className="w-3.5 h-3.5" /> Etiquetas
+                          </button>
+                          
+                          <div className="relative group/date">
+                              <button className="px-3 py-1.5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded font-semibold text-xs flex items-center gap-1.5 transition-colors">
+                                  <Clock className="w-3.5 h-3.5" /> Datas
+                              </button>
+                              <input 
+                                  type="date" 
+                                  value={activeExpandedData.card.dueDate || ''}
+                                  onChange={(e) => handleSetDueDate(activeExpandedData.col.id, activeExpandedData.card.id, e.target.value)}
+                                  className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                          </div>
+
+                          <button 
+                              onClick={() => {
+                                  const input = document.getElementById('subtask-input');
+                                  input?.focus();
+                              }}
+                              className="px-3 py-1.5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                              <CheckSquare className="w-3.5 h-3.5" /> Checklist
+                          </button>
+
+                          <button 
+                              onClick={() => {
+                                  const input = document.getElementById('attachment-input');
+                                  input?.focus();
+                              }}
+                              className="px-3 py-1.5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                              <LinkIcon className="w-3.5 h-3.5" /> Anexos
+                          </button>
+                      </div>
+
+                      {/* Expanding Inline Tag Selector */}
+                      {editingCardTags === activeExpandedData.card.id && (
+                          <div className="mt-4 ml-12 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 animate-fade-in relative">
+                              <span className="absolute -top-2 left-6 w-4 h-4 bg-white dark:bg-slate-800 border-t border-l border-slate-200 dark:border-slate-700 rotate-45"></span>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase mb-3 relative z-10">Adicionar Etiqueta</p>
+                              <div className="flex flex-wrap gap-2 relative z-10">
+                                  {AVAILABLE_TAGS.map(tag => {
+                                      const isSelected = activeExpandedData.card.tags?.some(t => t.id === tag.id);
+                                      const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                      return (
+                                          <button
+                                              key={tag.id}
+                                              onClick={() => handleToggleTag(activeExpandedData.col.id, activeExpandedData.card.id, tag)}
+                                              className={`text-xs px-3 py-1.5 rounded font-medium border transition-all flex items-center gap-2 ${isSelected ? `${tagColor.bg} ${tagColor.text} ${tagColor.border} shadow-sm ring-2 ring-offset-1 ring-${tagColor.value}-500/30` : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 hover:border-slate-300'}`}
+                                          >
+                                              {tag.name}
+                                              {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                          </button>
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-6 md:p-8 space-y-10">
+                      
+                      {/* Tags (if any exist) */}
+                      {activeExpandedData.card.tags && activeExpandedData.card.tags.length > 0 && (
+                          <div className="ml-12 flex flex-wrap gap-2">
+                              {activeExpandedData.card.tags.map(tag => {
+                                  const tagColor = COLORS.find(c => c.value === tag.color) || COLORS[0];
+                                  return (
+                                      <span key={tag.id} className={`text-xs px-2.5 py-1 rounded font-bold uppercase tracking-wider ${tagColor.bg} ${tagColor.text}`}>
+                                          {tag.name}
+                                      </span>
+                                  );
+                              })}
+                          </div>
+                      )}
+
+                      {/* Description */}
+                      <div className="flex items-start gap-4">
+                          <AlignLeft className="w-6 h-6 text-slate-400 mt-1" />
+                          <div className="flex-1">
+                              <h3 className="font-bold text-slate-800 dark:text-white mb-3 text-lg">Descrição</h3>
+                              <textarea 
+                                  className="w-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 p-4 rounded-xl border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition-colors outline-none resize-y min-h-[140px] text-sm text-slate-700 dark:text-slate-300 placeholder:text-slate-400"
+                                  placeholder="Adicione uma descrição mais detalhada..."
+                                  value={activeExpandedData.card.description || ''}
+                                  onChange={(e) => handleSaveCardDescription(activeExpandedData.col.id, activeExpandedData.card.id, e.target.value)}
+                              />
+                          </div>
+                      </div>
+
+                      {/* Subtasks */}
+                      <div className="flex items-start gap-4">
+                          <CheckSquare className="w-6 h-6 text-slate-400 mt-1" />
+                          <div className="flex-1 w-full overflow-hidden">
+                              <div className="flex items-center justify-between mb-4">
+                                  <h3 className="font-bold text-slate-800 dark:text-white text-lg">Checklist</h3>
+                                  <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                                      {activeExpandedData.card.subtasks?.filter(s => s.completed).length || 0}/{activeExpandedData.card.subtasks?.length || 0}
+                                  </span>
+                              </div>
+
+                              {/* Progress bar */}
+                              {activeExpandedData.card.subtasks && activeExpandedData.card.subtasks.length > 0 && (
+                                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-5 overflow-hidden">
+                                      <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${(activeExpandedData.card.subtasks.filter(s => s.completed).length / activeExpandedData.card.subtasks.length) * 100}%` }}></div>
+                                  </div>
+                              )}
+                              
+                              <div className="space-y-1.5 mb-4">
+                                  {activeExpandedData.card.subtasks?.map(subtask => (
+                                      <div key={subtask.id} className="flex items-start gap-3 group/subtask transition-all hover:bg-slate-50 dark:hover:bg-slate-800/30 p-2 -mx-2 rounded-lg">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={subtask.completed}
+                                              onChange={() => handleToggleSubtask(activeExpandedData.col.id, activeExpandedData.card.id, subtask.id)}
+                                              className="mt-0.5 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                                          />
+                                          <span className={`text-sm flex-1 ${subtask.completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                              {subtask.title}
+                                          </span>
+                                          <button 
+                                              onClick={() => handleDeleteSubtask(activeExpandedData.col.id, activeExpandedData.card.id, subtask.id)}
+                                              className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/subtask:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                              title="Excluir"
+                                          >
+                                              <X className="w-4 h-4" />
+                                          </button>
+                                      </div>
+                                  ))}
+                              </div>
+
+                              <div className="flex gap-2">
+                                  <input 
+                                      id="subtask-input"
+                                      type="text" 
+                                      placeholder="Adicionar um item..." 
+                                      value={newSubtaskTitle}
+                                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(activeExpandedData.col.id, activeExpandedData.card.id)}
+                                      className="flex-1 text-sm px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded border border-transparent focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 outline-none transition-all placeholder:text-slate-400"
+                                  />
+                                  <button 
+                                      onClick={() => handleAddSubtask(activeExpandedData.col.id, activeExpandedData.card.id)}
+                                      disabled={!newSubtaskTitle.trim()}
+                                      className="bg-indigo-600/10 text-indigo-700 dark:text-indigo-400 px-4 py-2 rounded hover:bg-indigo-600 hover:text-white dark:hover:text-white disabled:opacity-50 font-semibold text-sm transition-colors"
+                                  >
+                                      Adicionar
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Attachments Section */}
+                      <div className="flex items-start gap-4">
+                          <LinkIcon className="w-6 h-6 text-slate-400 mt-1" />
+                          <div className="flex-1 w-full overflow-hidden">
+                              <div className="flex items-center justify-between mb-4">
+                                  <h3 className="font-bold text-slate-800 dark:text-white text-lg">Anexos</h3>
+                                  <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+                                      {activeExpandedData.card.attachments?.length || 0}
+                                  </span>
+                              </div>
+                              
+                              {/* Attachment List */}
+                              {activeExpandedData.card.attachments && activeExpandedData.card.attachments.length > 0 && (
+                                  <div className="grid gap-2 mb-4">
+                                      {activeExpandedData.card.attachments.map(att => (
+                                          <div key={att.id} className="flex justify-between items-center bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 p-3 rounded-lg text-sm group/att transition-colors border border-slate-100 dark:border-slate-800">
+                                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium truncate flex-1 leading-none">
+                                                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded">
+                                                      <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                                                  </div>
+                                                  <span className="truncate">{att.name}</span>
+                                              </a>
+                                              <button 
+                                                  onClick={() => handleDeleteAttachment(activeExpandedData.col.id, activeExpandedData.card.id, att.id)}
+                                                  className="text-slate-400 hover:text-rose-500 opacity-100 md:opacity-0 md:group-hover/att:opacity-100 transition-opacity p-2 rounded hover:bg-white dark:hover:bg-slate-700 shadow-sm"
+                                              >
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                              )}
+
+                              {/* Add Attachment Inputs */}
+                              <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-xl space-y-3 border border-slate-100 dark:border-slate-800">
+                                  <input 
+                                      id="attachment-input"
+                                      type="text" 
+                                      placeholder="Nome do arquivo ou link (ex: Orçamento.pdf)" 
+                                      value={newAttachmentName}
+                                      onChange={(e) => setNewAttachmentName(e.target.value)}
+                                      className="w-full text-sm px-4 py-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400"
+                                  />
+                                  <div className="flex gap-2">
+                                      <input 
+                                          type="url" 
+                                          placeholder="https://..." 
+                                          value={newAttachmentUrl}
+                                          onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                                          className="flex-1 text-sm px-4 py-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400"
+                                      />
+                                      <button 
+                                          onClick={() => handleAddAttachment(activeExpandedData.col.id, activeExpandedData.card.id)}
+                                          disabled={!newAttachmentUrl.trim()}
+                                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold text-sm transition-colors"
+                                      >
+                                          Anexar
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Comments Section */}
+                      <div className="flex items-start gap-4">
+                          <MessageSquare className="w-6 h-6 text-slate-400 mt-1" />
+                          <div className="flex-1 w-full overflow-hidden">
+                              <h3 className="font-bold text-slate-800 dark:text-white text-lg mb-4">Atividades & Comentários</h3>
+                              
+                              {/* Add Comment Input */}
+                              <div className="flex gap-3 mb-6 relative">
+                                  <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center font-bold text-indigo-700 dark:text-indigo-400 flex-shrink-0">
+                                      eu
+                                  </div>
+                                  <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all shadow-sm">
+                                      <textarea 
+                                          placeholder="Escreva um comentário..." 
+                                          value={newCommentText}
+                                          onChange={(e) => setNewCommentText(e.target.value)}
+                                          onKeyDown={(e) => {
+                                              if (e.key === 'Enter' && !e.shiftKey) {
+                                                  e.preventDefault();
+                                                  handleAddComment(activeExpandedData.col.id, activeExpandedData.card.id);
+                                              }
+                                          }}
+                                          className="w-full text-sm p-3 min-h-[80px] bg-transparent text-slate-800 dark:text-white outline-none resize-y placeholder:text-slate-400"
+                                      />
+                                      <div className="bg-slate-50 dark:bg-slate-800/80 px-3 py-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                                          <button 
+                                              onClick={() => handleAddComment(activeExpandedData.col.id, activeExpandedData.card.id)}
+                                              disabled={!newCommentText.trim()}
+                                              className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold text-sm transition-colors"
+                                          >
+                                              Salvar
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              {/* Comment List */}
+                              <div className="space-y-4">
+                                  {activeExpandedData.card.comments?.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(comment => (
+                                      <div key={comment.id} className="flex gap-3 group/comment animate-fade-in relative">
+                                          {/* Timeline line */}
+                                          <div className="absolute top-8 left-4 w-px h-full bg-slate-200 dark:bg-slate-700 -z-10 group-last/comment:hidden"></div>
+                                          
+                                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300 flex-shrink-0 relative z-10 border-2 border-white dark:border-slate-900">
+                                              :)
+                                          </div>
+                                          <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl rounded-tl-none border border-slate-200 dark:border-slate-800">
+                                              <div className="flex justify-between items-baseline mb-1">
+                                                  <span className="font-bold text-sm text-slate-800 dark:text-white">Usuário</span>
+                                                  <span className="text-[11px] text-slate-500 font-medium">
+                                                      {new Date(comment.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                                  </span>
+                                              </div>
+                                              <p className="text-slate-700 dark:text-slate-300 text-sm break-words whitespace-pre-wrap">{comment.text}</p>
+                                              <button 
+                                                  onClick={() => handleDeleteComment(activeExpandedData.col.id, activeExpandedData.card.id, comment.id)}
+                                                  className="absolute top-3 right-0 -mr-2 text-slate-400 hover:text-rose-500 opacity-0 md:group-hover/comment:opacity-100 transition-opacity bg-white dark:bg-slate-900 rounded-full p-1 border border-slate-200 dark:border-slate-700 shadow-sm"
+                                                  title="Excluir"
+                                              >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  {(!activeExpandedData.card.comments || activeExpandedData.card.comments.length === 0) && (
+                                      <p className="text-sm text-slate-500 text-center py-6 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                          Nenhuma atividade recente.
+                                      </p>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

@@ -127,15 +127,23 @@ export interface KanbanAttachment {
   url: string;
 }
 
+export interface KanbanSubtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
 export interface KanbanCard {
   id: string;
   title: string;
   amount: number;
   color: string; // Main card color (border)
+  description?: string;
   tags?: KanbanTag[]; // New field for labels
   dueDate?: string; // ISO Date
   comments?: KanbanComment[];
   attachments?: KanbanAttachment[];
+  subtasks?: KanbanSubtask[];
 }
 
 export interface KanbanColumn {
@@ -208,6 +216,11 @@ export interface AgendaEvent {
   startDate: string; // ISO datetime or YYYY-MM-DD
   endDate: string; // ISO datetime or YYYY-MM-DD
   allDay: boolean;
+  isRecurring?: boolean;
+  recurrencePeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom_days';
+  recurrenceDays?: number[]; // 0=Sunday, 1=Monday... used for custom_days
+  recurrenceEndDate?: string;
+  isGhost?: boolean;
   updatedAt?: string;
 }
 
@@ -276,6 +289,7 @@ export interface AppData {
   tasks: Task[]; // Novo campo: Tarefas
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
   habits: Habit[]; // Novo campo: Hábitos
+  dailyRoutines?: DailyRoutine[]; // Checklists diárias que resetam
   unlockedBadges: string[];
   wallets?: Wallet[]; // Novo campo: Carteiras/Bancos
   driveLink?: string; // Novo campo: Link do Drive
@@ -302,7 +316,12 @@ export enum View {
   PASSWORDS = 'PASSWORDS',
   PIX_KEYS = 'PIX_KEYS',
   PRODUCTIVITY = 'PRODUCTIVITY',
-  EISENHOWER = 'EISENHOWER', // Matriz de Eisenhower
   WALLETS = 'WALLETS', // Gerenciamento de Carteiras
   SETTINGS = 'SETTINGS'
+}
+
+export interface DailyRoutine {
+  id: string;
+  title: string;
+  lastCompletedDate?: string; // YYYY-MM-DD
 }

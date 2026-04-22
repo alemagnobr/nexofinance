@@ -131,7 +131,8 @@ const App: React.FC = () => {
             pixKeys: [],
             taskLists: [],
             tasks: [],
-            habits: []
+            habits: [],
+            dailyRoutines: []
         });
     } else {
         await signOut(auth);
@@ -253,6 +254,9 @@ const App: React.FC = () => {
                 onUnlockBadge={actions.unlockBadge}
                 onNavigate={(view) => setCurrentView(view)}
                 onToggleHabitEntry={actions.toggleHabitEntry}
+                onAddDailyRoutine={actions.addDailyRoutine}
+                onToggleDailyRoutine={actions.toggleDailyRoutine}
+                onDeleteDailyRoutine={actions.deleteDailyRoutine}
             />
         );
     }
@@ -322,7 +326,7 @@ const App: React.FC = () => {
     }
 
     // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower)
-    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.EISENHOWER].includes(currentView)) {
+    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
         return (
             <ProductivityView 
                 currentView={currentView}
@@ -355,6 +359,10 @@ const App: React.FC = () => {
                     onAddTask={actions.addTask}
                     onUpdateTask={actions.updateTask}
                     onDeleteTask={actions.deleteTask}
+                    dailyRoutines={data.dailyRoutines}
+                    onAddDailyRoutine={actions.addDailyRoutine}
+                    onToggleDailyRoutine={actions.toggleDailyRoutine}
+                    onDeleteDailyRoutine={actions.deleteDailyRoutine}
                     privacyMode={privacyMode} 
                     onNavigate={setCurrentView}
                 />
@@ -378,7 +386,18 @@ const App: React.FC = () => {
     }
 
     // Fallback
-    return <Dashboard data={data} privacyMode={privacyMode} onUnlockBadge={actions.unlockBadge} onNavigate={(view) => setCurrentView(view)} onToggleHabitEntry={actions.toggleHabitEntry} />;
+    return (
+      <Dashboard 
+        data={data} 
+        privacyMode={privacyMode} 
+        onUnlockBadge={actions.unlockBadge} 
+        onNavigate={(view) => setCurrentView(view)} 
+        onToggleHabitEntry={actions.toggleHabitEntry} 
+        onAddDailyRoutine={actions.addDailyRoutine}
+        onToggleDailyRoutine={actions.toggleDailyRoutine}
+        onDeleteDailyRoutine={actions.deleteDailyRoutine}
+      />
+    );
   };
 
   if (authLoading) {

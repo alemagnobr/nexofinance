@@ -749,6 +749,24 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     else setData(prev => ({ ...prev, wallets: (prev.wallets || []).filter(w => w.id !== id) }));
   };
 
+  // --- DAILY ROUTINES ---
+  const addDailyRoutine = async (title: string) => {
+    const newRoutine = { id: crypto.randomUUID(), title };
+    if (user) { /* Assuming firestore sync isn't requested strictly for this iteration, but fallback to sync if we write the logic */ }
+    setData(prev => ({ ...prev, dailyRoutines: [...(prev.dailyRoutines || []), newRoutine] }));
+  };
+
+  const toggleDailyRoutine = async (id: string, dateStr: string) => {
+    setData(prev => ({
+      ...prev,
+      dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, lastCompletedDate: dateStr } : r)
+    }));
+  };
+
+  const deleteDailyRoutine = async (id: string) => {
+    setData(prev => ({ ...prev, dailyRoutines: (prev.dailyRoutines || []).filter(r => r.id !== id) }));
+  };
+
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
       if (user) await addCategoryFire(user.uid, cat);
@@ -828,6 +846,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         addWallet,
         updateWallet,
         deleteWallet,
+        addDailyRoutine,
+        toggleDailyRoutine,
+        deleteDailyRoutine,
         addTaskList,
         updateTaskList,
         deleteTaskList,

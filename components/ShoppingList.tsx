@@ -376,22 +376,22 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       {/* HEADER & BUDGET BAR */}
       <div>
         {/* Month Selector */}
-        <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
+        <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 p-2.5 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 mb-4 max-w-sm mx-auto w-full">
             <button 
                 onClick={handlePrevMonth}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-400"
+                className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
             >
                 <ChevronLeft className="w-5 h-5" />
             </button>
             
-            <div className="flex items-center gap-2 text-slate-800 dark:text-white font-bold">
-                <Calendar className="w-5 h-5 text-indigo-600" />
-                <span className="text-sm md:text-base">{formatMonth(currentDate)}</span>
+            <div className="px-3 text-sm md:text-base font-black text-indigo-800 dark:text-indigo-300 text-center flex items-center justify-center gap-2 capitalize">
+                <Calendar className="w-4 h-4 text-indigo-500 hidden md:block" />
+                {currentDate.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + currentDate.toLocaleDateString('pt-BR', { month: 'long' }).slice(1)}/{currentDate.getFullYear().toString().slice(-2)}
             </div>
             
             <button 
                 onClick={handleNextMonth}
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-400"
+                className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
             >
                 <ChevronRight className="w-5 h-5" />
             </button>

@@ -1,0 +1,137 @@
+import React, { useState } from 'react';
+import { DailyRoutine } from '../types';
+import { CheckCircle2, Circle, Plus, Trash2, RotateCw, ArrowRight } from 'lucide-react';
+
+interface DailyRoutinesProps {
+  routines: DailyRoutine[];
+  onAddRoutine: (title: string) => void;
+  onToggleRoutine: (id: string, dateStr: string) => void;
+  onDeleteRoutine: (id: string) => void;
+  compact?: boolean;
+  onNavigate?: () => void;
+}
+
+export const DailyRoutines: React.FC<DailyRoutinesProps> = ({ 
+  routines, 
+  onAddRoutine, 
+  onToggleRoutine, 
+  onDeleteRoutine,
+  compact = false,
+  onNavigate
+}) => {
+  const [newRoutine, setNewRoutine] = useState('');
+  
+  // Format current date as YYYY-MM-DD
+  const today = new Date().toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD
+
+  const getIsCompleted = (routine: DailyRoutine) => {
+    return routine.lastCompletedDate === today;
+  };
+
+  const handleToggle = (id: string, currentlyCompleted: boolean) => {
+    onToggleRoutine(id, currentlyCompleted ? '' : today);
+  };
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newRoutine.trim()) {
+      onAddRoutine(newRoutine.trim());
+      setNewRoutine('');
+    }
+  };
+
+  // Stats
+  const completedCount = routines.filter(getIsCompleted).length;
+  const progress = routines.length === 0 ? 0 : (completedCount / routines.length) * 100;
+
+  return (
+    <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-full ${compact ? 'p-4' : 'p-5'}`}>
+      <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+             <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                <RotateCw className="w-4 h-4 md:w-5 md:h-5" />
+             </div>
+             <div>
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    Rotinas Diárias
+                </h3>
+                {!compact && <p className="text-xs text-slate-500">Checklists que resetam à meia-noite.</p>}
+             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-full">
+                {completedCount}/{routines.length}
+            </div>
+            {onNavigate && (
+                <button 
+                    onClick={onNavigate}
+                    className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-1 rounded transition-colors"
+                    title="Abrir Rotinas na Agenda"
+                >
+                    <ArrowRight className="w-4 h-4" />
+                </button>
+            )}
+          </div>
+      </div>
+
+      {routines.length > 0 && (
+          <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mb-4 overflow-hidden">
+              <div 
+                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" 
+                  style={{ width: `${progress}%` }}
+              ></div>
+          </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto min-h-[100px] mb-4 space-y-2">
+        {routines.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-70">
+             <Circle className="w-6 h-6 shrink-0 mb-2 opacity-30" />
+             <p className="text-xs text-center italic px-4">Você ainda não possui rotinas. Adicione alguma ex: "Ler 10 páginas".</p>
+          </div>
+        ) : (
+          routines.map(routine => {
+            const completed = getIsCompleted(routine);
+            return (
+              <div key={routine.id} className="group flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600">
+                <button 
+                  onClick={() => handleToggle(routine.id, completed)}
+                  className={`shrink-0 transition-colors ${completed ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'}`}
+                >
+                  {completed ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                </button>
+                <span className={`flex-1 text-sm transition-all ${completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                  {routine.title}
+                </span>
+                <button 
+                  onClick={() => onDeleteRoutine(routine.id)}
+                  className="shrink-0 p-1.5 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                  title="Excluir rotina"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <form onSubmit={handleAdd} className="mt-auto relative">
+        <input 
+          type="text" 
+          value={newRoutine}
+          onChange={e => setNewRoutine(e.target.value)}
+          placeholder="Nova rotina..."
+          className="w-full text-sm pl-4 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100 focus:bg-white dark:bg-slate-900/50 dark:hover:bg-slate-900 dark:focus:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400"
+        />
+        <button 
+          type="submit"
+          disabled={!newRoutine.trim()}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-500 disabled:opacity-50 disabled:hover:text-slate-400 transition-colors rounded-md"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </form>
+    </div>
+  );
+};
