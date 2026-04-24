@@ -106,6 +106,10 @@ export const MovementsView: React.FC<MovementsViewProps> = ({
             onAddTransaction={actions.addTransaction}
             privacyMode={privacyMode}
             quickActionSignal={quickActionSignal}
+            scoreSerasa={data.scoreSerasa}
+            scoreSerasaUpdatedAt={data.scoreSerasaUpdatedAt}
+            scoreSerasaHistory={data.scoreSerasaHistory}
+            onUpdateScoreSerasa={(score) => actions.updateScoreSerasa(score, new Date().toISOString())}
           />
         )}
       </div>

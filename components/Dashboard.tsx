@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2 } from 'lucide-react';
 import { DailyRoutines } from './DailyRoutines';
 
 interface DashboardProps {
@@ -14,6 +14,8 @@ interface DashboardProps {
   onAddDailyRoutine: (title: string) => void;
   onToggleDailyRoutine: (id: string, dateStr: string) => void;
   onDeleteDailyRoutine: (id: string) => void;
+  onUpdateDailyRoutineOrder: (id: string, newOrder: number) => void;
+  onUpdateDailyRoutine: (id: string, newTitle: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -134,7 +136,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onToggleHabitEntry,
   onAddDailyRoutine,
   onToggleDailyRoutine,
-  onDeleteDailyRoutine
+  onDeleteDailyRoutine,
+  onUpdateDailyRoutineOrder,
+  onUpdateDailyRoutine
 }) => {
   
   // History Chart State
@@ -147,8 +151,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Mobile Tabs State
   const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
-
-
 
   // Greeting Logic
   const greeting = useMemo(() => {
@@ -688,35 +690,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  </div>
             </div>
 
-            {/* Score Serasa */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                 <div className="flex items-center justify-between mb-2">
-                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Serasa</h3>
-                   <ShieldAlert className="w-4 h-4 text-pink-500" />
-                 </div>
-                 <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">
-                      {data.scoreSerasa !== undefined ? data.scoreSerasa : '-'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
-                 </div>
-                 <p className="text-[10px] text-slate-400 mb-2">
-                   {data.scoreSerasaUpdatedAt 
-                     ? `Última atualização: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
-                     : 'Ainda não atualizado'}
-                 </p>
-
-                 {/* Serasa History Chart */}
-                 {data.scoreSerasaHistory && data.scoreSerasaHistory.length > 0 && (
-                     <div className="h-10 w-full mt-1">
-                         <ResponsiveContainer width="100%" height="100%">
-                             <LineChart data={data.scoreSerasaHistory}>
-                                 <Line type="monotone" dataKey="score" stroke="#ec4899" strokeWidth={2} dot={false} />
-                             </LineChart>
-                         </ResponsiveContainer>
+            {/* Read-only Score Serasa summary */}
+            {(data.scoreSerasa !== undefined) && (
+                 <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
+                     <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                           <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Score Serasa</h3>
+                           <ShieldAlert className="w-3 h-3 text-pink-500" />
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                           {data.scoreSerasaUpdatedAt 
+                            ? `Atualizado: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
+                            : 'Nenhuma atualização'}
+                        </span>
                      </div>
-                 )}
-            </div>
+                     <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-black text-slate-800 dark:text-white tracking-tighter">
+                          {data.scoreSerasa}
+                        </span>
+                     </div>
+                 </div>
+            )}
 
             {/* Priority Debts */}
             {priorityDebts.length > 0 && (
@@ -1067,6 +1061,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   onAddRoutine={onAddDailyRoutine}
                   onToggleRoutine={onToggleDailyRoutine}
                   onDeleteRoutine={onDeleteDailyRoutine}
+                  onUpdateOrder={onUpdateDailyRoutineOrder}
+                  onUpdateRoutine={onUpdateDailyRoutine}
                   compact={true}
                   onNavigate={() => onNavigate(View.CALENDAR)}
                 />

@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DailyRoutine } from '../types';
-import { CheckCircle2, Circle, Plus, Trash2, RotateCw, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Circle, Plus, Trash2, RotateCw, ArrowRight, ArrowUp, ArrowDown, Edit2, X, Check } from 'lucide-react';
 
 interface DailyRoutinesProps {
   routines: DailyRoutine[];
   onAddRoutine: (title: string) => void;
   onToggleRoutine: (id: string, dateStr: string) => void;
   onDeleteRoutine: (id: string) => void;
+  onUpdateOrder: (id: string, newOrder: number) => void;
+  onUpdateRoutine?: (id: string, newTitle: string) => void;
   compact?: boolean;
   onNavigate?: () => void;
 }
@@ -16,19 +18,31 @@ export const DailyRoutines: React.FC<DailyRoutinesProps> = ({
   onAddRoutine, 
   onToggleRoutine, 
   onDeleteRoutine,
+  onUpdateOrder,
+  onUpdateRoutine,
   compact = false,
   onNavigate
 }) => {
   const [newRoutine, setNewRoutine] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
   
   // Format current date as YYYY-MM-DD
   const today = new Date().toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD
+
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingId]);
 
   const getIsCompleted = (routine: DailyRoutine) => {
     return routine.lastCompletedDate === today;
   };
 
   const handleToggle = (id: string, currentlyCompleted: boolean) => {
+    if (editingId === id) return;
     onToggleRoutine(id, currentlyCompleted ? '' : today);
   };
 
@@ -38,6 +52,17 @@ export const DailyRoutines: React.FC<DailyRoutinesProps> = ({
       onAddRoutine(newRoutine.trim());
       setNewRoutine('');
     }
+  };
+
+  const saveEdit = () => {
+    if (editingId && editTitle.trim() && onUpdateRoutine) {
+      onUpdateRoutine(editingId, editTitle.trim());
+    }
+    setEditingId(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
   };
 
   // Stats
@@ -90,26 +115,118 @@ export const DailyRoutines: React.FC<DailyRoutinesProps> = ({
              <p className="text-xs text-center italic px-4">Você ainda não possui rotinas. Adicione alguma ex: "Ler 10 páginas".</p>
           </div>
         ) : (
-          routines.map(routine => {
+          [...routines]
+            .map((r, index) => ({ ...r, originalIndex: index }))
+            .sort((a, b) => {
+               const orderA = a.order !== undefined ? a.order : a.originalIndex;
+               const orderB = b.order !== undefined ? b.order : b.originalIndex;
+               return orderA - orderB;
+            })
+            .map((routine, index, arr) => {
             const completed = getIsCompleted(routine);
+            const isFirst = index === 0;
+            const isLast = index === arr.length - 1;
+
             return (
-              <div key={routine.id} className="group flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600">
+              <div key={routine.id} className="group flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600">
                 <button 
                   onClick={() => handleToggle(routine.id, completed)}
                   className={`shrink-0 transition-colors ${completed ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'}`}
                 >
                   {completed ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
                 </button>
-                <span className={`flex-1 text-sm transition-all ${completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                  {routine.title}
-                </span>
-                <button 
-                  onClick={() => onDeleteRoutine(routine.id)}
-                  className="shrink-0 p-1.5 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
-                  title="Excluir rotina"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                
+                {editingId === routine.id ? (
+                  <div className="flex-1 flex items-center gap-1">
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      className="flex-1 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-2 py-0.5 outline-none focus:border-emerald-500 text-slate-800 dark:text-white"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveEdit();
+                        if (e.key === 'Escape') cancelEdit();
+                      }}
+                      onBlur={saveEdit}
+                    />
+                  </div>
+                ) : (
+                  <span className={`flex-1 text-sm transition-all text-left ${completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                    {routine.title}
+                  </span>
+                )}
+
+                <div className={`flex items-center transition-opacity gap-1 ${editingId === routine.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  {editingId === routine.id ? (
+                    <>
+                      <button 
+                        onMouseDown={(e) => { e.preventDefault(); saveEdit(); }}
+                        className="p-1 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded"
+                        title="Salvar"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onMouseDown={(e) => { e.preventDefault(); cancelEdit(); }}
+                        className="p-1 text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 hover:text-rose-500 rounded"
+                        title="Cancelar"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingId(routine.id);
+                          setEditTitle(routine.title);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-blue-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                        title="Editar rotina"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      {!isFirst && (
+                    <button
+                      onClick={() => {
+                        const prevRoutine = arr[index - 1];
+                        const myOrder = routine.order !== undefined ? routine.order : routine.originalIndex;
+                        const prevOrder = prevRoutine.order !== undefined ? prevRoutine.order : prevRoutine.originalIndex;
+                        onUpdateOrder(routine.id, prevOrder);
+                        onUpdateOrder(prevRoutine.id, myOrder);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                      title="Mover para cima"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {!isLast && (
+                    <button
+                      onClick={() => {
+                        const nextRoutine = arr[index + 1];
+                        const myOrder = routine.order !== undefined ? routine.order : routine.originalIndex;
+                        const nextOrder = nextRoutine.order !== undefined ? nextRoutine.order : nextRoutine.originalIndex;
+                        onUpdateOrder(routine.id, nextOrder);
+                        onUpdateOrder(nextRoutine.id, myOrder);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                      title="Mover para baixo"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => onDeleteRoutine(routine.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                    title="Excluir rotina"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })

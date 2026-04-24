@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -266,6 +266,13 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar hábitos");
   });
 
+  const unsubDailyRoutines = onSnapshot(collection(db, 'users', uid, 'dailyRoutines'), (snapshot) => {
+    const dailyRoutines = snapshot.docs.map(doc => doc.data() as DailyRoutine);
+    onUpdate({ dailyRoutines });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar rotinas diárias");
+  });
+
   const unsubWallets = onSnapshot(query(collection(db, 'users', uid, 'wallets')), (snapshot) => {
     const wallets = snapshot.docs.map(doc => doc.data() as Wallet);
     onUpdate({ wallets });
@@ -322,6 +329,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubTasks();
     unsubPixKeys();
     unsubHabits();
+    unsubDailyRoutines();
     unsubWallets();
     unsubCategories();
     unsubUserDoc();
@@ -744,6 +752,29 @@ export const deleteHabitFire = async (uid: string, id: string) => {
     } catch (error) {
       handleFirestoreError(error, "Erro ao excluir hábito");
     }
+};
+
+// --- DAILY ROUTINES ---
+export const addDailyRoutineFire = async (uid: string, routine: DailyRoutine) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'dailyRoutines', routine.id), routine);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar rotina diária");
+  }
+};
+export const updateDailyRoutineFire = async (uid: string, id: string, data: Partial<DailyRoutine>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'dailyRoutines', id), data);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar rotina diária");
+  }
+};
+export const deleteDailyRoutineFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'dailyRoutines', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao excluir rotina diária");
+  }
 };
 
 // --- WALLETS ---

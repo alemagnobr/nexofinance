@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Debt, Transaction } from '../types';
 import { Plus, Trash2, ShieldAlert, AlertTriangle, CheckCircle2, Handshake, CalendarClock, Ban, Filter, ArrowRight, Target, ListFilter, Stamp, Calendar, CheckCheck, HelpCircle, Archive, AlertOctagon, TrendingUp, Calculator, Layers, Globe, Link, Edit2 } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line } from 'recharts';
 import { CurrencyInput } from './CurrencyInput';
 
 interface DebtManagerProps {
@@ -12,6 +13,10 @@ interface DebtManagerProps {
   onAddTransaction: (t: Omit<Transaction, 'id'>) => void;
   privacyMode: boolean;
   quickActionSignal?: number; // Prop to trigger form open
+  scoreSerasa?: number;
+  scoreSerasaUpdatedAt?: string;
+  scoreSerasaHistory?: { score: number, date: string }[];
+  onUpdateScoreSerasa?: (score: number) => void;
 }
 
 const NEGOTIATION_PLATFORMS = [
@@ -26,8 +31,13 @@ const NEGOTIATION_PLATFORMS = [
     'Outros'
 ];
 
-export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode, quickActionSignal }) => {
+export const DebtManager: React.FC<DebtManagerProps> = ({ 
+  debts, onAdd, onUpdate, onDelete, onAddTransaction, privacyMode, quickActionSignal,
+  scoreSerasa, scoreSerasaUpdatedAt, scoreSerasaHistory, onUpdateScoreSerasa
+}) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditingScore, setIsEditingScore] = useState(false);
+  const [editedScore, setEditedScore] = useState(scoreSerasa?.toString() || '');
   const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
   const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'prescribed'>('all');
 
@@ -452,7 +462,7 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-rose-100 dark:border-rose-900/30 shadow-sm">
           <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase">Total da Dívida (Banco)</p>
           <h3 className="text-2xl font-bold text-rose-600 dark:text-rose-400">{formatValue(totalDebt)}</h3>
@@ -469,6 +479,80 @@ export const DebtManager: React.FC<DebtManagerProps> = ({ debts, onAdd, onUpdate
           <p className="text-indigo-100 text-xs font-semibold uppercase">Economia Potencial</p>
           <h3 className="text-2xl font-bold">{formatValue(potentialSavings)}</h3>
           <p className="text-indigo-100 text-xs mt-1">Baseado nas suas metas</p>
+        </div>
+
+        {/* Score Serasa Section */}
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-pink-100 dark:border-pink-900/30 shadow-sm group relative flex flex-col justify-between">
+           <div className="flex items-center justify-between mb-2">
+             <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Serasa</h3>
+             <div className="flex items-center gap-2">
+               {!isEditingScore && onUpdateScoreSerasa && (
+                 <button
+                   onClick={() => {
+                     setIsEditingScore(true);
+                     setEditedScore(scoreSerasa?.toString() || '');
+                   }}
+                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-indigo-500 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                   title="Atualizar Score"
+                 >
+                   <Edit2 className="w-3 h-3" />
+                 </button>
+               )}
+               <ShieldAlert className="w-4 h-4 text-pink-500" />
+             </div>
+           </div>
+
+           {isEditingScore ? (
+             <div className="flex items-center gap-2 mb-1">
+               <input
+                 autoFocus
+                 type="number"
+                 className="w-full text-xl font-black text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 outline-none focus:border-pink-500"
+                 value={editedScore}
+                 onChange={(e) => setEditedScore(e.target.value)}
+                 onKeyDown={(e) => {
+                   if (e.key === 'Enter') {
+                     if (onUpdateScoreSerasa && editedScore) {
+                         onUpdateScoreSerasa(Number(editedScore));
+                     }
+                     setIsEditingScore(false);
+                   }
+                   if (e.key === 'Escape') setIsEditingScore(false);
+                 }}
+                 onBlur={() => {
+                   if (onUpdateScoreSerasa && editedScore) {
+                       onUpdateScoreSerasa(Number(editedScore));
+                   }
+                   setIsEditingScore(false);
+                 }}
+                 min={0}
+                 max={1000}
+               />
+             </div>
+           ) : (
+             <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tighter">
+                  {scoreSerasa !== undefined ? scoreSerasa : '-'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
+             </div>
+           )}
+           <p className="text-[10px] text-slate-400 mb-2 truncate">
+             {scoreSerasaUpdatedAt 
+               ? `Atualizado: ${new Date(scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
+               : 'Ainda não atualizado'}
+           </p>
+
+           {/* Serasa History Chart */}
+           {scoreSerasaHistory && scoreSerasaHistory.length > 0 && (
+               <div className="h-10 w-full mt-auto">
+                   <ResponsiveContainer width="100%" height="100%">
+                       <LineChart data={scoreSerasaHistory}>
+                           <Line type="monotone" dataKey="score" stroke="#ec4899" strokeWidth={2} dot={false} />
+                       </LineChart>
+                   </ResponsiveContainer>
+               </div>
+           )}
         </div>
       </div>
 

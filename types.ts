@@ -316,6 +316,7 @@ export enum View {
   PASSWORDS = 'PASSWORDS',
   PIX_KEYS = 'PIX_KEYS',
   PRODUCTIVITY = 'PRODUCTIVITY',
+  DAILY_ROUTINES = 'DAILY_ROUTINES',
   WALLETS = 'WALLETS', // Gerenciamento de Carteiras
   SETTINGS = 'SETTINGS'
 }
@@ -324,4 +325,5 @@ export interface DailyRoutine {
   id: string;
   title: string;
   lastCompletedDate?: string; // YYYY-MM-DD
+  order?: number;
 }

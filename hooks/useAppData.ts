@@ -16,6 +16,7 @@ import {
   addTaskFire, updateTaskFire, deleteTaskFire,
   addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
   addHabitFire, updateHabitFire, deleteHabitFire,
+  addDailyRoutineFire, updateDailyRoutineFire, deleteDailyRoutineFire,
   addWalletFire, updateWalletFire, deleteWalletFire,
   addCategoryFire, deleteCategoryFire,
   unlockBadgeFire, saveWealthProfileFire, saveDriveLinkFire, subscribeToData, recalculateBalanceFire,
@@ -38,6 +39,7 @@ const DEFAULT_DATA: AppData = {
     tasks: [],
     pixKeys: [],
     habits: [],
+    dailyRoutines: [],
     unlockedBadges: [],
     walletBalance: 0,
     categories: DEFAULT_CATEGORIES // Initial defaults
@@ -751,20 +753,39 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
   // --- DAILY ROUTINES ---
   const addDailyRoutine = async (title: string) => {
-    const newRoutine = { id: crypto.randomUUID(), title };
-    if (user) { /* Assuming firestore sync isn't requested strictly for this iteration, but fallback to sync if we write the logic */ }
-    setData(prev => ({ ...prev, dailyRoutines: [...(prev.dailyRoutines || []), newRoutine] }));
+    const newOrder = (data.dailyRoutines || []).length;
+    const newRoutine = { id: crypto.randomUUID(), title, order: newOrder };
+    if (user) await addDailyRoutineFire(user.uid, newRoutine);
+    else setData(prev => ({ ...prev, dailyRoutines: [...(prev.dailyRoutines || []), newRoutine] }));
   };
 
   const toggleDailyRoutine = async (id: string, dateStr: string) => {
-    setData(prev => ({
+    if (user) await updateDailyRoutineFire(user.uid, id, { lastCompletedDate: dateStr });
+    else setData(prev => ({
       ...prev,
       dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, lastCompletedDate: dateStr } : r)
     }));
   };
 
+  const updateDailyRoutineOrder = async (id: string, newOrder: number) => {
+    if (user) await updateDailyRoutineFire(user.uid, id, { order: newOrder });
+    else setData(prev => ({
+       ...prev,
+       dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, order: newOrder } : r)
+    }));
+  };
+
+  const updateDailyRoutine = async (id: string, newTitle: string) => {
+    if (user) await updateDailyRoutineFire(user.uid, id, { title: newTitle });
+    else setData(prev => ({
+       ...prev,
+       dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, title: newTitle } : r)
+    }));
+  };
+
   const deleteDailyRoutine = async (id: string) => {
-    setData(prev => ({ ...prev, dailyRoutines: (prev.dailyRoutines || []).filter(r => r.id !== id) }));
+    if (user) await deleteDailyRoutineFire(user.uid, id);
+    else setData(prev => ({ ...prev, dailyRoutines: (prev.dailyRoutines || []).filter(r => r.id !== id) }));
   };
 
   // --- CATEGORY ACTIONS ---
@@ -847,8 +868,10 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
         updateWallet,
         deleteWallet,
         addDailyRoutine,
+        updateDailyRoutine,
         toggleDailyRoutine,
         deleteDailyRoutine,
+        updateDailyRoutineOrder,
         addTaskList,
         updateTaskList,
         deleteTaskList,
