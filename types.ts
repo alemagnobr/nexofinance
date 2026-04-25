@@ -325,5 +325,8 @@ export interface DailyRoutine {
   id: string;
   title: string;
   lastCompletedDate?: string; // YYYY-MM-DD
+  completedDates?: string[]; // Arrays de datas em que a rotina foi marcada
   order?: number;
+  time?: string; // HH:mm
+  eventId?: string; // Links to agenda event
 }

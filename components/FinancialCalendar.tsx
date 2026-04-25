@@ -39,6 +39,7 @@ import {
   ChevronDown,
   Grid,
   Repeat,
+  CheckSquare,
 } from "lucide-react";
 import { updateTransactionFire } from "../services/storageService";
 import { auth } from "../services/firebase";
@@ -66,11 +67,11 @@ interface FinancialCalendarProps {
   onAddTask?: (task: Omit<Task, "id" | "createdAt" | "updatedAt">) => void;
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDeleteTask?: (id: string) => void;
-  onAddDailyRoutine?: (title: string) => void;
+  onAddDailyRoutine?: (title: string, time?: string) => void;
   onToggleDailyRoutine?: (id: string, dateStr: string) => void;
   onDeleteDailyRoutine?: (id: string) => void;
   onUpdateDailyRoutineOrder?: (id: string, newOrder: number) => void;
-  onUpdateDailyRoutine?: (id: string, newTitle: string) => void;
+  onUpdateDailyRoutine?: (id: string, newTitle: string, newTime?: string) => void;
   privacyMode: boolean;
   onNavigate?: (view: any) => void;
   currentView?: View;
@@ -161,6 +162,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   const [filterType, setFilterType] = useState<ViewFilter>("all");
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [isRoutinesModalOpen, setIsRoutinesModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
@@ -189,6 +191,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     description: "",
     listId: "",
     dueDate: "",
+  });
+  const [routineFormData, setRoutineFormData] = useState({
+    id: "",
+    title: "",
+    time: "",
   });
 
   // Form State
@@ -450,6 +457,28 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     });
   }, [displayedAgendaEvents, selectedDay, year, month]);
 
+  const timelessTasks = useMemo(() => {
+    return tasks?.filter(t => !t.dueDate && !t.completed) || [];
+  }, [tasks]);
+
+  const timelessRoutines = useMemo(() => {
+    return dailyRoutines?.filter(r => !r.time) || [];
+  }, [dailyRoutines]);
+
+  const todayTasks = useMemo(() => {
+    if (selectedDay === null) return [];
+    return tasks?.filter((t) => {
+      if (!t.dueDate) return false;
+      const [tYear, tMonth, tDay] = t.dueDate.split("-").map(Number);
+      return tDay === selectedDay && tMonth === month + 1 && tYear === year;
+    }) || [];
+  }, [tasks, selectedDay, month, year]);
+
+  const timedRoutines = useMemo(() => {
+    if (selectedDay === null) return [];
+    return dailyRoutines?.filter(r => !!r.time) || [];
+  }, [dailyRoutines, selectedDay]);
+
   const handleMoveTransaction = (index: number, direction: "up" | "down") => {
     if (!onUpdateTransaction) return;
 
@@ -535,7 +564,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   };
 
   const handleOpenModal = () => {
-    if (!selectedDay) return;
+    if (!selectedDay || !onAddTask || !onUpdateTask) return;
     // Reset form
     setFormData({
       description: "",
@@ -681,9 +710,22 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     setIsTaskModalOpen(true);
   };
 
+  const handleRoutineSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!routineFormData.title.trim()) return;
+
+    if (routineFormData.id && onUpdateDailyRoutine) {
+      onUpdateDailyRoutine(routineFormData.id, routineFormData.title.trim(), routineFormData.time || undefined);
+    } else if (onAddDailyRoutine) {
+      onAddDailyRoutine(routineFormData.title.trim(), routineFormData.time || undefined);
+    }
+    setIsRoutinesModalOpen(false);
+    setRoutineFormData({ id: "", title: "", time: "" });
+  };
+
   const handleTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDay || !onAddTask || !onUpdateTask) return;
+    if (!selectedDay) return;
 
     // Ensure we have a list to add to, if not create a default one
     let targetListId = taskFormData.listId;
@@ -705,20 +747,24 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     }
 
     if (taskFormData.id) {
-      await onUpdateTask(taskFormData.id, {
-        title: taskFormData.title,
-        description: taskFormData.description,
-        listId: targetListId,
-        dueDate: taskFormData.dueDate,
-      });
+      if (onUpdateTask) {
+        await onUpdateTask(taskFormData.id, {
+          title: taskFormData.title,
+          description: taskFormData.description,
+          listId: targetListId,
+          dueDate: taskFormData.dueDate,
+        });
+      }
     } else {
-      await onAddTask({
-        title: taskFormData.title,
-        description: taskFormData.description,
-        listId: targetListId,
-        completed: false,
-        dueDate: taskFormData.dueDate,
-      });
+      if (onAddTask) {
+        await onAddTask({
+          title: taskFormData.title,
+          description: taskFormData.description,
+          listId: targetListId,
+          completed: false,
+          dueDate: taskFormData.dueDate,
+        });
+      }
     }
 
     setIsTaskModalOpen(false);
@@ -862,1267 +908,1120 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => onNavigate && onNavigate(View.CALENDAR)}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${!currentView || currentView === View.CALENDAR ? "bg-indigo-600 text-white shadow-lg" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-        >
-          Agenda
-        </button>
-        <button
-          onClick={() => onNavigate && onNavigate(View.DAILY_ROUTINES)}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${currentView === View.DAILY_ROUTINES ? "bg-emerald-600 text-white shadow-lg" : "bg-slate-800 text-slate-400 hover:bg-slate-700"}`}
-        >
-          Rotinas Diárias
-        </button>
-      </div>
+      <AIAgendaAssistant
+        onAddEvent={(event) => {
+          if (onAddAgendaEvent) {
+            onAddAgendaEvent({
+              ...event,
+              id: Date.now().toString(),
+              userId: auth.currentUser?.uid || "",
+            });
+          }
+        }}
+        onAddTask={(task) => {
+          if (onAddTask) {
+            // Get or create a default list
+            let defaultListId =
+              taskLists.length > 0 ? taskLists[0].id : "default";
+            if (taskLists.length === 0 && onAddTaskList) {
+              onAddTaskList({ id: "default", title: "Tarefas Gerais" });
+            }
+            onAddTask({
+              ...task,
+              id: Date.now().toString(),
+              listId: defaultListId,
+              userId: auth.currentUser?.uid || "",
+            });
+          }
+        }}
+      />
 
-      {currentView === View.DAILY_ROUTINES ? (
-        <DailyRoutines
-          routines={dailyRoutines || []}
-          onAddRoutine={onAddDailyRoutine || (() => {})}
-          onToggleRoutine={onToggleDailyRoutine || (() => {})}
-          onDeleteRoutine={onDeleteDailyRoutine || (() => {})}
-          onUpdateOrder={onUpdateDailyRoutineOrder || (() => {})}
-          onUpdateRoutine={onUpdateDailyRoutine}
-        />
-      ) : (
-        <>
-          <AIAgendaAssistant
-            onAddEvent={(event) => {
-              if (onAddAgendaEvent) {
-                onAddAgendaEvent({
-                  ...event,
-                  id: Date.now().toString(),
-                  userId: auth.currentUser?.uid || "",
-                });
-              }
-            }}
-            onAddTask={(task) => {
-              if (onAddTask) {
-                // Get or create a default list
-                let defaultListId =
-                  taskLists.length > 0 ? taskLists[0].id : "default";
-                if (taskLists.length === 0 && onAddTaskList) {
-                  onAddTaskList({ id: "default", title: "Tarefas Gerais" });
-                }
-                onAddTask({
-                  ...task,
-                  id: Date.now().toString(),
-                  listId: defaultListId,
-                  userId: auth.currentUser?.uid || "",
-                });
-              }
-            }}
-          />
-
-          {/* ALERTS SECTION */}
-          {budgetAlerts.length > 0 && (
-            <div className="space-y-2 mb-4">
-              {budgetAlerts.map((alert, idx) => (
-                <div
-                  key={idx}
-                  className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3 animate-fade-in-down shadow-sm"
-                >
-                  <div className="bg-amber-100 dark:bg-amber-800 p-2 rounded-full flex-shrink-0">
-                    <Bell className="w-5 h-5 text-amber-600 dark:text-amber-300" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-amber-800 dark:text-amber-300 text-sm">
-                      {alert.title}
-                    </h4>
-                    <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
-                      {alert.message}
-                    </p>
-                  </div>
-                </div>
-              ))}
+      {/* ALERTS SECTION */}
+      {budgetAlerts.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {budgetAlerts.map((alert, idx) => (
+            <div
+              key={idx}
+              className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3 animate-fade-in-down shadow-sm"
+            >
+              <div className="bg-amber-100 dark:bg-amber-800 p-2 rounded-full flex-shrink-0">
+                <Bell className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+              </div>
+              <div>
+                <h4 className="font-bold text-amber-800 dark:text-amber-300 text-sm">
+                  {alert.title}
+                </h4>
+                <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">
+                  {alert.message}
+                </p>
+              </div>
             </div>
-          )}
+          ))}
+        </div>
+      )}
 
-          {/* ADD TRANSACTION MODAL */}
-          {isModalOpen && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                      Nova Transação
-                    </h3>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
-                      <CalendarClock className="w-3 h-3" />
-                      {selectedDay} de{" "}
-                      {currentDate.toLocaleDateString("pt-BR", {
-                        month: "long",
-                      })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+      {/* ADD TRANSACTION MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                  Nova Transação
+                </h3>
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
+                  <CalendarClock className="w-3 h-3" />
+                  {selectedDay} de{" "}
+                  {currentDate.toLocaleDateString("pt-BR", {
+                    month: "long",
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  O que é?
+                </label>
+                <div className="relative">
+                  <AlignLeft className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    autoFocus
+                    required
+                    type="text"
+                    placeholder="Ex: Mercado, Conta de Luz..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        description: e.target.value,
+                      })
+                    }
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
+              </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      O que é?
-                    </label>
-                    <div className="relative">
-                      <AlignLeft className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                      <input
-                        autoFocus
-                        required
-                        type="text"
-                        placeholder="Ex: Mercado, Conta de Luz..."
-                        value={formData.description}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                    Valor (R$)
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <CurrencyInput
+                      required
+                      placeholder="0,00"
+                      value={formData.amount}
+                      onChangeValue={(val) =>
+                        setFormData({ ...formData, amount: val })
+                      }
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Valor (R$)
-                      </label>
-                      <div className="relative">
-                        <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                        <CurrencyInput
-                          required
-                          placeholder="0,00"
-                          value={formData.amount}
-                          onChangeValue={(val) =>
-                            setFormData({ ...formData, amount: val })
-                          }
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Tipo
-                      </label>
-                      <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, type: "expense" })
-                          }
-                          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "expense" ? "bg-white dark:bg-slate-600 text-rose-600 shadow-sm" : "text-slate-500"}`}
-                        >
-                          Saída
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData({ ...formData, type: "income" })
-                          }
-                          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "income" ? "bg-white dark:bg-slate-600 text-emerald-600 shadow-sm" : "text-slate-500"}`}
-                        >
-                          Entrada
-                        </button>
-                      </div>
-                    </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                    Tipo
+                  </label>
+                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, type: "expense" })
+                      }
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "expense" ? "bg-white dark:bg-slate-600 text-rose-600 shadow-sm" : "text-slate-500"}`}
+                    >
+                      Saída
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, type: "income" })
+                      }
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "income" ? "bg-white dark:bg-slate-600 text-emerald-600 shadow-sm" : "text-slate-500"}`}
+                    >
+                      Entrada
+                    </button>
                   </div>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Categoria
-                      </label>
-                      <div className="relative">
-                        <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                        <select
-                          value={formData.category}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              category: e.target.value,
-                            })
-                          }
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                        >
-                          {CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Pagamento
-                      </label>
-                      <div className="relative">
-                        <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                        <select
-                          value={formData.paymentMethod}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              paymentMethod: e.target.value as PaymentMethod,
-                            })
-                          }
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                        >
-                          {PAYMENT_METHODS.map((m) => (
-                            <option key={m.value} value={m.value}>
-                              {m.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
-                      Status
-                    </label>
-                    <div className="flex gap-3">
-                      <label
-                        className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "paid" ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-700"}`}
-                      >
-                        <input
-                          type="radio"
-                          name="status"
-                          className="hidden"
-                          checked={formData.status === "paid"}
-                          onChange={() =>
-                            setFormData({ ...formData, status: "paid" })
-                          }
-                        />
-                        <Check className="w-4 h-4" />
-                        <span className="text-sm font-semibold">
-                          Pago / Recebido
-                        </span>
-                      </label>
-                      <label
-                        className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "pending" ? "bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-900/20" : "border-slate-200 dark:border-slate-700"}`}
-                      >
-                        <input
-                          type="radio"
-                          name="status"
-                          className="hidden"
-                          checked={formData.status === "pending"}
-                          onChange={() =>
-                            setFormData({ ...formData, status: "pending" })
-                          }
-                        />
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm font-semibold">Pendente</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Observações (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Detalhes adicionais..."
-                      value={formData.observation}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                    Categoria
+                  </label>
+                  <div className="relative">
+                    <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <select
+                      value={formData.category}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          observation: e.target.value,
+                          category: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-                  >
-                    <Plus className="w-5 h-5" /> Adicionar Transação
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ADD AGENDA EVENT MODAL */}
-          {isAgendaModalOpen && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                      {agendaFormData.id ? "Editar Evento" : "Novo Evento"}
-                    </h3>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                      <CalendarClock className="w-3 h-3" />
-                      {selectedDay} de{" "}
-                      {currentDate.toLocaleDateString("pt-BR", {
-                        month: "long",
-                      })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsAgendaModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                    Pagamento
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <select
+                      value={formData.paymentMethod}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          paymentMethod: e.target.value as PaymentMethod,
+                        })
+                      }
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
+                    >
+                      {PAYMENT_METHODS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
 
-                <form onSubmit={handleAgendaSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                  Status
+                </label>
+                <div className="flex gap-3">
+                  <label
+                    className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "paid" ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-700"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      className="hidden"
+                      checked={formData.status === "paid"}
+                      onChange={() =>
+                        setFormData({ ...formData, status: "paid" })
+                      }
+                    />
+                    <Check className="w-4 h-4" />
+                    <span className="text-sm font-semibold">
+                      Pago / Recebido
+                    </span>
+                  </label>
+                  <label
+                    className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "pending" ? "bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-900/20" : "border-slate-200 dark:border-slate-700"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      className="hidden"
+                      checked={formData.status === "pending"}
+                      onChange={() =>
+                        setFormData({ ...formData, status: "pending" })
+                      }
+                    />
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Pendente</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Observações (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Detalhes adicionais..."
+                  value={formData.observation}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      observation: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 mt-4"
+              >
+                <Plus className="w-5 h-5" /> Adicionar Transação
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD AGENDA EVENT MODAL */}
+      {isAgendaModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                  {agendaFormData.id ? "Editar Evento" : "Novo Evento"}
+                </h3>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                  <CalendarClock className="w-3 h-3" />
+                  {selectedDay} de{" "}
+                  {currentDate.toLocaleDateString("pt-BR", {
+                    month: "long",
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAgendaModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAgendaSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Título
+                </label>
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  placeholder="Ex: Reunião, Consulta..."
+                  value={agendaFormData.title}
+                  onChange={(e) =>
+                    setAgendaFormData({
+                      ...agendaFormData,
+                      title: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agendaFormData.allDay}
+                    onChange={(e) =>
+                      setAgendaFormData({
+                        ...agendaFormData,
+                        allDay: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Dia inteiro
+                  </span>
+                </label>
+              </div>
+
+              {!agendaFormData.allDay && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Título
+                      Início
                     </label>
                     <input
-                      autoFocus
                       required
-                      type="text"
-                      placeholder="Ex: Reunião, Consulta..."
-                      value={agendaFormData.title}
+                      type="time"
+                      value={agendaFormData.startTime}
                       onChange={(e) =>
                         setAgendaFormData({
                           ...agendaFormData,
-                          title: e.target.value,
+                          startTime: e.target.value,
                         })
                       }
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={agendaFormData.allDay}
-                        onChange={(e) =>
-                          setAgendaFormData({
-                            ...agendaFormData,
-                            allDay: e.target.checked,
-                          })
-                        }
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                      />
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Dia inteiro
-                      </span>
-                    </label>
-                  </div>
-
-                  {!agendaFormData.allDay && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                          Início
-                        </label>
-                        <input
-                          required
-                          type="time"
-                          value={agendaFormData.startTime}
-                          onChange={(e) =>
-                            setAgendaFormData({
-                              ...agendaFormData,
-                              startTime: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                          Fim
-                        </label>
-                        <input
-                          required
-                          type="time"
-                          value={agendaFormData.endTime}
-                          onChange={(e) =>
-                            setAgendaFormData({
-                              ...agendaFormData,
-                              endTime: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-4">
-                    <label className="flex items-center gap-2 cursor-pointer mb-3">
-                      <input
-                        type="checkbox"
-                        checked={agendaFormData.isRecurring}
-                        onChange={(e) =>
-                          setAgendaFormData({
-                            ...agendaFormData,
-                            isRecurring: e.target.checked,
-                          })
-                        }
-                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                      />
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <Repeat className="w-4 h-4" /> Repetir evento
-                      </span>
-                    </label>
-
-                    {agendaFormData.isRecurring && (
-                      <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 mb-4 text-left">
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                            Frequência
-                          </label>
-                          <select
-                            value={agendaFormData.recurrencePeriod}
-                            onChange={(e) =>
-                              setAgendaFormData({
-                                ...agendaFormData,
-                                recurrencePeriod: e.target.value as any,
-                              })
-                            }
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          >
-                            <option value="daily">Todos os dias</option>
-                            <option value="weekly">Semanalmente</option>
-                            <option value="monthly">Mensalmente</option>
-                            <option value="yearly">Anualmente</option>
-                            <option value="custom_days">
-                              Dias Específicos da Semana
-                            </option>
-                          </select>
-                        </div>
-
-                        {agendaFormData.recurrencePeriod === "custom_days" && (
-                          <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
-                              Dias da Semana
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                              {[
-                                "Dom",
-                                "Seg",
-                                "Ter",
-                                "Qua",
-                                "Qui",
-                                "Sex",
-                                "Sáb",
-                              ].map((day, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    const currentlySelected = (
-                                      agendaFormData.recurrenceDays || []
-                                    ).includes(index);
-                                    const newDays = currentlySelected
-                                      ? (
-                                          agendaFormData.recurrenceDays || []
-                                        ).filter((d: number) => d !== index)
-                                      : [
-                                          ...(agendaFormData.recurrenceDays ||
-                                            []),
-                                          index,
-                                        ];
-                                    setAgendaFormData({
-                                      ...agendaFormData,
-                                      recurrenceDays: newDays,
-                                    });
-                                  }}
-                                  className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold border transition-colors ${
-                                    (
-                                      agendaFormData.recurrenceDays || []
-                                    ).includes(index)
-                                      ? "bg-blue-600 border-blue-600 text-white"
-                                      : "bg-white border-slate-300 text-slate-500 hover:border-blue-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300"
-                                  }`}
-                                >
-                                  {day}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                            Término em (Opcional)
-                          </label>
-                          <input
-                            type="date"
-                            value={agendaFormData.recurrenceEndDate || ""}
-                            onChange={(e) =>
-                              setAgendaFormData({
-                                ...agendaFormData,
-                                recurrenceEndDate: e.target.value,
-                              })
-                            }
-                            min={new Date().toISOString().split("T")[0]}
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Descrição (Opcional)
+                      Fim
                     </label>
-                    <textarea
-                      placeholder="Detalhes adicionais..."
-                      value={agendaFormData.description}
+                    <input
+                      required
+                      type="time"
+                      value={agendaFormData.endTime}
                       onChange={(e) =>
                         setAgendaFormData({
                           ...agendaFormData,
-                          description: e.target.value,
+                          endTime: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-                  >
-                    {agendaFormData.id ? (
-                      <Check className="w-5 h-5" />
-                    ) : (
-                      <Plus className="w-5 h-5" />
-                    )}
-                    {agendaFormData.id ? "Atualizar Evento" : "Salvar Evento"}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ADD TASK MODAL */}
-          {isTaskModalOpen && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                      {taskFormData.id ? "Editar Tarefa" : "Nova Tarefa"}
-                    </h3>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <ListTodo className="w-3 h-3" />
-                      {selectedDay} de{" "}
-                      {currentDate.toLocaleDateString("pt-BR", {
-                        month: "long",
-                      })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsTaskModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
+              )}
 
-                <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Título
-                    </label>
-                    <input
-                      autoFocus
-                      required
-                      type="text"
-                      placeholder="Ex: Pagar conta de luz, Comprar leite..."
-                      value={taskFormData.title}
-                      onChange={(e) =>
-                        setTaskFormData({
-                          ...taskFormData,
-                          title: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
+              <div className="mt-4">
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={agendaFormData.isRecurring}
+                    onChange={(e) =>
+                      setAgendaFormData({
+                        ...agendaFormData,
+                        isRecurring: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                    <Repeat className="w-4 h-4" /> Repetir evento
+                  </span>
+                </label>
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Data de Vencimento
-                    </label>
-                    <input
-                      required
-                      type="date"
-                      value={taskFormData.dueDate}
-                      onChange={(e) =>
-                        setTaskFormData({
-                          ...taskFormData,
-                          dueDate: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  {taskLists && taskLists.length > 0 && (
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                          Lista
-                        </label>
-                        <select
-                          value={taskFormData.listId}
-                          onChange={(e) =>
-                            setTaskFormData({
-                              ...taskFormData,
-                              listId: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                        >
-                          {taskLists.map((list) => (
-                            <option key={list.id} value={list.id}>
-                              {list.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsListManagerOpen(true)}
-                        className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition-colors border border-slate-200 dark:border-slate-600"
-                        title="Gerenciar Listas"
-                      >
-                        <Layers className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Descrição (Opcional)
-                    </label>
-                    <textarea
-                      placeholder="Detalhes adicionais..."
-                      value={taskFormData.description}
-                      onChange={(e) =>
-                        setTaskFormData({
-                          ...taskFormData,
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] resize-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-                  >
-                    {taskFormData.id ? (
-                      <Check className="w-5 h-5" />
-                    ) : (
-                      <Plus className="w-5 h-5" />
-                    )}
-                    {taskFormData.id ? "Atualizar Tarefa" : "Salvar Tarefa"}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* LIST MANAGER MODAL */}
-          {isListManagerOpen && (
-            <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-500" />
-                    Gerenciar Listas
-                  </h3>
-                  <button
-                    onClick={() => setIsListManagerOpen(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Nome da nova lista..."
-                      value={newListName}
-                      onChange={(e) => setNewListName(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          if (!newListName.trim() || !onAddTaskList) return;
-                          const newListId = crypto.randomUUID();
-                          await onAddTaskList({
-                            id: newListId,
-                            title: newListName.trim(),
-                          });
-                          setNewListName("");
-                          setTaskFormData((prev) => ({
-                            ...prev,
-                            listId: newListId,
-                          }));
+                {agendaFormData.isRecurring && (
+                  <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 mb-4 text-left">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                        Frequência
+                      </label>
+                      <select
+                        value={agendaFormData.recurrencePeriod}
+                        onChange={(e) =>
+                          setAgendaFormData({
+                            ...agendaFormData,
+                            recurrencePeriod: e.target.value as any,
+                          })
                         }
-                      }}
-                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!newListName.trim() || !onAddTaskList) return;
-                        const newListId = crypto.randomUUID();
-                        await onAddTaskList({
-                          id: newListId,
-                          title: newListName.trim(),
-                        });
-                        setNewListName("");
-                        setTaskFormData((prev) => ({
-                          ...prev,
-                          listId: newListId,
-                        }));
-                      }}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-indigo-500/20"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                    {taskLists?.map((list) => (
-                      <div
-                        key={list.id}
-                        className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       >
-                        {editingListId === list.id ? (
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editingListName}
-                            onChange={(e) => setEditingListName(e.target.value)}
-                            onBlur={async () => {
-                              if (
-                                editingListName.trim() &&
-                                editingListName !== list.title &&
-                                onUpdateTaskList
-                              ) {
-                                await onUpdateTaskList(list.id, {
-                                  title: editingListName.trim(),
+                        <option value="daily">Todos os dias</option>
+                        <option value="weekly">Semanalmente</option>
+                        <option value="monthly">Mensalmente</option>
+                        <option value="yearly">Anualmente</option>
+                        <option value="custom_days">
+                          Dias Específicos da Semana
+                        </option>
+                      </select>
+                    </div>
+
+                    {agendaFormData.recurrencePeriod === "custom_days" && (
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+                          Dias da Semana
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            "Dom",
+                            "Seg",
+                            "Ter",
+                            "Qua",
+                            "Qui",
+                            "Sex",
+                            "Sáb",
+                          ].map((day, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                const currentlySelected = (
+                                  agendaFormData.recurrenceDays || []
+                                ).includes(index);
+                                const newDays = currentlySelected
+                                  ? (
+                                      agendaFormData.recurrenceDays || []
+                                    ).filter((d: number) => d !== index)
+                                  : [
+                                      ...(agendaFormData.recurrenceDays || []),
+                                      index,
+                                    ];
+                                setAgendaFormData({
+                                  ...agendaFormData,
+                                  recurrenceDays: newDays,
                                 });
-                              }
-                              setEditingListId(null);
-                            }}
-                            onKeyDown={async (e) => {
-                              if (e.key === "Enter") {
-                                if (
-                                  editingListName.trim() &&
-                                  editingListName !== list.title &&
-                                  onUpdateTaskList
-                                ) {
-                                  await onUpdateTaskList(list.id, {
-                                    title: editingListName.trim(),
-                                  });
-                                }
-                                setEditingListId(null);
-                              }
-                            }}
-                            className="flex-1 px-2 py-1 rounded border border-indigo-500 dark:bg-slate-700 dark:text-white outline-none"
-                          />
-                        ) : (
-                          <span className="font-medium text-slate-700 dark:text-slate-200">
-                            {list.title}
-                          </span>
-                        )}
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingListId(list.id);
-                              setEditingListName(list.title);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 rounded transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (
-                                window.confirm(
-                                  "Excluir esta lista apagará todas as tarefas nela. Continuar?",
+                              }}
+                              className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold border transition-colors ${
+                                (agendaFormData.recurrenceDays || []).includes(
+                                  index,
                                 )
-                              ) {
-                                if (onDeleteTaskList)
-                                  await onDeleteTaskList(list.id);
-                                if (taskFormData.listId === list.id) {
-                                  setTaskFormData((prev) => ({
-                                    ...prev,
-                                    listId:
-                                      taskLists.find((l) => l.id !== list.id)
-                                        ?.id || "",
-                                  }));
-                                }
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-white border-slate-300 text-slate-500 hover:border-blue-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300"
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                        Término em (Opcional)
+                      </label>
+                      <input
+                        type="date"
+                        value={agendaFormData.recurrenceEndDate || ""}
+                        onChange={(e) =>
+                          setAgendaFormData({
+                            ...agendaFormData,
+                            recurrenceEndDate: e.target.value,
+                          })
+                        }
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
-          )}
 
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <CalendarIcon className="w-7 h-7 text-indigo-600" />
-                Agenda
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">
-                Rotinas diárias, eventos e controle de vencimentos.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mr-2">
-                <button
-                  onClick={() => setViewMode("month")}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "month" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-                >
-                  Mês
-                </button>
-                <button
-                  onClick={() => setViewMode("week")}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "week" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-                >
-                  Semana
-                </button>
-                <button
-                  onClick={() => setViewMode("day")}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "day" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
-                >
-                  Dia
-                </button>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Descrição (Opcional)
+                </label>
+                <textarea
+                  placeholder="Detalhes adicionais..."
+                  value={agendaFormData.description}
+                  onChange={(e) =>
+                    setAgendaFormData({
+                      ...agendaFormData,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none"
+                />
               </div>
 
               <button
-                onClick={() => exportToICS(displayedTransactions)}
-                className="p-2 text-slate-500 hover:text-indigo-600 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800"
-                title="Exportar para Arquivo (.ics)"
+                type="submit"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 mt-4"
               >
-                <Download className="w-5 h-5" />
+                {agendaFormData.id ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <Plus className="w-5 h-5" />
+                )}
+                {agendaFormData.id ? "Atualizar Evento" : "Salvar Evento"}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center bg-indigo-50 dark:bg-indigo-900/30 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-1 flex-1 md:flex-none justify-center">
-                <button
-                  onClick={handlePrev}
-                  className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="px-4 text-sm md:text-base font-black text-indigo-800 dark:text-indigo-300 min-w-[140px] text-center capitalize">
-                  {viewMode === "day"
-                    ? new Date(
-                        year,
-                        month,
-                        selectedDay || 1,
-                      ).toLocaleDateString("pt-BR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })
-                    : `${currentDate.toLocaleDateString("pt-BR", { month: "long" }).charAt(0).toUpperCase() + currentDate.toLocaleDateString("pt-BR", { month: "long" }).slice(1)}/${currentDate.getFullYear().toString().slice(-2)}`}
+      {/* ADD ROUTINE MODAL */}
+      {isRoutinesModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                  {routineFormData.id ? "Editar Rotina" : "Nova Rotina"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsRoutinesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRoutineSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Título
+                </label>
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  placeholder="Ex: Ler 10 páginas, Beber Água, etc..."
+                  value={routineFormData.title}
+                  onChange={(e) =>
+                    setRoutineFormData({ ...routineFormData, title: e.target.value })
+                  }
+                  className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Hora (Opcional - Sessão Fixa)
+                </label>
+                <input
+                  type="time"
+                  value={routineFormData.time}
+                  onChange={(e) =>
+                    setRoutineFormData({ ...routineFormData, time: e.target.value })
+                  }
+                  className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-800 dark:text-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 mt-4"
+              >
+                {routineFormData.id ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <Plus className="w-5 h-5" />
+                )}
+                {routineFormData.id ? "Atualizar Rotina" : "Salvar Rotina"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD TASK MODAL */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                  {taskFormData.id ? "Editar Tarefa" : "Nova Tarefa"}
+                </h3>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <ListTodo className="w-3 h-3" />
+                  {selectedDay} de{" "}
+                  {currentDate.toLocaleDateString("pt-BR", {
+                    month: "long",
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsTaskModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Título
+                </label>
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  placeholder="Ex: Pagar conta de luz, Comprar leite..."
+                  value={taskFormData.title}
+                  onChange={(e) =>
+                    setTaskFormData({
+                      ...taskFormData,
+                      title: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Data de Vencimento
+                </label>
+                <input
+                  required
+                  type="date"
+                  value={taskFormData.dueDate}
+                  onChange={(e) =>
+                    setTaskFormData({
+                      ...taskFormData,
+                      dueDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {taskLists && taskLists.length > 0 && (
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                      Lista
+                    </label>
+                    <select
+                      value={taskFormData.listId}
+                      onChange={(e) =>
+                        setTaskFormData({
+                          ...taskFormData,
+                          listId: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {taskLists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsListManagerOpen(true)}
+                    className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition-colors border border-slate-200 dark:border-slate-600"
+                    title="Gerenciar Listas"
+                  >
+                    <Layers className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                  </button>
                 </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  Descrição (Opcional)
+                </label>
+                <textarea
+                  placeholder="Detalhes adicionais..."
+                  value={taskFormData.description}
+                  onChange={(e) =>
+                    setTaskFormData({
+                      ...taskFormData,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] resize-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 mt-4"
+              >
+                {taskFormData.id ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <Plus className="w-5 h-5" />
+                )}
+                {taskFormData.id ? "Atualizar Tarefa" : "Salvar Tarefa"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* LIST MANAGER MODAL */}
+      {isListManagerOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-500" />
+                Gerenciar Listas
+              </h3>
+              <button
+                onClick={() => setIsListManagerOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nome da nova lista..."
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (!newListName.trim() || !onAddTaskList) return;
+                      const newListId = crypto.randomUUID();
+                      await onAddTaskList({
+                        id: newListId,
+                        title: newListName.trim(),
+                      });
+                      setNewListName("");
+                      setTaskFormData((prev) => ({
+                        ...prev,
+                        listId: newListId,
+                      }));
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
                 <button
-                  onClick={handleNext}
-                  className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
+                  type="button"
+                  onClick={async () => {
+                    if (!newListName.trim() || !onAddTaskList) return;
+                    const newListId = crypto.randomUUID();
+                    await onAddTaskList({
+                      id: newListId,
+                      title: newListName.trim(),
+                    });
+                    setNewListName("");
+                    setTaskFormData((prev) => ({
+                      ...prev,
+                      listId: newListId,
+                    }));
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-indigo-500/20"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  <Plus className="w-5 h-5" />
                 </button>
+              </div>
+
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                {taskLists?.map((list) => (
+                  <div
+                    key={list.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+                  >
+                    {editingListId === list.id ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editingListName}
+                        onChange={(e) => setEditingListName(e.target.value)}
+                        onBlur={async () => {
+                          if (
+                            editingListName.trim() &&
+                            editingListName !== list.title &&
+                            onUpdateTaskList
+                          ) {
+                            await onUpdateTaskList(list.id, {
+                              title: editingListName.trim(),
+                            });
+                          }
+                          setEditingListId(null);
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter") {
+                            if (
+                              editingListName.trim() &&
+                              editingListName !== list.title &&
+                              onUpdateTaskList
+                            ) {
+                              await onUpdateTaskList(list.id, {
+                                title: editingListName.trim(),
+                              });
+                            }
+                            setEditingListId(null);
+                          }
+                        }}
+                        className="flex-1 px-2 py-1 rounded border border-indigo-500 dark:bg-slate-700 dark:text-white outline-none"
+                      />
+                    ) : (
+                      <span className="font-medium text-slate-700 dark:text-slate-200">
+                        {list.title}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingListId(list.id);
+                          setEditingListName(list.title);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              "Excluir esta lista apagará todas as tarefas nela. Continuar?",
+                            )
+                          ) {
+                            if (onDeleteTaskList)
+                              await onDeleteTaskList(list.id);
+                            if (taskFormData.listId === list.id) {
+                              setTaskFormData((prev) => ({
+                                ...prev,
+                                listId:
+                                  taskLists.find((l) => l.id !== list.id)?.id ||
+                                  "",
+                              }));
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* FILTERS */}
-          <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 overflow-x-auto">
-            {[
-              { id: "all", label: "Tudo", icon: Filter },
-              { id: "expense", label: "Saídas", icon: ArrowDown },
-              { id: "income", label: "Entradas", icon: ArrowUp },
-              { id: "pending", label: "Pendentes", icon: Clock },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilterType(f.id as ViewFilter)}
-                className={`flex-1 min-w-[80px] py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-2
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <CalendarIcon className="w-7 h-7 text-indigo-600" />
+            Agenda
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Rotinas diárias, eventos e controle de vencimentos.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mr-2">
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "month" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+            >
+              Mês
+            </button>
+            <button
+              onClick={() => setViewMode("week")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "week" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => setViewMode("day")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === "day" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"}`}
+            >
+              Dia
+            </button>
+          </div>
+
+          <button
+            onClick={() => exportToICS(displayedTransactions)}
+            className="p-2 text-slate-500 hover:text-indigo-600 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800"
+            title="Exportar para Arquivo (.ics)"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+
+          <div className="flex items-center bg-indigo-50 dark:bg-indigo-900/30 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-1 flex-1 md:flex-none justify-center">
+            <button
+              onClick={handlePrev}
+              className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="px-4 text-sm md:text-base font-black text-indigo-800 dark:text-indigo-300 min-w-[140px] text-center capitalize">
+              {viewMode === "day"
+                ? new Date(year, month, selectedDay || 1).toLocaleDateString(
+                    "pt-BR",
+                    {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    },
+                  )
+                : `${currentDate.toLocaleDateString("pt-BR", { month: "long" }).charAt(0).toUpperCase() + currentDate.toLocaleDateString("pt-BR", { month: "long" }).slice(1)}/${currentDate.getFullYear().toString().slice(-2)}`}
+            </div>
+            <button
+              onClick={handleNext}
+              className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-800/50 transition-colors rounded-lg text-indigo-700 dark:text-indigo-400"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* FILTERS */}
+      <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 overflow-x-auto">
+        {[
+          { id: "all", label: "Tudo", icon: Filter },
+          { id: "expense", label: "Saídas", icon: ArrowDown },
+          { id: "income", label: "Entradas", icon: ArrowUp },
+          { id: "pending", label: "Pendentes", icon: Clock },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilterType(f.id as ViewFilter)}
+            className={`flex-1 min-w-[80px] py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-2
                     ${
                       filterType === f.id
                         ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
                         : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     }`}
-              >
-                <f.icon className="w-3 h-3" /> {f.label}
-              </button>
-            ))}
-          </div>
+          >
+            <f.icon className="w-3 h-3" /> {f.label}
+          </button>
+        ))}
+      </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Calendar Grid */}
-            {viewMode === "month" ? (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
-                  {DAYS_OF_WEEK.map((d) => (
-                    <div
-                      key={d}
-                      className="py-3 text-center text-xs font-bold uppercase text-slate-500 dark:text-slate-400"
-                    >
-                      {d}
-                    </div>
-                  ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar Grid */}
+        {viewMode === "month" ? (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+              {DAYS_OF_WEEK.map((d) => (
+                <div
+                  key={d}
+                  className="py-3 text-center text-xs font-bold uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {d}
                 </div>
-                <div className="grid grid-cols-7">{calendarCells}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">{calendarCells}</div>
+          </div>
+        ) : viewMode === "week" ? (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+            {/* Week Header */}
+            <div className="grid grid-cols-8 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+              <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
+              {weekDays.map((d, i) => (
+                <div
+                  key={i}
+                  onClick={() => {
+                    setSelectedDay(d.getDate());
+                    setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
+                  }}
+                  className={`py-2 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 ${d.getDate() === selectedDay && d.getMonth() === month ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}
+                >
+                  <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                    {DAYS_OF_WEEK[i]}
+                  </div>
+                  <div
+                    className={`text-lg font-bold ${d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? "text-indigo-600 dark:text-indigo-400" : "text-slate-700 dark:text-slate-200"}`}
+                  >
+                    {d.getDate()}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* All Day Section */}
+            <div className="grid grid-cols-8 border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
+              <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                O Dia Todo
               </div>
-            ) : viewMode === "week" ? (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
-                {/* Week Header */}
-                <div className="grid grid-cols-8 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
-                  <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
-                  {weekDays.map((d, i) => (
+              {weekDays.map((d, i) => {
+                const dayTrans = displayedTransactions.filter((t) => {
+                  const [tYear, tMonth, tDay] = t.date.split("-").map(Number);
+                  return (
+                    tDay === d.getDate() &&
+                    tMonth === d.getMonth() + 1 &&
+                    tYear === d.getFullYear()
+                  );
+                });
+                const dayTasks =
+                  tasks?.filter((t) => {
+                    if (!t.dueDate) return false;
+                    const [tYear, tMonth, tDay] = t.dueDate
+                      .split("-")
+                      .map(Number);
+                    return (
+                      tDay === d.getDate() &&
+                      tMonth === d.getMonth() + 1 &&
+                      tYear === d.getFullYear()
+                    );
+                  }) || [];
+                const dayAgendaEvents = displayedAgendaEvents.filter((e) => {
+                  const eStart = new Date(e.startDate);
+                  eStart.setHours(0, 0, 0, 0);
+                  const eEnd = new Date(e.endDate);
+                  eEnd.setHours(23, 59, 59, 999);
+                  const targetDate = new Date(
+                    d.getFullYear(),
+                    d.getMonth(),
+                    d.getDate(),
+                  );
+                  return targetDate >= eStart && targetDate <= eEnd && e.allDay;
+                });
+
+                return (
+                  <div
+                    key={i}
+                    className="p-1 border-r border-slate-200 dark:border-slate-600 min-h-[40px]"
+                  >
+                    {dayTrans.map((t) => (
+                      <div
+                        key={t.id}
+                        className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"}`}
+                      >
+                        {t.type === "income" ? "+" : "-"}
+                        {formatValue(t.amount)} {t.description}
+                      </div>
+                    ))}
+                    {dayTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                      >
+                        {t.title}
+                      </div>
+                    ))}
+                    {dayAgendaEvents.map((e) => (
+                      <div
+                        key={e.id}
+                        onClick={() => handleEditAgendaEvent(e)}
+                        className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                      >
+                        {e.title}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Time Grid */}
+            <div className="flex-1 overflow-y-auto relative">
+              <div className="grid grid-cols-8">
+                {/* Time Labels */}
+                <div className="border-r border-slate-200 dark:border-slate-600">
+                  {Array.from({ length: 24 }).map((_, i) => (
                     <div
                       key={i}
-                      onClick={() => {
-                        setSelectedDay(d.getDate());
-                        setCurrentDate(
-                          new Date(d.getFullYear(), d.getMonth(), 1),
-                        );
-                      }}
-                      className={`py-2 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 ${d.getDate() === selectedDay && d.getMonth() === month ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}
+                      className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
                     >
-                      <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
-                        {DAYS_OF_WEEK[i]}
-                      </div>
-                      <div
-                        className={`text-lg font-bold ${d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear() ? "text-indigo-600 dark:text-indigo-400" : "text-slate-700 dark:text-slate-200"}`}
-                      >
-                        {d.getDate()}
-                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
                     </div>
                   ))}
                 </div>
 
-                {/* All Day Section */}
-                <div className="grid grid-cols-8 border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
-                  <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
-                    O Dia Todo
-                  </div>
-                  {weekDays.map((d, i) => {
-                    const dayTrans = displayedTransactions.filter((t) => {
-                      const [tYear, tMonth, tDay] = t.date
-                        .split("-")
-                        .map(Number);
-                      return (
-                        tDay === d.getDate() &&
-                        tMonth === d.getMonth() + 1 &&
-                        tYear === d.getFullYear()
-                      );
-                    });
-                    const dayTasks =
-                      tasks?.filter((t) => {
-                        if (!t.dueDate) return false;
-                        const [tYear, tMonth, tDay] = t.dueDate
-                          .split("-")
-                          .map(Number);
-                        return (
-                          tDay === d.getDate() &&
-                          tMonth === d.getMonth() + 1 &&
-                          tYear === d.getFullYear()
-                        );
-                      }) || [];
-                    const dayAgendaEvents = displayedAgendaEvents.filter(
-                      (e) => {
-                        const eStart = new Date(e.startDate);
-                        eStart.setHours(0, 0, 0, 0);
-                        const eEnd = new Date(e.endDate);
-                        eEnd.setHours(23, 59, 59, 999);
-                        const targetDate = new Date(
-                          d.getFullYear(),
-                          d.getMonth(),
-                          d.getDate(),
-                        );
-                        return (
-                          targetDate >= eStart && targetDate <= eEnd && e.allDay
-                        );
-                      },
+                {/* Day Columns */}
+                {weekDays.map((d, dayIdx) => {
+                  const dayAgendaEvents = displayedAgendaEvents.filter((e) => {
+                    const eStart = new Date(e.startDate);
+                    const targetDate = new Date(
+                      d.getFullYear(),
+                      d.getMonth(),
+                      d.getDate(),
                     );
-
                     return (
-                      <div
-                        key={i}
-                        className="p-1 border-r border-slate-200 dark:border-slate-600 min-h-[40px]"
-                      >
-                        {dayTrans.map((t) => (
-                          <div
-                            key={t.id}
-                            className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"}`}
-                          >
-                            {t.type === "income" ? "+" : "-"}
-                            {formatValue(t.amount)} {t.description}
-                          </div>
-                        ))}
-                        {dayTasks.map((t) => (
-                          <div
-                            key={t.id}
-                            className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
-                          >
-                            {t.title}
-                          </div>
-                        ))}
-                        {dayAgendaEvents.map((e) => (
-                          <div
-                            key={e.id}
-                            onClick={() => handleEditAgendaEvent(e)}
-                            className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                          >
-                            {e.title}
-                          </div>
-                        ))}
-                      </div>
+                      eStart.getDate() === targetDate.getDate() &&
+                      eStart.getMonth() === targetDate.getMonth() &&
+                      eStart.getFullYear() === targetDate.getFullYear() &&
+                      !e.allDay
                     );
-                  })}
-                </div>
+                  });
 
-                {/* Time Grid */}
-                <div className="flex-1 overflow-y-auto relative">
-                  <div className="grid grid-cols-8">
-                    {/* Time Labels */}
-                    <div className="border-r border-slate-200 dark:border-slate-600">
-                      {Array.from({ length: 24 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
-                        >
-                          <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Day Columns */}
-                    {weekDays.map((d, dayIdx) => {
-                      const dayAgendaEvents = displayedAgendaEvents.filter(
-                        (e) => {
-                          const eStart = new Date(e.startDate);
-                          const targetDate = new Date(
-                            d.getFullYear(),
-                            d.getMonth(),
-                            d.getDate(),
-                          );
-                          return (
-                            eStart.getDate() === targetDate.getDate() &&
-                            eStart.getMonth() === targetDate.getMonth() &&
-                            eStart.getFullYear() === targetDate.getFullYear() &&
-                            !e.allDay
-                          );
-                        },
-                      );
-
-                      return (
-                        <div
-                          key={dayIdx}
-                          className="border-r border-slate-200 dark:border-slate-600 relative"
-                        >
-                          {Array.from({ length: 24 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="h-12 border-b border-slate-100 dark:border-slate-700/50"
-                            ></div>
-                          ))}
-
-                          {/* Render Events */}
-                          {dayAgendaEvents.map((e) => {
-                            const start = new Date(e.startDate);
-                            const end = new Date(e.endDate);
-                            const startHour =
-                              start.getHours() + start.getMinutes() / 60;
-                            const endHour =
-                              end.getHours() + end.getMinutes() / 60;
-                            const top = startHour * 48; // 48px per hour (h-12)
-                            const height = Math.max(
-                              (endHour - startHour) * 48,
-                              20,
-                            ); // Min height 20px
-
-                            return (
-                              <div
-                                key={e.id}
-                                onClick={() => handleEditAgendaEvent(e)}
-                                className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
-                                style={{
-                                  top: `${top}px`,
-                                  height: `${height}px`,
-                                }}
-                              >
-                                <div className="text-[10px] font-bold leading-tight truncate">
-                                  {e.title}
-                                </div>
-                                {height >= 40 && (
-                                  <div className="text-[9px] opacity-80 leading-tight truncate">
-                                    {start.toLocaleTimeString("pt-BR", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}{" "}
-                                    -{" "}
-                                    {end.toLocaleTimeString("pt-BR", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
-                {/* Day Header */}
-                <div className="grid grid-cols-[60px_1fr] bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
-                  <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
-                  <div className="py-2 text-center bg-indigo-50 dark:bg-indigo-900/20">
-                    <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
-                      {
-                        DAYS_OF_WEEK[
-                          new Date(year, month, selectedDay || 1).getDay()
-                        ]
-                      }
-                    </div>
-                    <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-                      {selectedDay || 1}
-                    </div>
-                  </div>
-                </div>
-
-                {/* All Day Section */}
-                <div className="grid grid-cols-[60px_1fr] border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
-                  <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
-                    O Dia Todo
-                  </div>
-                  <div className="p-1 min-h-[40px]">
-                    {(() => {
-                      const d = new Date(year, month, selectedDay || 1);
-                      const dayTrans = displayedTransactions.filter((t) => {
-                        const [tYear, tMonth, tDay] = t.date
-                          .split("-")
-                          .map(Number);
-                        return (
-                          tDay === d.getDate() &&
-                          tMonth === d.getMonth() + 1 &&
-                          tYear === d.getFullYear()
-                        );
-                      });
-                      const dayTasks =
-                        tasks?.filter((t) => {
-                          if (!t.dueDate) return false;
-                          const [tYear, tMonth, tDay] = t.dueDate
-                            .split("-")
-                            .map(Number);
-                          return (
-                            tDay === d.getDate() &&
-                            tMonth === d.getMonth() + 1 &&
-                            tYear === d.getFullYear()
-                          );
-                        }) || [];
-                      const dayAgendaEvents = displayedAgendaEvents.filter(
-                        (e) => {
-                          const eStart = new Date(e.startDate);
-                          eStart.setHours(0, 0, 0, 0);
-                          const eEnd = new Date(e.endDate);
-                          eEnd.setHours(23, 59, 59, 999);
-                          const targetDate = new Date(
-                            d.getFullYear(),
-                            d.getMonth(),
-                            d.getDate(),
-                          );
-                          return (
-                            targetDate >= eStart &&
-                            targetDate <= eEnd &&
-                            e.allDay
-                          );
-                        },
-                      );
-
-                      return (
-                        <>
-                          {dayTrans.map((t) => (
-                            <div
-                              key={t.id}
-                              className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"}`}
-                            >
-                              {t.type === "income" ? "+" : "-"}
-                              {formatValue(t.amount)} {t.description}
-                            </div>
-                          ))}
-                          {dayTasks.map((t) => (
-                            <div
-                              key={t.id}
-                              className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
-                            >
-                              {t.title}
-                            </div>
-                          ))}
-                          {dayAgendaEvents.map((e) => (
-                            <div
-                              key={e.id}
-                              onClick={() => handleEditAgendaEvent(e)}
-                              className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                            >
-                              {e.title}
-                            </div>
-                          ))}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Time Grid */}
-                <div className="flex-1 overflow-y-auto relative">
-                  <div className="grid grid-cols-[60px_1fr]">
-                    {/* Time Labels */}
-                    <div className="border-r border-slate-200 dark:border-slate-600">
-                      {Array.from({ length: 24 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
-                        >
-                          <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Day Column */}
-                    <div className="relative">
+                  return (
+                    <div
+                      key={dayIdx}
+                      className="border-r border-slate-200 dark:border-slate-600 relative"
+                    >
                       {Array.from({ length: 24 }).map((_, i) => (
                         <div
                           key={i}
@@ -2131,397 +2030,566 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       ))}
 
                       {/* Render Events */}
-                      {(() => {
-                        const d = new Date(year, month, selectedDay || 1);
-                        const dayAgendaEvents = displayedAgendaEvents.filter(
-                          (e) => {
-                            const eStart = new Date(e.startDate);
-                            const targetDate = new Date(
-                              d.getFullYear(),
-                              d.getMonth(),
-                              d.getDate(),
-                            );
-                            return (
-                              eStart.getDate() === targetDate.getDate() &&
-                              eStart.getMonth() === targetDate.getMonth() &&
-                              eStart.getFullYear() ===
-                                targetDate.getFullYear() &&
-                              !e.allDay
-                            );
-                          },
-                        );
+                      {dayAgendaEvents.map((e) => {
+                        const start = new Date(e.startDate);
+                        const end = new Date(e.endDate);
+                        const startHour =
+                          start.getHours() + start.getMinutes() / 60;
+                        const endHour = end.getHours() + end.getMinutes() / 60;
+                        const top = startHour * 48; // 48px per hour (h-12)
+                        const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
 
-                        return dayAgendaEvents.map((e) => {
-                          const start = new Date(e.startDate);
-                          const end = new Date(e.endDate);
-                          const startHour =
-                            start.getHours() + start.getMinutes() / 60;
-                          const endHour =
-                            end.getHours() + end.getMinutes() / 60;
-                          const top = startHour * 48; // 48px per hour (h-12)
-                          const height = Math.max(
-                            (endHour - startHour) * 48,
-                            20,
-                          ); // Min height 20px
-
-                          return (
-                            <div
-                              key={e.id}
-                              onClick={() => handleEditAgendaEvent(e)}
-                              className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
-                              style={{ top: `${top}px`, height: `${height}px` }}
-                            >
-                              <div className="text-[10px] font-bold leading-tight truncate">
-                                {e.title}
-                              </div>
-                              {height >= 40 && (
-                                <div className="text-[9px] opacity-80 leading-tight truncate">
-                                  {start.toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}{" "}
-                                  -{" "}
-                                  {end.toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Details Sidebar */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-0 overflow-hidden flex flex-col h-full min-h-[400px]">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  {selectedDay
-                    ? `${selectedDay} de ${currentDate.toLocaleDateString("pt-BR", { month: "long" })}`
-                    : "Resumo do Mês"}
-                </h3>
-                {selectedDay && (
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={handleOpenModal}
-                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" /> Transação
-                    </button>
-                    <button
-                      onClick={handleOpenAgendaModal}
-                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <CalendarClock className="w-3 h-3" /> Evento
-                    </button>
-                    <button
-                      onClick={handleOpenTaskModal}
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                    >
-                      <ListTodo className="w-3 h-3" /> Tarefa
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {selectedDay &&
-                  selectedTransactions.length === 0 &&
-                  selectedAgendaEvents.length === 0 &&
-                  (!tasks ||
-                    tasks.filter((t) => {
-                      if (!t.dueDate) return false;
-                      const [tYear, tMonth, tDay] = t.dueDate
-                        .split("-")
-                        .map(Number);
-                      return (
-                        tDay === selectedDay &&
-                        tMonth === month + 1 &&
-                        tYear === year
-                      );
-                    }).length === 0) && (
-                    <div className="text-center py-10">
-                      <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">
-                        Nenhuma movimentação, evento ou tarefa.
-                      </p>
-                    </div>
-                  )}
-                {!selectedDay && (
-                  <div className="text-center py-10">
-                    <div className="inline-block p-4 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
-                      <CalendarIcon className="w-8 h-8 text-indigo-500" />
-                    </div>
-                    <p className="text-slate-500 font-medium">
-                      Selecione um dia
-                    </p>
-                    <p className="text-slate-400 text-xs mt-1">
-                      Clique no calendário para ver detalhes ou adicionar contas
-                      e eventos.
-                    </p>
-                  </div>
-                )}
-
-                {/* Render Agenda Events */}
-                {selectedAgendaEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 mt-0.5">
-                        <CalendarIcon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-800 dark:text-white text-sm">
-                          {event.title}
-                        </p>
-                        {event.description && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
-                            {event.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {event.allDay
-                              ? "Dia Inteiro"
-                              : `${new Date(event.startDate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} - ${new Date(event.endDate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => handleEditAgendaEvent(event)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-                        title="Editar Evento"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteAgendaEvent(event.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                        title="Excluir Evento"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Render Tasks */}
-                {tasks &&
-                  tasks
-                    .filter((t) => {
-                      if (!t.dueDate) return false;
-                      const [tYear, tMonth, tDay] = t.dueDate
-                        .split("-")
-                        .map(Number);
-                      return (
-                        tDay === selectedDay &&
-                        tMonth === month + 1 &&
-                        tYear === year
-                      );
-                    })
-                    .map((task) => (
-                      <div
-                        key={task.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border ${task.completed ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60" : "bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <button
-                            onClick={() =>
-                              onUpdateTask &&
-                              onUpdateTask(task.id, {
-                                completed: !task.completed,
-                              })
-                            }
-                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.completed ? "bg-indigo-500 border-indigo-500 text-white" : "border-slate-300 dark:border-slate-500 hover:border-indigo-500"}`}
-                          >
-                            {task.completed && <Check className="w-3 h-3" />}
-                          </button>
-                          <div>
-                            <p
-                              className={`font-semibold text-sm ${task.completed ? "text-slate-500 line-through" : "text-slate-800 dark:text-white"}`}
-                            >
-                              {task.title}
-                            </p>
-                            {task.description && (
-                              <p
-                                className={`text-xs mt-0.5 line-clamp-2 ${task.completed ? "text-slate-400" : "text-slate-500 dark:text-slate-400"}`}
-                              >
-                                {task.description}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                                <ListTodo className="w-3 h-3" />
-                                {taskLists?.find((l) => l.id === task.listId)
-                                  ?.title || "Tarefa"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <button
-                            onClick={() => {
-                              setTaskFormData({
-                                id: task.id,
-                                title: task.title,
-                                description: task.description || "",
-                                listId: task.listId,
-                                dueDate: task.dueDate || "",
-                              });
-                              setIsTaskModalOpen(true);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-                            title="Editar Tarefa"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              onDeleteTask && onDeleteTask(task.id)
-                            }
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                            title="Excluir Tarefa"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-
-                {/* Render Transactions */}
-                {selectedTransactions.map((t, idx) => {
-                  const showPendingSeparator =
-                    (idx === 0 && t.status === "pending") ||
-                    (idx > 0 &&
-                      selectedTransactions[idx - 1].status === "paid" &&
-                      t.status === "pending");
-                  const showPaidSeparator = idx === 0 && t.status === "paid";
-                  const canMoveUp =
-                    idx > 0 &&
-                    selectedTransactions[idx - 1].status === t.status;
-                  const canMoveDown =
-                    idx < selectedTransactions.length - 1 &&
-                    selectedTransactions[idx + 1].status === t.status;
-
-                  return (
-                    <React.Fragment key={t.id || idx}>
-                      {showPaidSeparator && (
-                        <div className="flex items-center gap-2 py-2">
-                          <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                            Pagos
-                          </span>
-                          <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                        </div>
-                      )}
-                      {showPendingSeparator && (
-                        <div className="flex items-center gap-2 py-2">
-                          <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                            Pendentes
-                          </span>
-                          <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                        </div>
-                      )}
-                      <div
-                        className={`flex items-center justify-between p-3 rounded-lg border ${
-                          (t as any).isGhost
-                            ? "bg-slate-50 dark:bg-slate-800 border-dashed border-indigo-300 dark:border-indigo-700"
-                            : "bg-white dark:bg-slate-700/50 border-slate-100 dark:border-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
+                        return (
                           <div
-                            className={`p-2 rounded-full ${
-                              t.type === "income"
-                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                : "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
-                            }`}
+                            key={e.id}
+                            onClick={() => handleEditAgendaEvent(e)}
+                            className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
+                            style={{
+                              top: `${top}px`,
+                              height: `${height}px`,
+                            }}
                           >
-                            {t.type === "income" ? (
-                              <ArrowUp className="w-4 h-4" />
-                            ) : (
-                              <ArrowDown className="w-4 h-4" />
+                            <div className="text-[10px] font-bold leading-tight truncate">
+                              {e.title}
+                            </div>
+                            {height >= 40 && (
+                              <div className="text-[9px] opacity-80 leading-tight truncate">
+                                {start.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}{" "}
+                                -{" "}
+                                {end.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </div>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-slate-800 dark:text-white text-sm line-clamp-1">
-                                {t.description}
-                              </p>
-                              {(t as any).isGhost && (
-                                <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1.5 rounded uppercase font-bold">
-                                  Previsto
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-col">
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {t.category}
-                              </p>
-                              {t.observation && (
-                                <p className="text-[10px] text-slate-400 italic mt-0.5">
-                                  {t.observation}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p
-                              className={`font-bold text-sm ${t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}
-                            >
-                              {formatFullValue(t.amount)}
-                            </p>
-                            {t.type === "expense" && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded ${t.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
-                              >
-                                {t.status === "pending" ? "Pendente" : "Pago"}
-                              </span>
-                            )}
-                          </div>
-                          {onUpdateTransaction && !(t as any).isGhost && (
-                            <div className="flex flex-col gap-0.5 border-l border-slate-100 dark:border-slate-700 pl-2 ml-1">
-                              <button
-                                onClick={() => handleMoveTransaction(idx, "up")}
-                                disabled={!canMoveUp}
-                                className={`p-0.5 rounded ${canMoveUp ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}
-                              >
-                                <ChevronUp className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleMoveTransaction(idx, "down")
-                                }
-                                disabled={!canMoveDown}
-                                className={`p-0.5 rounded ${canMoveDown ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}
-                              >
-                                <ChevronDown className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </React.Fragment>
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </div>
             </div>
           </div>
-        </>
-      )}
+        ) : (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+            {/* Day Header */}
+            <div className="grid grid-cols-[60px_1fr] bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+              <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
+              <div className="py-2 text-center bg-indigo-50 dark:bg-indigo-900/20">
+                <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                  {
+                    DAYS_OF_WEEK[
+                      new Date(year, month, selectedDay || 1).getDay()
+                    ]
+                  }
+                </div>
+                <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                  {selectedDay || 1}
+                </div>
+              </div>
+            </div>
+
+            {/* All Day Section */}
+            <div className="grid grid-cols-[60px_1fr] border-b border-slate-200 dark:border-slate-600 max-h-32 overflow-y-auto">
+              <div className="py-2 text-center text-[10px] font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-600 flex items-center justify-center">
+                O Dia Todo
+              </div>
+              <div className="p-1 min-h-[40px]">
+                {(() => {
+                  const d = new Date(year, month, selectedDay || 1);
+                  const dayTrans = displayedTransactions.filter((t) => {
+                    const [tYear, tMonth, tDay] = t.date.split("-").map(Number);
+                    return (
+                      tDay === d.getDate() &&
+                      tMonth === d.getMonth() + 1 &&
+                      tYear === d.getFullYear()
+                    );
+                  });
+                  const dayTasks =
+                    tasks?.filter((t) => {
+                      if (!t.dueDate) return false;
+                      const [tYear, tMonth, tDay] = t.dueDate
+                        .split("-")
+                        .map(Number);
+                      return (
+                        tDay === d.getDate() &&
+                        tMonth === d.getMonth() + 1 &&
+                        tYear === d.getFullYear()
+                      );
+                    }) || [];
+                  const dayAgendaEvents = displayedAgendaEvents.filter((e) => {
+                    const eStart = new Date(e.startDate);
+                    eStart.setHours(0, 0, 0, 0);
+                    const eEnd = new Date(e.endDate);
+                    eEnd.setHours(23, 59, 59, 999);
+                    const targetDate = new Date(
+                      d.getFullYear(),
+                      d.getMonth(),
+                      d.getDate(),
+                    );
+                    return (
+                      targetDate >= eStart && targetDate <= eEnd && e.allDay
+                    );
+                  });
+
+                  return (
+                    <>
+                      {dayTrans.map((t) => (
+                        <div
+                          key={t.id}
+                          className={`text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate ${t.type === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"}`}
+                        >
+                          {t.type === "income" ? "+" : "-"}
+                          {formatValue(t.amount)} {t.description}
+                        </div>
+                      ))}
+                      {dayTasks.map((t) => (
+                        <div
+                          key={t.id}
+                          className="text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400"
+                        >
+                          {t.title}
+                        </div>
+                      ))}
+                      {dayAgendaEvents.map((e) => (
+                        <div
+                          key={e.id}
+                          onClick={() => handleEditAgendaEvent(e)}
+                          className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        >
+                          {e.title}
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Time Grid */}
+            <div className="flex-1 overflow-y-auto relative">
+              <div className="grid grid-cols-[60px_1fr]">
+                {/* Time Labels */}
+                <div className="border-r border-slate-200 dark:border-slate-600">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
+                    >
+                      <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day Column */}
+                <div className="relative">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-12 border-b border-slate-100 dark:border-slate-700/50"
+                    ></div>
+                  ))}
+
+                  {/* Render Events */}
+                  {(() => {
+                    const d = new Date(year, month, selectedDay || 1);
+                    const dayAgendaEvents = displayedAgendaEvents.filter(
+                      (e) => {
+                        const eStart = new Date(e.startDate);
+                        const targetDate = new Date(
+                          d.getFullYear(),
+                          d.getMonth(),
+                          d.getDate(),
+                        );
+                        return (
+                          eStart.getDate() === targetDate.getDate() &&
+                          eStart.getMonth() === targetDate.getMonth() &&
+                          eStart.getFullYear() === targetDate.getFullYear() &&
+                          !e.allDay
+                        );
+                      },
+                    );
+
+                    return dayAgendaEvents.map((e) => {
+                      const start = new Date(e.startDate);
+                      const end = new Date(e.endDate);
+                      const startHour =
+                        start.getHours() + start.getMinutes() / 60;
+                      const endHour = end.getHours() + end.getMinutes() / 60;
+                      const top = startHour * 48; // 48px per hour (h-12)
+                      const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
+
+                      return (
+                        <div
+                          key={e.id}
+                          onClick={() => handleEditAgendaEvent(e)}
+                          className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
+                          style={{ top: `${top}px`, height: `${height}px` }}
+                        >
+                          <div className="text-[10px] font-bold leading-tight truncate">
+                            {e.title}
+                          </div>
+                          {height >= 40 && (
+                            <div className="text-[9px] opacity-80 leading-tight truncate">
+                              {start.toLocaleTimeString("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              -{" "}
+                              {end.toLocaleTimeString("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Details Sidebar */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-0 overflow-hidden flex flex-col h-full min-h-[400px]">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+              {selectedDay
+                ? `${selectedDay} de ${currentDate.toLocaleDateString("pt-BR", { month: "long" })}`
+                : "Resumo do Mês"}
+            </h3>
+            {selectedDay && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+                <button
+                  onClick={handleOpenModal}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Transação
+                </button>
+                <button
+                  onClick={handleOpenAgendaModal}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                  <CalendarClock className="w-3 h-3" /> Evento
+                </button>
+                <button
+                  onClick={handleOpenTaskModal}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                  <ListTodo className="w-3 h-3" /> Tarefa
+                </button>
+                <button
+                  onClick={() => {
+                    setRoutineFormData({ id: "", title: "", time: "" });
+                    setIsRoutinesModalOpen(true);
+                  }}
+                  className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                >
+                  <CheckSquare className="w-3 h-3" /> Rotinas
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {selectedDay &&
+              selectedTransactions.length === 0 &&
+              selectedAgendaEvents.length === 0 &&
+              todayTasks.length === 0 &&
+              timelessTasks.length === 0 &&
+              timedRoutines.length === 0 &&
+              timelessRoutines.length === 0 && (
+                <div className="text-center py-10">
+                  <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">
+                    Nenhuma movimentação, evento ou tarefa.
+                  </p>
+                </div>
+              )}
+            {!selectedDay && (
+              <div className="text-center py-10">
+                <div className="inline-block p-4 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
+                  <CalendarIcon className="w-8 h-8 text-indigo-500" />
+                </div>
+                <p className="text-slate-500 font-medium">Selecione um dia</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Clique no calendário para ver detalhes ou adicionar contas e eventos.
+                </p>
+              </div>
+            )}
+            {/* ATEMPORAL GROUP */}
+            {selectedDay && (timelessTasks.length > 0 || timelessRoutines.length > 0) && (
+              <div className="mb-6">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
+                  <Clock className="w-3.5 h-3.5 text-indigo-500" /> Atemporal
+                </h4>
+                <div className="space-y-2">
+                  {/* Timeless Tasks */}
+                  {timelessTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="group flex items-start justify-between p-3 rounded-lg border bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
+                    >
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: !task.completed })}
+                          className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors border-slate-300 dark:border-slate-500 hover:border-indigo-500"
+                        >
+                        </button>
+                        <div>
+                          <p className="font-semibold text-sm text-slate-800 dark:text-white">
+                            {task.title}
+                          </p>
+                          {task.description && (
+                            <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" });
+                            setIsTaskModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+                          title="Editar Tarefa"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteTask && onDeleteTask(task.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
+                          title="Excluir Tarefa"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Timeless Routines */}
+                  {timelessRoutines.map((routine) => {
+                    const dateStr = new Date(year, month, selectedDay).toISOString().split('T')[0];
+                    const completed = (routine as any).lastCompletedDate === dateStr || !!routine.completedDates?.includes(dateStr);
+                    return (
+                      <div
+                        key={routine.id}
+                        className={`group flex items-start justify-between p-3 rounded-lg border ${completed ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60" : "bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => onToggleDailyRoutine && onToggleDailyRoutine(routine.id, completed ? '' : dateStr)}
+                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${completed ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 dark:border-slate-500 hover:border-teal-500"}`}
+                          >
+                            {completed && <Check className="w-3 h-3" />}
+                          </button>
+                          <div>
+                            <p className={`font-semibold text-sm ${completed ? "text-slate-500 line-through" : "text-slate-800 dark:text-white"}`}>
+                              {routine.title}
+                            </p>
+                            <p className="text-[10px] uppercase font-bold tracking-wider mt-0.5 text-teal-500 dark:text-teal-400">
+                              ROTINA DIÁRIA
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setRoutineFormData({ id: routine.id, title: routine.title, time: routine.time || "" });
+                              setIsRoutinesModalOpen(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                            title="Editar Rotina"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteDailyRoutine && onDeleteDailyRoutine(routine.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
+                            title="Excluir Rotina"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* PROGRAMADO GROUP */}
+            {selectedDay && (selectedTransactions.length > 0 || selectedAgendaEvents.length > 0 || todayTasks.length > 0 || timedRoutines.length > 0) && (
+              <div className="mb-6">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
+                  <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" /> Programado
+                </h4>
+                <div className="space-y-2">
+                  {/* Timed Routines */}
+                  {timedRoutines.map((routine) => {
+                    const dateStr = new Date(year, month, selectedDay).toISOString().split('T')[0];
+                    const completed = (routine as any).lastCompletedDate === dateStr || !!routine.completedDates?.includes(dateStr);
+                    return (
+                      <div
+                        key={routine.id}
+                        className={`group flex items-start justify-between p-3 rounded-lg border ${completed ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60" : "bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => onToggleDailyRoutine && onToggleDailyRoutine(routine.id, completed ? '' : dateStr)}
+                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${completed ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 dark:border-slate-500 hover:border-teal-500"}`}
+                          >
+                            {completed && <Check className="w-3 h-3" />}
+                          </button>
+                          <div>
+                            <p className={`font-semibold text-sm ${completed ? "text-slate-500 line-through" : "text-slate-800 dark:text-white"}`}>
+                              {routine.title}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded">
+                                {routine.time}
+                              </span>
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-teal-400 dark:text-teal-500">
+                                ROTINA DIÁRIA
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => {
+                              setRoutineFormData({ id: routine.id, title: routine.title, time: routine.time || "" });
+                              setIsRoutinesModalOpen(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
+                            title="Editar Rotina"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteDailyRoutine && onDeleteDailyRoutine(routine.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
+                            title="Excluir Rotina"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Agenda Events */}
+                  {selectedAgendaEvents.map(event => (
+                    <div key={event.id} className="group flex items-start justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/50">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className="flex flex-col items-center min-w-[3rem] mt-0.5">
+                          <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                            {event.allDay ? "Dia Todo" : new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm text-slate-800 dark:text-white">
+                            {event.title}
+                          </p>
+                          {event.description && (
+                            <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">
+                              {event.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEditAgendaEvent(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Evento"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => onDeleteAgendaEvent && onDeleteAgendaEvent(event.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Evento"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Today Tasks */}
+                  {todayTasks.filter(t => !t.completed).map((task) => (
+                    <div key={task.id} className="group flex items-start justify-between p-3 rounded-lg border bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
+                      <div className="flex items-start gap-3">
+                        <button onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: true })} className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors border-slate-300 dark:border-slate-500 hover:border-indigo-500"></button>
+                        <div>
+                          <p className="font-semibold text-sm text-slate-800 dark:text-white">{task.title}</p>
+                          {task.description && <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">{task.description}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" }); setIsTaskModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => onDeleteTask && onDeleteTask(task.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Today Completed Tasks */}
+                  {todayTasks.filter(t => t.completed).map((task) => (
+                    <div key={task.id} className="group flex items-start justify-between p-3 rounded-lg border bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60">
+                      <div className="flex items-start gap-3">
+                        <button onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: false })} className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors bg-indigo-500 border-indigo-500 text-white"><Check className="w-3 h-3" /></button>
+                        <div>
+                          <p className="font-semibold text-sm text-slate-500 line-through">{task.title}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" }); setIsTaskModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => onDeleteTask && onDeleteTask(task.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Transactions */}
+                  {selectedTransactions.map((t, idx) => {
+                    const canMoveUp = idx > 0;
+                    const canMoveDown = idx < selectedTransactions.length - 1;
+                    return (
+                      <div key={t.id} className="group p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-700/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.type === "income" ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"}`}>
+                              {t.type === "income" ? <ArrowUp className="w-5 h-5" /> : <ArrowDown className="w-5 h-5" />}
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm text-slate-800 dark:text-white">{t.description}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase">{t.category}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <p className={`font-bold text-sm ${t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}>R$ {t.amount.toFixed(2)}</p>
+                              {t.type === "expense" && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                                  {t.status === "pending" ? "Pendente" : "Pago"}
+                                </span>
+                              )}
+                            </div>
+                            {onUpdateTransaction && (
+                              <div className="flex flex-col gap-0.5 border-l border-slate-100 dark:border-slate-700 pl-2 ml-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleMoveTransaction(idx, "up")} disabled={!canMoveUp} className={`p-0.5 rounded ${canMoveUp ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}><ChevronUp className="w-4 h-4" /></button>
+                                <button onClick={() => handleMoveTransaction(idx, "down")} disabled={!canMoveDown} className={`p-0.5 rounded ${canMoveDown ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}><ChevronDown className="w-4 h-4" /></button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

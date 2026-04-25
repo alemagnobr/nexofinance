@@ -41,6 +41,7 @@ import {
   Cloud,
   ChevronDown,
   ChevronRight,
+  CheckSquare,
 } from "lucide-react";
 import { View } from "../types";
 import { useFocus } from "../contexts/FocusContext";
@@ -243,6 +244,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label="Dashboard Global"
         />
 
+        <NavItem
+          active={currentView === View.CALENDAR}
+          onClick={() => handleNavClick(View.CALENDAR)}
+          icon={Calendar}
+          label="Agenda"
+        />
+
         <button
           onClick={() => toggleMenu("financeiro")}
           className="w-full flex items-center justify-between px-2 mb-2 mt-4 group"
@@ -318,18 +326,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
         {openMenus.planejamento && (
           <div className="space-y-1 pl-2 border-l border-slate-800/50 ml-2 mb-2">
-            <NavItem
-              active={[View.CALENDAR, View.DAILY_ROUTINES].includes(
-                currentView,
-              )}
-              onClick={() => handleNavClick(View.CALENDAR)}
-              icon={Calendar}
-              label="Agenda"
-            />
-
-            <p className="px-3 text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-3 mb-1">
-              Produtividade
-            </p>
             <NavItem
               active={currentView === View.PRODUCTIVITY}
               onClick={() => handleNavClick(View.PRODUCTIVITY)}

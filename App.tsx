@@ -50,6 +50,7 @@ import { AssetsView } from "./components/AssetsView";
 import { ProductivityView } from "./components/ProductivityView";
 import { UtilitiesView } from "./components/UtilitiesView";
 import { FinancialCalendar } from "./components/FinancialCalendar";
+import { DailyRoutines } from "./components/DailyRoutines";
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -384,7 +385,7 @@ const App: React.FC = () => {
     }
 
     // 4.5. Standalone: Calendar
-    if ([View.CALENDAR, View.DAILY_ROUTINES].includes(currentView)) {
+    if (currentView === View.CALENDAR) {
       return (
         <div className="animate-fade-in">
           <FinancialCalendar

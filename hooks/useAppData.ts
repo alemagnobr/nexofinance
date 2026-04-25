@@ -1,48 +1,107 @@
-
-import { useState, useEffect, useCallback } from 'react';
-import { User } from 'firebase/auth';
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, TransactionStatus, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, PixKey, TaskList, Task, Habit, Wallet } from '../types';
-import { 
-  addTransactionFire, updateTransactionFire, deleteTransactionFire,
-  addInvestmentFire, updateInvestmentFire, deleteInvestmentFire,
-  addBudgetFire, deleteBudgetFire, updateBudgetFire,
-  addDebtFire, updateDebtFire, deleteDebtFire,
-  addShoppingItemFire, updateShoppingItemFire, deleteShoppingItemFire, clearShoppingListFire, updateShoppingBudgetFire, updateScoreSerasaFire,
-  saveKanbanColumnFire, deleteKanbanColumnFire, saveKanbanBoardFire, deleteKanbanBoardFire,
-  addNoteFire, updateNoteFire, deleteNoteFire,
-  addPasswordFire, updatePasswordFire, deletePasswordFire,
-  addAgendaEventFire, updateAgendaEventFire, deleteAgendaEventFire,
-  addTaskListFire, updateTaskListFire, deleteTaskListFire,
-  addTaskFire, updateTaskFire, deleteTaskFire,
-  addPixKeyFire, updatePixKeyFire, deletePixKeyFire,
-  addHabitFire, updateHabitFire, deleteHabitFire,
-  addDailyRoutineFire, updateDailyRoutineFire, deleteDailyRoutineFire,
-  addWalletFire, updateWalletFire, deleteWalletFire,
-  addCategoryFire, deleteCategoryFire,
-  unlockBadgeFire, saveWealthProfileFire, saveDriveLinkFire, subscribeToData, recalculateBalanceFire,
-  DEFAULT_CATEGORIES
-} from '../services/storageService';
+import { useState, useEffect, useCallback } from "react";
+import { User } from "firebase/auth";
+import {
+  AppData,
+  Transaction,
+  Investment,
+  Budget,
+  Debt,
+  ShoppingItem,
+  TransactionStatus,
+  WealthProfile,
+  KanbanColumn,
+  KanbanBoard,
+  Note,
+  Category,
+  PasswordEntry,
+  AgendaEvent,
+  PixKey,
+  TaskList,
+  Task,
+  Habit,
+  Wallet,
+  DailyRoutine,
+} from "../types";
+import {
+  addTransactionFire,
+  updateTransactionFire,
+  deleteTransactionFire,
+  addInvestmentFire,
+  updateInvestmentFire,
+  deleteInvestmentFire,
+  addBudgetFire,
+  deleteBudgetFire,
+  updateBudgetFire,
+  addDebtFire,
+  updateDebtFire,
+  deleteDebtFire,
+  addShoppingItemFire,
+  updateShoppingItemFire,
+  deleteShoppingItemFire,
+  clearShoppingListFire,
+  updateShoppingBudgetFire,
+  updateScoreSerasaFire,
+  saveKanbanColumnFire,
+  deleteKanbanColumnFire,
+  saveKanbanBoardFire,
+  deleteKanbanBoardFire,
+  addNoteFire,
+  updateNoteFire,
+  deleteNoteFire,
+  addPasswordFire,
+  updatePasswordFire,
+  deletePasswordFire,
+  addAgendaEventFire,
+  updateAgendaEventFire,
+  deleteAgendaEventFire,
+  addTaskListFire,
+  updateTaskListFire,
+  deleteTaskListFire,
+  addTaskFire,
+  updateTaskFire,
+  deleteTaskFire,
+  addPixKeyFire,
+  updatePixKeyFire,
+  deletePixKeyFire,
+  addHabitFire,
+  updateHabitFire,
+  deleteHabitFire,
+  addDailyRoutineFire,
+  updateDailyRoutineFire,
+  deleteDailyRoutineFire,
+  addWalletFire,
+  updateWalletFire,
+  deleteWalletFire,
+  addCategoryFire,
+  deleteCategoryFire,
+  unlockBadgeFire,
+  saveWealthProfileFire,
+  saveDriveLinkFire,
+  subscribeToData,
+  recalculateBalanceFire,
+  DEFAULT_CATEGORIES,
+} from "../services/storageService";
 
 const DEFAULT_DATA: AppData = {
-    transactions: [],
-    investments: [],
-    budgets: [],
-    debts: [],
-    shoppingList: [],
-    shoppingBudget: 0,
-    kanbanColumns: [],
-    kanbanBoards: [],
-    notes: [],
-    passwords: [],
-    agendaEvents: [],
-    taskLists: [],
-    tasks: [],
-    pixKeys: [],
-    habits: [],
-    dailyRoutines: [],
-    unlockedBadges: [],
-    walletBalance: 0,
-    categories: DEFAULT_CATEGORIES // Initial defaults
+  transactions: [],
+  investments: [],
+  budgets: [],
+  debts: [],
+  shoppingList: [],
+  shoppingBudget: 0,
+  kanbanColumns: [],
+  kanbanBoards: [],
+  notes: [],
+  passwords: [],
+  agendaEvents: [],
+  taskLists: [],
+  tasks: [],
+  pixKeys: [],
+  habits: [],
+  dailyRoutines: [],
+  unlockedBadges: [],
+  walletBalance: 0,
+  categories: DEFAULT_CATEGORIES, // Initial defaults
 };
 
 export const useAppData = (user: User | null, isGuest: boolean) => {
@@ -51,149 +110,165 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   // Sincronização com Firestore
   useEffect(() => {
     if (user && !isGuest) {
-        const unsub = subscribeToData(user.uid, (newData) => {
-            setData(prev => ({ ...prev, ...newData }));
-        });
-        return () => unsub();
+      const unsub = subscribeToData(user.uid, (newData) => {
+        setData((prev) => ({ ...prev, ...newData }));
+      });
+      return () => unsub();
     }
   }, [user, isGuest]);
 
   // Migração de Saldo (One-time check)
   useEffect(() => {
-      if (user && !isGuest && data.transactions.length > 0 && data.walletBalance === undefined) {
-          // Se carregou transações mas não tem saldo salvo, recalcula no banco
-          console.log("Migrando para sistema de Saldo Otimizado...");
-          recalculateBalanceFire(user.uid);
-      }
+    if (
+      user &&
+      !isGuest &&
+      data.transactions.length > 0 &&
+      data.walletBalance === undefined
+    ) {
+      // Se carregou transações mas não tem saldo salvo, recalcula no banco
+      console.log("Migrando para sistema de Saldo Otimizado...");
+      recalculateBalanceFire(user.uid);
+    }
   }, [user, isGuest, data.transactions.length, data.walletBalance]);
 
   // Processamento de Lançamento Automático (Auto Pay)
   useEffect(() => {
-      if (user || isGuest) {
-          const processAutoPay = async () => {
-              // Obtém a data local no formato YYYY-MM-DD
-              const d = new Date();
-              const year = d.getFullYear();
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const day = String(d.getDate()).padStart(2, '0');
-              const todayLocal = `${year}-${month}-${day}`;
+    if (user || isGuest) {
+      const processAutoPay = async () => {
+        // Obtém a data local no formato YYYY-MM-DD
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const todayLocal = `${year}-${month}-${day}`;
 
-              const toPay = data.transactions.filter(t => 
-                  t.status === 'pending' && 
-                  t.autoPay && 
-                  t.date <= todayLocal
-              );
+        const toPay = data.transactions.filter(
+          (t) => t.status === "pending" && t.autoPay && t.date <= todayLocal,
+        );
 
-              if (toPay.length > 0) {
-                  if (user) {
-                      for (const t of toPay) {
-                          await updateTransactionFire(user.uid, t.id, { status: 'paid' });
-                      }
-                  } else {
-                      setData(prev => ({
-                          ...prev,
-                          transactions: prev.transactions.map(t => 
-                              (t.status === 'pending' && t.autoPay && t.date <= todayLocal)
-                              ? { ...t, status: 'paid' }
-                              : t
-                          )
-                      }));
-                  }
-              }
-          };
-          
-          // Delay curto para garantir que os dados iniciais foram carregados
-          const timer = setTimeout(processAutoPay, 2000);
-          return () => clearTimeout(timer);
-      }
+        if (toPay.length > 0) {
+          if (user) {
+            for (const t of toPay) {
+              await updateTransactionFire(user.uid, t.id, { status: "paid" });
+            }
+          } else {
+            setData((prev) => ({
+              ...prev,
+              transactions: prev.transactions.map((t) =>
+                t.status === "pending" && t.autoPay && t.date <= todayLocal
+                  ? { ...t, status: "paid" }
+                  : t,
+              ),
+            }));
+          }
+        }
+      };
+
+      // Delay curto para garantir que os dados iniciais foram carregados
+      const timer = setTimeout(processAutoPay, 2000);
+      return () => clearTimeout(timer);
+    }
   }, [user, isGuest, data.transactions]);
 
   // Processamento de Transações Recorrentes
   useEffect(() => {
     if (user || isGuest) {
-        const processRecurring = async () => {
-            const today = new Date();
-            const currentMonth = today.getMonth();
-            const currentYear = today.getFullYear();
-            
-            const recurringTemplates = new Map<string, Transaction>();
-            
-            data.transactions.forEach(t => {
-                if (t.isRecurring) {
-                    const existing = recurringTemplates.get(t.description);
-                    if (!existing || new Date(t.date) > new Date(existing.date)) {
-                        recurringTemplates.set(t.description, t);
-                    }
-                }
-            });
+      const processRecurring = async () => {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
 
-            const newTransactions: Transaction[] = [];
+        const recurringTemplates = new Map<string, Transaction>();
 
-            recurringTemplates.forEach((template, description) => {
-                // CORREÇÃO: Verifica se a data de início da recorrência é futura em relação ao mês atual
-                const [tStartYear, tStartMonth] = template.date.split('-').map(Number);
-                
-                // Cria datas comparáveis (Dia 1 de cada mês para ignorar o dia específico)
-                const processingMonthDate = new Date(currentYear, currentMonth, 1);
-                const recurrenceStartDate = new Date(tStartYear, tStartMonth - 1, 1);
-
-                // Se o mês atual é anterior ao mês de início da transação, ignora
-                if (processingMonthDate < recurrenceStartDate) {
-                    return;
-                }
-
-                const existsInCurrentMonth = data.transactions.some(t => {
-                    const tDate = new Date(t.date);
-                    return t.description === description &&
-                          tDate.getMonth() === currentMonth &&
-                          tDate.getFullYear() === currentYear;
-                });
-
-                if (!existsInCurrentMonth) {
-                    const tDate = new Date(template.date + 'T00:00:00'); // Garante leitura correta da data local
-                    const targetDay = tDate.getDate();
-                    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-                    const finalDay = Math.min(targetDay, daysInCurrentMonth);
-                    // Formata a data manualmente para evitar problemas de timezone UTC
-                    const newMonthStr = String(currentMonth + 1).padStart(2, '0');
-                    const newDayStr = String(finalDay).padStart(2, '0');
-                    const newDateIso = `${currentYear}-${newMonthStr}-${newDayStr}`;
-                    
-                    newTransactions.push({
-                        ...template,
-                        id: crypto.randomUUID(),
-                        date: newDateIso,
-                        status: 'pending',
-                        isRecurring: true,
-                        observation: 'Valor referente ao mês anterior'
-                    });
-                }
-            });
-
-            if (newTransactions.length > 0) {
-                if (user) {
-                    for (const t of newTransactions) {
-                        await addTransactionFire(user.uid, t);
-                    }
-                } else {
-                    setData(prev => ({
-                        ...prev,
-                        transactions: [...prev.transactions, ...newTransactions]
-                    }));
-                }
+        data.transactions.forEach((t) => {
+          if (t.isRecurring) {
+            const existing = recurringTemplates.get(t.description);
+            if (!existing || new Date(t.date) > new Date(existing.date)) {
+              recurringTemplates.set(t.description, t);
             }
-        };
-        processRecurring();
+          }
+        });
+
+        const newTransactions: Transaction[] = [];
+
+        recurringTemplates.forEach((template, description) => {
+          // CORREÇÃO: Verifica se a data de início da recorrência é futura em relação ao mês atual
+          const [tStartYear, tStartMonth] = template.date
+            .split("-")
+            .map(Number);
+
+          // Cria datas comparáveis (Dia 1 de cada mês para ignorar o dia específico)
+          const processingMonthDate = new Date(currentYear, currentMonth, 1);
+          const recurrenceStartDate = new Date(tStartYear, tStartMonth - 1, 1);
+
+          // Se o mês atual é anterior ao mês de início da transação, ignora
+          if (processingMonthDate < recurrenceStartDate) {
+            return;
+          }
+
+          const existsInCurrentMonth = data.transactions.some((t) => {
+            const tDate = new Date(t.date);
+            return (
+              t.description === description &&
+              tDate.getMonth() === currentMonth &&
+              tDate.getFullYear() === currentYear
+            );
+          });
+
+          if (!existsInCurrentMonth) {
+            const tDate = new Date(template.date + "T00:00:00"); // Garante leitura correta da data local
+            const targetDay = tDate.getDate();
+            const daysInCurrentMonth = new Date(
+              currentYear,
+              currentMonth + 1,
+              0,
+            ).getDate();
+            const finalDay = Math.min(targetDay, daysInCurrentMonth);
+            // Formata a data manualmente para evitar problemas de timezone UTC
+            const newMonthStr = String(currentMonth + 1).padStart(2, "0");
+            const newDayStr = String(finalDay).padStart(2, "0");
+            const newDateIso = `${currentYear}-${newMonthStr}-${newDayStr}`;
+
+            newTransactions.push({
+              ...template,
+              id: crypto.randomUUID(),
+              date: newDateIso,
+              status: "pending",
+              isRecurring: true,
+              observation: "Valor referente ao mês anterior",
+            });
+          }
+        });
+
+        if (newTransactions.length > 0) {
+          if (user) {
+            for (const t of newTransactions) {
+              await addTransactionFire(user.uid, t);
+            }
+          } else {
+            setData((prev) => ({
+              ...prev,
+              transactions: [...prev.transactions, ...newTransactions],
+            }));
+          }
+        }
+      };
+      processRecurring();
     }
-  }, [user, isGuest, data.transactions]); 
+  }, [user, isGuest, data.transactions]);
 
   // --- ACTIONS ---
 
-  const adjustWalletBalance = async (walletId: string, amount: number, type: 'income' | 'expense', isRevert: boolean = false) => {
-    const wallet = data.wallets?.find(w => w.id === walletId);
+  const adjustWalletBalance = async (
+    walletId: string,
+    amount: number,
+    type: "income" | "expense",
+    isRevert: boolean = false,
+  ) => {
+    const wallet = data.wallets?.find((w) => w.id === walletId);
     if (!wallet) return;
 
-    let adjustment = type === 'income' ? amount : -amount;
+    let adjustment = type === "income" ? amount : -amount;
     if (isRevert) adjustment = -adjustment;
 
     const newBalance = wallet.balance + adjustment;
@@ -201,68 +276,97 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     if (user) {
       await updateWalletFire(user.uid, walletId, { balance: newBalance });
     } else {
-      setData(prev => ({
+      setData((prev) => ({
         ...prev,
-        wallets: (prev.wallets || []).map(w => w.id === walletId ? { ...w, balance: newBalance } : w)
+        wallets: (prev.wallets || []).map((w) =>
+          w.id === walletId ? { ...w, balance: newBalance } : w,
+        ),
       }));
     }
   };
 
-  const addTransaction = async (t: Omit<Transaction, 'id'>) => {
+  const addTransaction = async (t: Omit<Transaction, "id">) => {
     const newTransaction: Transaction = { ...t, id: crypto.randomUUID() };
     if (user) await addTransactionFire(user.uid, newTransaction);
-    else setData(prev => ({ ...prev, transactions: [...prev.transactions, newTransaction] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        transactions: [...prev.transactions, newTransaction],
+      }));
 
-    if (newTransaction.status === 'paid' && newTransaction.walletId) {
-      await adjustWalletBalance(newTransaction.walletId, newTransaction.amount, newTransaction.type);
+    if (newTransaction.status === "paid" && newTransaction.walletId) {
+      await adjustWalletBalance(
+        newTransaction.walletId,
+        newTransaction.amount,
+        newTransaction.type,
+      );
     }
   };
 
-  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
-    const oldTransaction = data.transactions.find(t => t.id === id);
+  const updateTransaction = async (
+    id: string,
+    updates: Partial<Transaction>,
+  ) => {
+    const oldTransaction = data.transactions.find((t) => t.id === id);
     if (!oldTransaction) return;
 
     if (user) await updateTransactionFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, transactions: prev.transactions.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        transactions: prev.transactions.map((t) =>
+          t.id === id ? { ...t, ...updates } : t,
+        ),
+      }));
 
     // Handle wallet balance changes if it was paid or is becoming paid
-    const isNowPaid = updates.status ? updates.status === 'paid' : oldTransaction.status === 'paid';
-    const wasPaid = oldTransaction.status === 'paid';
-    
+    const isNowPaid = updates.status
+      ? updates.status === "paid"
+      : oldTransaction.status === "paid";
+    const wasPaid = oldTransaction.status === "paid";
+
     const oldWalletId = oldTransaction.walletId;
-    const newWalletId = updates.walletId !== undefined ? updates.walletId : oldTransaction.walletId;
-    
+    const newWalletId =
+      updates.walletId !== undefined
+        ? updates.walletId
+        : oldTransaction.walletId;
+
     const oldAmount = Number(oldTransaction.amount);
-    const newAmount = updates.amount !== undefined ? Number(updates.amount) : oldAmount;
-    
+    const newAmount =
+      updates.amount !== undefined ? Number(updates.amount) : oldAmount;
+
     const oldType = oldTransaction.type;
-    const newType = updates.type !== undefined ? updates.type : oldTransaction.type;
+    const newType =
+      updates.type !== undefined ? updates.type : oldTransaction.type;
 
     // Calculate net changes per wallet to avoid race conditions when oldWalletId === newWalletId
     const walletChanges: Record<string, number> = {};
 
     if (wasPaid && oldWalletId) {
-      const revertAdj = oldType === 'income' ? -oldAmount : oldAmount;
-      walletChanges[oldWalletId] = (walletChanges[oldWalletId] || 0) + revertAdj;
+      const revertAdj = oldType === "income" ? -oldAmount : oldAmount;
+      walletChanges[oldWalletId] =
+        (walletChanges[oldWalletId] || 0) + revertAdj;
     }
 
     if (isNowPaid && newWalletId) {
-      const applyAdj = newType === 'income' ? newAmount : -newAmount;
+      const applyAdj = newType === "income" ? newAmount : -newAmount;
       walletChanges[newWalletId] = (walletChanges[newWalletId] || 0) + applyAdj;
     }
 
     // Apply changes
     for (const [wId, change] of Object.entries(walletChanges)) {
       if (change !== 0) {
-        const wallet = data.wallets?.find(w => w.id === wId);
+        const wallet = data.wallets?.find((w) => w.id === wId);
         if (wallet) {
           const newBalance = wallet.balance + change;
           if (user) {
             await updateWalletFire(user.uid, wId, { balance: newBalance });
           } else {
-            setData(prev => ({
+            setData((prev) => ({
               ...prev,
-              wallets: (prev.wallets || []).map(w => w.id === wId ? { ...w, balance: newBalance } : w)
+              wallets: (prev.wallets || []).map((w) =>
+                w.id === wId ? { ...w, balance: newBalance } : w,
+              ),
             }));
           }
         }
@@ -271,618 +375,1033 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
   };
 
   const deleteTransaction = async (id: string) => {
-    const transactionToDelete = data.transactions.find(t => t.id === id);
+    const transactionToDelete = data.transactions.find((t) => t.id === id);
     if (!transactionToDelete) return;
 
     // Check for installments or daily recurrence
-    const installmentMatch = transactionToDelete.description.match(/^(.*) \(\d+\/\d+\)$/);
-    const dailyMatch = transactionToDelete.description.match(/^(.*) \(Dia \d+\)$/);
+    const installmentMatch =
+      transactionToDelete.description.match(/^(.*) \(\d+\/\d+\)$/);
+    const dailyMatch =
+      transactionToDelete.description.match(/^(.*) \(Dia \d+\)$/);
 
     if (transactionToDelete.isRecurring || installmentMatch || dailyMatch) {
-        let baseDescription = transactionToDelete.description;
-        if (installmentMatch) baseDescription = installmentMatch[1];
-        if (dailyMatch) baseDescription = dailyMatch[1];
+      let baseDescription = transactionToDelete.description;
+      if (installmentMatch) baseDescription = installmentMatch[1];
+      if (dailyMatch) baseDescription = dailyMatch[1];
 
-        // Find all related recurring transactions (same description)
-        const relatedTransactions = data.transactions.filter(t => {
-            if (transactionToDelete.isRecurring) {
-                return t.description === baseDescription && t.isRecurring;
-            } else if (installmentMatch) {
-                return t.description.startsWith(baseDescription + ' (') && t.description.match(/ \(\d+\/\d+\)$/);
-            } else if (dailyMatch) {
-                return t.description.startsWith(baseDescription + ' (') && t.description.match(/ \(Dia \d+\)$/);
-            }
-            return false;
-        });
+      // Find all related recurring transactions (same description)
+      const relatedTransactions = data.transactions.filter((t) => {
+        if (transactionToDelete.isRecurring) {
+          return t.description === baseDescription && t.isRecurring;
+        } else if (installmentMatch) {
+          return (
+            t.description.startsWith(baseDescription + " (") &&
+            t.description.match(/ \(\d+\/\d+\)$/)
+          );
+        } else if (dailyMatch) {
+          return (
+            t.description.startsWith(baseDescription + " (") &&
+            t.description.match(/ \(Dia \d+\)$/)
+          );
+        }
+        return false;
+      });
 
-        const toDelete: string[] = [];
-        const toUpdate: string[] = [];
+      const toDelete: string[] = [];
+      const toUpdate: string[] = [];
 
-        const deletedDate = new Date(transactionToDelete.date);
+      const deletedDate = new Date(transactionToDelete.date);
 
-        relatedTransactions.forEach(t => {
-            const tDate = new Date(t.date);
-            if (tDate >= deletedDate) {
-                toDelete.push(t.id);
-            } else {
-                if (transactionToDelete.isRecurring) {
-                    toUpdate.push(t.id);
-                }
-            }
-        });
-
-        if (user) {
-            // Delete future ones
-            await Promise.all(toDelete.map(async delId => {
-                const t = data.transactions.find(tx => tx.id === delId);
-                if (t && t.status === 'paid' && t.walletId) {
-                    await adjustWalletBalance(t.walletId, t.amount, t.type, true);
-                }
-                await deleteTransactionFire(user.uid, delId);
-            }));
-            // Update past ones to stop recurring
-            if (toUpdate.length > 0) {
-                await Promise.all(toUpdate.map(updateId => updateTransactionFire(user.uid, updateId, { isRecurring: false })));
-            }
+      relatedTransactions.forEach((t) => {
+        const tDate = new Date(t.date);
+        if (tDate >= deletedDate) {
+          toDelete.push(t.id);
         } else {
-            // Revert balances for deleted transactions in guest mode
-            toDelete.forEach(delId => {
-                const t = data.transactions.find(tx => tx.id === delId);
-                if (t && t.status === 'paid' && t.walletId) {
-                    adjustWalletBalance(t.walletId, t.amount, t.type, true);
-                }
-            });
-            setData(prev => {
-                let newTransactions = prev.transactions.filter(t => !toDelete.includes(t.id));
-                if (toUpdate.length > 0) {
-                    newTransactions = newTransactions.map(t => 
-                        toUpdate.includes(t.id) ? { ...t, isRecurring: false } : t
-                    );
-                }
-                return { ...prev, transactions: newTransactions };
-            });
+          if (transactionToDelete.isRecurring) {
+            toUpdate.push(t.id);
+          }
         }
+      });
+
+      if (user) {
+        // Delete future ones
+        await Promise.all(
+          toDelete.map(async (delId) => {
+            const t = data.transactions.find((tx) => tx.id === delId);
+            if (t && t.status === "paid" && t.walletId) {
+              await adjustWalletBalance(t.walletId, t.amount, t.type, true);
+            }
+            await deleteTransactionFire(user.uid, delId);
+          }),
+        );
+        // Update past ones to stop recurring
+        if (toUpdate.length > 0) {
+          await Promise.all(
+            toUpdate.map((updateId) =>
+              updateTransactionFire(user.uid, updateId, { isRecurring: false }),
+            ),
+          );
+        }
+      } else {
+        // Revert balances for deleted transactions in guest mode
+        toDelete.forEach((delId) => {
+          const t = data.transactions.find((tx) => tx.id === delId);
+          if (t && t.status === "paid" && t.walletId) {
+            adjustWalletBalance(t.walletId, t.amount, t.type, true);
+          }
+        });
+        setData((prev) => {
+          let newTransactions = prev.transactions.filter(
+            (t) => !toDelete.includes(t.id),
+          );
+          if (toUpdate.length > 0) {
+            newTransactions = newTransactions.map((t) =>
+              toUpdate.includes(t.id) ? { ...t, isRecurring: false } : t,
+            );
+          }
+          return { ...prev, transactions: newTransactions };
+        });
+      }
     } else {
-        // Normal deletion
-        if (transactionToDelete.status === 'paid' && transactionToDelete.walletId) {
-            await adjustWalletBalance(transactionToDelete.walletId, transactionToDelete.amount, transactionToDelete.type, true);
-        }
-        if (user) await deleteTransactionFire(user.uid, id);
-        else setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+      // Normal deletion
+      if (
+        transactionToDelete.status === "paid" &&
+        transactionToDelete.walletId
+      ) {
+        await adjustWalletBalance(
+          transactionToDelete.walletId,
+          transactionToDelete.amount,
+          transactionToDelete.type,
+          true,
+        );
+      }
+      if (user) await deleteTransactionFire(user.uid, id);
+      else
+        setData((prev) => ({
+          ...prev,
+          transactions: prev.transactions.filter((t) => t.id !== id),
+        }));
     }
   };
 
   const toggleTransactionStatus = async (id: string, walletId?: string) => {
-    const targetTransaction = data.transactions.find(t => t.id === id);
+    const targetTransaction = data.transactions.find((t) => t.id === id);
     if (!targetTransaction) return;
-    
-    const newStatus: TransactionStatus = targetTransaction.status === 'paid' ? 'pending' : 'paid';
+
+    const newStatus: TransactionStatus =
+      targetTransaction.status === "paid" ? "pending" : "paid";
     const finalWalletId = walletId || targetTransaction.walletId;
 
     if (user) {
-        await updateTransactionFire(user.uid, id, { status: newStatus, walletId: finalWalletId });
-        
-        if (finalWalletId) {
-            if (newStatus === 'paid') {
-                await adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type);
-            } else {
-                await adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type, true);
-            }
-        }
-        
-        // Debt Sync Logic
-        if (targetTransaction.debtId) {
-             const debt = data.debts.find(d => d.id === targetTransaction.debtId);
-             if (debt) {
-                 const relatedTransactions = data.transactions.filter(t => t.debtId === targetTransaction.debtId);
-                 const allPaid = relatedTransactions.every(t => {
-                     if (t.id === id) return newStatus === 'paid';
-                     return t.status === 'paid';
-                 });
+      await updateTransactionFire(user.uid, id, {
+        status: newStatus,
+        walletId: finalWalletId,
+      });
 
-                 const newDebtStatus = allPaid ? 'paid' : 'agreement';
-                 
-                 if (debt.status !== newDebtStatus) {
-                    await updateDebtFire(user.uid, debt.id, { status: newDebtStatus });
-                 }
-             }
+      if (finalWalletId) {
+        if (newStatus === "paid") {
+          await adjustWalletBalance(
+            finalWalletId,
+            targetTransaction.amount,
+            targetTransaction.type,
+          );
+        } else {
+          await adjustWalletBalance(
+            finalWalletId,
+            targetTransaction.amount,
+            targetTransaction.type,
+            true,
+          );
         }
+      }
+
+      // Debt Sync Logic
+      if (targetTransaction.debtId) {
+        const debt = data.debts.find((d) => d.id === targetTransaction.debtId);
+        if (debt) {
+          const relatedTransactions = data.transactions.filter(
+            (t) => t.debtId === targetTransaction.debtId,
+          );
+          const allPaid = relatedTransactions.every((t) => {
+            if (t.id === id) return newStatus === "paid";
+            return t.status === "paid";
+          });
+
+          const newDebtStatus = allPaid ? "paid" : "agreement";
+
+          if (debt.status !== newDebtStatus) {
+            await updateDebtFire(user.uid, debt.id, { status: newDebtStatus });
+          }
+        }
+      }
     } else {
-        if (finalWalletId) {
-            if (newStatus === 'paid') {
-                adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type);
-            } else {
-                adjustWalletBalance(finalWalletId, targetTransaction.amount, targetTransaction.type, true);
-            }
+      if (finalWalletId) {
+        if (newStatus === "paid") {
+          adjustWalletBalance(
+            finalWalletId,
+            targetTransaction.amount,
+            targetTransaction.type,
+          );
+        } else {
+          adjustWalletBalance(
+            finalWalletId,
+            targetTransaction.amount,
+            targetTransaction.type,
+            true,
+          );
         }
-        setData(prev => {
-            const updatedTransactions = prev.transactions.map(t => t.id === id ? { ...t, status: newStatus, walletId: finalWalletId } : t);
-            
-            let updatedDebts = prev.debts;
-            if (targetTransaction.debtId) {
-                const relatedTransactions = updatedTransactions.filter(t => t.debtId === targetTransaction.debtId);
-                const allPaid = relatedTransactions.every(t => t.status === 'paid');
-                const newDebtStatus = allPaid ? 'paid' : 'agreement';
+      }
+      setData((prev) => {
+        const updatedTransactions = prev.transactions.map((t) =>
+          t.id === id
+            ? { ...t, status: newStatus, walletId: finalWalletId }
+            : t,
+        );
 
-                updatedDebts = prev.debts.map(d => {
-                    if (d.id === targetTransaction.debtId) {
-                         return { ...d, status: newDebtStatus };
-                    }
-                    return d;
-                });
+        let updatedDebts = prev.debts;
+        if (targetTransaction.debtId) {
+          const relatedTransactions = updatedTransactions.filter(
+            (t) => t.debtId === targetTransaction.debtId,
+          );
+          const allPaid = relatedTransactions.every((t) => t.status === "paid");
+          const newDebtStatus = allPaid ? "paid" : "agreement";
+
+          updatedDebts = prev.debts.map((d) => {
+            if (d.id === targetTransaction.debtId) {
+              return { ...d, status: newDebtStatus };
             }
-            return { ...prev, transactions: updatedTransactions, debts: updatedDebts };
-        });
+            return d;
+          });
+        }
+        return {
+          ...prev,
+          transactions: updatedTransactions,
+          debts: updatedDebts,
+        };
+      });
     }
   };
 
-  const addInvestment = async (inv: Omit<Investment, 'id'>) => {
+  const addInvestment = async (inv: Omit<Investment, "id">) => {
     const newInvestment: Investment = { ...inv, id: crypto.randomUUID() };
     if (user) await addInvestmentFire(user.uid, newInvestment);
-    else setData(prev => ({ ...prev, investments: [...prev.investments, newInvestment] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        investments: [...prev.investments, newInvestment],
+      }));
   };
 
   const updateInvestment = async (id: string, updates: Partial<Investment>) => {
     if (user) await updateInvestmentFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, investments: prev.investments.map(inv => inv.id === id ? { ...inv, ...updates } : inv) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        investments: prev.investments.map((inv) =>
+          inv.id === id ? { ...inv, ...updates } : inv,
+        ),
+      }));
   };
 
   const deleteInvestment = async (id: string) => {
     if (user) await deleteInvestmentFire(user.uid, id);
-    else setData(prev => ({ ...prev, investments: prev.investments.filter(i => i.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        investments: prev.investments.filter((i) => i.id !== id),
+      }));
   };
 
-  const addBudget = async (b: Omit<Budget, 'id'>) => {
+  const addBudget = async (b: Omit<Budget, "id">) => {
     const newBudget: Budget = { ...b, id: crypto.randomUUID() };
     if (user) await addBudgetFire(user.uid, newBudget);
-    else setData(prev => ({ ...prev, budgets: [...(prev.budgets || []), newBudget] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        budgets: [...(prev.budgets || []), newBudget],
+      }));
   };
 
   const updateBudget = async (id: string, updates: Partial<Budget>) => {
     if (user) await updateBudgetFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, budgets: prev.budgets.map(b => b.id === id ? { ...b, ...updates } : b) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        budgets: prev.budgets.map((b) =>
+          b.id === id ? { ...b, ...updates } : b,
+        ),
+      }));
   };
 
   const deleteBudget = async (id: string) => {
     if (user) await deleteBudgetFire(user.uid, id);
-    else setData(prev => ({ ...prev, budgets: prev.budgets.filter(b => b.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        budgets: prev.budgets.filter((b) => b.id !== id),
+      }));
   };
 
-  const addDebt = async (d: Omit<Debt, 'id'>) => {
+  const addDebt = async (d: Omit<Debt, "id">) => {
     const newDebt: Debt = { ...d, id: crypto.randomUUID() };
     if (user) await addDebtFire(user.uid, newDebt);
-    else setData(prev => ({ ...prev, debts: [...(prev.debts || []), newDebt] }));
+    else
+      setData((prev) => ({ ...prev, debts: [...(prev.debts || []), newDebt] }));
   };
 
   const updateDebt = async (id: string, updates: Partial<Debt>) => {
     if (user) await updateDebtFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, debts: prev.debts.map(d => d.id === id ? { ...d, ...updates } : d) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        debts: prev.debts.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+      }));
   };
 
   const deleteDebt = async (id: string) => {
     if (user) await deleteDebtFire(user.uid, id);
-    else setData(prev => ({ ...prev, debts: prev.debts.filter(d => d.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        debts: prev.debts.filter((d) => d.id !== id),
+      }));
   };
 
-  const addShoppingItem = async (item: Omit<ShoppingItem, 'id'>) => {
-    const newItem: ShoppingItem = { 
-      ...item, 
+  const addShoppingItem = async (item: Omit<ShoppingItem, "id">) => {
+    const newItem: ShoppingItem = {
+      ...item,
       id: crypto.randomUUID(),
-      month: item.month || new Date().toISOString().slice(0, 7)
+      month: item.month || new Date().toISOString().slice(0, 7),
     };
     if (user) await addShoppingItemFire(user.uid, newItem);
-    else setData(prev => ({ ...prev, shoppingList: [...(prev.shoppingList || []), newItem] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        shoppingList: [...(prev.shoppingList || []), newItem],
+      }));
   };
 
-  const updateShoppingItem = async (id: string, updates: Partial<ShoppingItem>) => {
+  const updateShoppingItem = async (
+    id: string,
+    updates: Partial<ShoppingItem>,
+  ) => {
     if (user) await updateShoppingItemFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, shoppingList: prev.shoppingList.map(item => item.id === id ? { ...item, ...updates } : item) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        shoppingList: prev.shoppingList.map((item) =>
+          item.id === id ? { ...item, ...updates } : item,
+        ),
+      }));
   };
 
   const deleteShoppingItem = async (id: string) => {
     if (user) await deleteShoppingItemFire(user.uid, id);
-    else setData(prev => ({ ...prev, shoppingList: prev.shoppingList.filter(item => item.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        shoppingList: prev.shoppingList.filter((item) => item.id !== id),
+      }));
   };
 
   const clearShoppingList = async (month?: string) => {
     if (user) await clearShoppingListFire(user.uid, month);
-    else setData(prev => ({ 
-      ...prev, 
-      shoppingList: month 
-        ? prev.shoppingList.filter(item => item.month !== month)
-        : [] 
-    }));
+    else
+      setData((prev) => ({
+        ...prev,
+        shoppingList: month
+          ? prev.shoppingList.filter((item) => item.month !== month)
+          : [],
+      }));
   };
 
   const setShoppingBudget = async (amount: number) => {
     if (user) await updateShoppingBudgetFire(user.uid, amount);
-    else setData(prev => ({ ...prev, shoppingBudget: amount }));
+    else setData((prev) => ({ ...prev, shoppingBudget: amount }));
   };
 
   const updateScoreSerasa = async (score: number, updatedAt: string) => {
     if (user) {
-        await updateScoreSerasaFire(user.uid, score, updatedAt, data.scoreSerasaHistory || []);
+      await updateScoreSerasaFire(
+        user.uid,
+        score,
+        updatedAt,
+        data.scoreSerasaHistory || [],
+      );
     } else {
-        setData(prev => {
-            const newHistory = [...(prev.scoreSerasaHistory || []), { score, date: updatedAt }];
-            return { ...prev, scoreSerasa: score, scoreSerasaUpdatedAt: updatedAt, scoreSerasaHistory: newHistory };
-        });
+      setData((prev) => {
+        const newHistory = [
+          ...(prev.scoreSerasaHistory || []),
+          { score, date: updatedAt },
+        ];
+        return {
+          ...prev,
+          scoreSerasa: score,
+          scoreSerasaUpdatedAt: updatedAt,
+          scoreSerasaHistory: newHistory,
+        };
+      });
     }
   };
 
   // --- KANBAN ACTIONS ---
   const saveKanbanBoard = async (board: KanbanBoard) => {
-      if (user) await saveKanbanBoardFire(user.uid, board);
-      else setData(prev => {
-          const exists = prev.kanbanBoards.some(b => b.id === board.id);
-          if (exists) {
-              return { ...prev, kanbanBoards: prev.kanbanBoards.map(b => b.id === board.id ? board : b) };
-          }
-          return { ...prev, kanbanBoards: [...prev.kanbanBoards, board] };
+    if (user) await saveKanbanBoardFire(user.uid, board);
+    else
+      setData((prev) => {
+        const exists = prev.kanbanBoards.some((b) => b.id === board.id);
+        if (exists) {
+          return {
+            ...prev,
+            kanbanBoards: prev.kanbanBoards.map((b) =>
+              b.id === board.id ? board : b,
+            ),
+          };
+        }
+        return { ...prev, kanbanBoards: [...prev.kanbanBoards, board] };
       });
   };
 
   const deleteKanbanBoard = async (id: string) => {
-      if (user) await deleteKanbanBoardFire(user.uid, id);
-      else setData(prev => ({ ...prev, kanbanBoards: prev.kanbanBoards.filter(b => b.id !== id) }));
+    if (user) await deleteKanbanBoardFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        kanbanBoards: prev.kanbanBoards.filter((b) => b.id !== id),
+      }));
   };
 
   // Legacy support for single column actions (optional, or redirect to board logic)
   const saveKanbanColumn = async (column: KanbanColumn) => {
-      // This is now deprecated in favor of board-level saving, but kept for compatibility if needed
-      if (user) await saveKanbanColumnFire(user.uid, column);
-      else setData(prev => {
-          const exists = prev.kanbanColumns.some(c => c.id === column.id);
-          if (exists) {
-              return { ...prev, kanbanColumns: prev.kanbanColumns.map(c => c.id === column.id ? column : c) };
-          }
-          return { ...prev, kanbanColumns: [...prev.kanbanColumns, column] };
+    // This is now deprecated in favor of board-level saving, but kept for compatibility if needed
+    if (user) await saveKanbanColumnFire(user.uid, column);
+    else
+      setData((prev) => {
+        const exists = prev.kanbanColumns.some((c) => c.id === column.id);
+        if (exists) {
+          return {
+            ...prev,
+            kanbanColumns: prev.kanbanColumns.map((c) =>
+              c.id === column.id ? column : c,
+            ),
+          };
+        }
+        return { ...prev, kanbanColumns: [...prev.kanbanColumns, column] };
       });
   };
 
   const deleteKanbanColumn = async (id: string) => {
-      if (user) await deleteKanbanColumnFire(user.uid, id);
-      else setData(prev => ({ ...prev, kanbanColumns: prev.kanbanColumns.filter(c => c.id !== id) }));
+    if (user) await deleteKanbanColumnFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        kanbanColumns: prev.kanbanColumns.filter((c) => c.id !== id),
+      }));
   };
 
   // --- NOTES ACTIONS ---
-  const addNote = async (note: Omit<Note, 'id'>) => {
-      const newNote: Note = { ...note, id: crypto.randomUUID() };
-      if (user) await addNoteFire(user.uid, newNote);
-      else setData(prev => ({ ...prev, notes: [newNote, ...prev.notes] }));
+  const addNote = async (note: Omit<Note, "id">) => {
+    const newNote: Note = { ...note, id: crypto.randomUUID() };
+    if (user) await addNoteFire(user.uid, newNote);
+    else setData((prev) => ({ ...prev, notes: [newNote, ...prev.notes] }));
   };
 
   const updateNote = async (id: string, updates: Partial<Note>) => {
-      if (user) await updateNoteFire(user.uid, id, updates);
-      else setData(prev => ({ ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...updates } : n) }));
+    if (user) await updateNoteFire(user.uid, id, updates);
+    else
+      setData((prev) => ({
+        ...prev,
+        notes: prev.notes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
+      }));
   };
 
   const deleteNote = async (id: string) => {
-      if (user) await deleteNoteFire(user.uid, id);
-      else setData(prev => ({ ...prev, notes: prev.notes.filter(n => n.id !== id) }));
+    if (user) await deleteNoteFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        notes: prev.notes.filter((n) => n.id !== id),
+      }));
   };
 
   // --- PASSWORDS ACTIONS ---
-  const addPassword = async (entry: Omit<PasswordEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const newPassword: PasswordEntry = { 
-          ...entry, 
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-      };
-      if (user) await addPasswordFire(user.uid, newPassword);
-      else setData(prev => ({ ...prev, passwords: [newPassword, ...prev.passwords] }));
+  const addPassword = async (
+    entry: Omit<PasswordEntry, "id" | "createdAt" | "updatedAt">,
+  ) => {
+    const newPassword: PasswordEntry = {
+      ...entry,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (user) await addPasswordFire(user.uid, newPassword);
+    else
+      setData((prev) => ({
+        ...prev,
+        passwords: [newPassword, ...prev.passwords],
+      }));
   };
 
-  const updatePassword = async (id: string, updates: Partial<PasswordEntry>) => {
-      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
-      if (user) await updatePasswordFire(user.uid, id, finalUpdates);
-      else setData(prev => ({ ...prev, passwords: prev.passwords.map(p => p.id === id ? { ...p, ...finalUpdates } : p) }));
+  const updatePassword = async (
+    id: string,
+    updates: Partial<PasswordEntry>,
+  ) => {
+    const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    if (user) await updatePasswordFire(user.uid, id, finalUpdates);
+    else
+      setData((prev) => ({
+        ...prev,
+        passwords: prev.passwords.map((p) =>
+          p.id === id ? { ...p, ...finalUpdates } : p,
+        ),
+      }));
   };
 
   const deletePassword = async (id: string) => {
-      if (user) await deletePasswordFire(user.uid, id);
-      else setData(prev => ({ ...prev, passwords: prev.passwords.filter(p => p.id !== id) }));
+    if (user) await deletePasswordFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        passwords: prev.passwords.filter((p) => p.id !== id),
+      }));
   };
 
   // --- AGENDA ACTIONS ---
-  const addAgendaEvent = async (event: Omit<AgendaEvent, 'id' | 'updatedAt'>) => {
-      const newEvent: AgendaEvent = {
-          ...event,
-          id: crypto.randomUUID(),
-          updatedAt: new Date().toISOString()
-      };
-      
-      if (user) {
-          await addAgendaEventFire(user.uid, newEvent);
-      } else {
-          setData(prev => ({ ...prev, agendaEvents: [...prev.agendaEvents, newEvent] }));
-      }
+  const addAgendaEvent = async (
+    event: Omit<AgendaEvent, "id" | "updatedAt">,
+  ) => {
+    const newEvent: AgendaEvent = {
+      ...event,
+      id: crypto.randomUUID(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (user) {
+      await addAgendaEventFire(user.uid, newEvent);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        agendaEvents: [...prev.agendaEvents, newEvent],
+      }));
+    }
   };
 
-  const updateAgendaEvent = async (id: string, updates: Partial<AgendaEvent>) => {
-      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
-      
-      if (user) {
-          await updateAgendaEventFire(user.uid, id, finalUpdates);
-      } else {
-          setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.map(e => e.id === id ? { ...e, ...finalUpdates } : e) }));
-      }
+  const updateAgendaEvent = async (
+    id: string,
+    updates: Partial<AgendaEvent>,
+  ) => {
+    const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+
+    if (user) {
+      await updateAgendaEventFire(user.uid, id, finalUpdates);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        agendaEvents: prev.agendaEvents.map((e) =>
+          e.id === id ? { ...e, ...finalUpdates } : e,
+        ),
+      }));
+    }
   };
 
   const deleteAgendaEvent = async (id: string) => {
-      if (user) {
-          await deleteAgendaEventFire(user.uid, id);
-      } else {
-          setData(prev => ({ ...prev, agendaEvents: prev.agendaEvents.filter(e => e.id !== id) }));
-      }
+    if (user) {
+      await deleteAgendaEventFire(user.uid, id);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        agendaEvents: prev.agendaEvents.filter((e) => e.id !== id),
+      }));
+    }
   };
 
   // --- PIX KEYS ACTIONS ---
-  const addPixKey = async (key: Omit<PixKey, 'id' | 'createdAt'>) => {
-      const newKey: PixKey = {
-          ...key,
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString()
-      };
-      if (user) await addPixKeyFire(user.uid, newKey);
-      else setData(prev => ({ ...prev, pixKeys: [newKey, ...prev.pixKeys] }));
+  const addPixKey = async (key: Omit<PixKey, "id" | "createdAt">) => {
+    const newKey: PixKey = {
+      ...key,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    if (user) await addPixKeyFire(user.uid, newKey);
+    else setData((prev) => ({ ...prev, pixKeys: [newKey, ...prev.pixKeys] }));
   };
 
   const updatePixKey = async (id: string, updates: Partial<PixKey>) => {
-      if (user) await updatePixKeyFire(user.uid, id, updates);
-      else setData(prev => ({ ...prev, pixKeys: prev.pixKeys.map(k => k.id === id ? { ...k, ...updates } : k) }));
+    if (user) await updatePixKeyFire(user.uid, id, updates);
+    else
+      setData((prev) => ({
+        ...prev,
+        pixKeys: prev.pixKeys.map((k) =>
+          k.id === id ? { ...k, ...updates } : k,
+        ),
+      }));
   };
 
   const deletePixKey = async (id: string) => {
-      if (user) await deletePixKeyFire(user.uid, id);
-      else setData(prev => ({ ...prev, pixKeys: prev.pixKeys.filter(k => k.id !== id) }));
+    if (user) await deletePixKeyFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        pixKeys: prev.pixKeys.filter((k) => k.id !== id),
+      }));
   };
 
   // --- TASKS ACTIONS ---
-  const addTaskList = async (list: Omit<TaskList, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-      const newList: TaskList = {
-          ...list,
-          id: list.id || crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-      };
-      if (user) await addTaskListFire(user.uid, newList);
-      else setData(prev => ({ ...prev, taskLists: [...prev.taskLists, newList] }));
+  const addTaskList = async (
+    list: Omit<TaskList, "id" | "createdAt" | "updatedAt"> & { id?: string },
+  ) => {
+    const newList: TaskList = {
+      ...list,
+      id: list.id || crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (user) await addTaskListFire(user.uid, newList);
+    else
+      setData((prev) => ({ ...prev, taskLists: [...prev.taskLists, newList] }));
   };
 
   const updateTaskList = async (id: string, updates: Partial<TaskList>) => {
-      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
-      if (user) await updateTaskListFire(user.uid, id, finalUpdates);
-      else setData(prev => ({ ...prev, taskLists: prev.taskLists.map(l => l.id === id ? { ...l, ...finalUpdates } : l) }));
+    const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    if (user) await updateTaskListFire(user.uid, id, finalUpdates);
+    else
+      setData((prev) => ({
+        ...prev,
+        taskLists: prev.taskLists.map((l) =>
+          l.id === id ? { ...l, ...finalUpdates } : l,
+        ),
+      }));
   };
 
   const deleteTaskList = async (id: string) => {
-      if (user) {
-          await deleteTaskListFire(user.uid, id);
-          // Delete all tasks in this list
-          const tasksToDelete = data.tasks.filter(t => t.listId === id);
-          for (const t of tasksToDelete) {
-              await deleteTaskFire(user.uid, t.id);
-          }
-      } else {
-          setData(prev => ({ 
-              ...prev, 
-              taskLists: prev.taskLists.filter(l => l.id !== id),
-              tasks: prev.tasks.filter(t => t.listId !== id)
-          }));
+    if (user) {
+      await deleteTaskListFire(user.uid, id);
+      // Delete all tasks in this list
+      const tasksToDelete = data.tasks.filter((t) => t.listId === id);
+      for (const t of tasksToDelete) {
+        await deleteTaskFire(user.uid, t.id);
       }
+    } else {
+      setData((prev) => ({
+        ...prev,
+        taskLists: prev.taskLists.filter((l) => l.id !== id),
+        tasks: prev.tasks.filter((t) => t.listId !== id),
+      }));
+    }
   };
 
-  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const newTask: Task = {
-          ...task,
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-      };
-      if (user) await addTaskFire(user.uid, newTask);
-      else setData(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+  const addTask = async (
+    task: Omit<Task, "id" | "createdAt" | "updatedAt">,
+  ) => {
+    const newTask: Task = {
+      ...task,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (user) await addTaskFire(user.uid, newTask);
+    else setData((prev) => ({ ...prev, tasks: [...prev.tasks, newTask] }));
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
-      const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
-      if (user) await updateTaskFire(user.uid, id, finalUpdates);
-      else setData(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === id ? { ...t, ...finalUpdates } : t) }));
+    const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    if (user) await updateTaskFire(user.uid, id, finalUpdates);
+    else
+      setData((prev) => ({
+        ...prev,
+        tasks: prev.tasks.map((t) =>
+          t.id === id ? { ...t, ...finalUpdates } : t,
+        ),
+      }));
   };
 
   const deleteTask = async (id: string) => {
-      if (user) await deleteTaskFire(user.uid, id);
-      else setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+    if (user) await deleteTaskFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        tasks: prev.tasks.filter((t) => t.id !== id),
+      }));
   };
 
   // --- HABITS ACTIONS ---
-  const addHabit = async (habit: Omit<Habit, 'id' | 'createdAt' | 'entries'>) => {
-      const newHabit: Habit = {
-          ...habit,
-          id: crypto.randomUUID(),
-          createdAt: new Date().toISOString(),
-          entries: {}
-      };
-      if (user) await addHabitFire(user.uid, newHabit);
-      else setData(prev => ({ ...prev, habits: [...prev.habits, newHabit] }));
+  const addHabit = async (
+    habit: Omit<Habit, "id" | "createdAt" | "entries">,
+  ) => {
+    const newHabit: Habit = {
+      ...habit,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      entries: {},
+    };
+    if (user) await addHabitFire(user.uid, newHabit);
+    else setData((prev) => ({ ...prev, habits: [...prev.habits, newHabit] }));
   };
 
   const updateHabit = async (id: string, updates: Partial<Habit>) => {
-      if (user) await updateHabitFire(user.uid, id, updates);
-      else setData(prev => ({ ...prev, habits: prev.habits.map(h => h.id === id ? { ...h, ...updates } : h) }));
+    if (user) await updateHabitFire(user.uid, id, updates);
+    else
+      setData((prev) => ({
+        ...prev,
+        habits: prev.habits.map((h) =>
+          h.id === id ? { ...h, ...updates } : h,
+        ),
+      }));
   };
 
   const deleteHabit = async (id: string) => {
-      if (user) await deleteHabitFire(user.uid, id);
-      else setData(prev => ({ ...prev, habits: prev.habits.filter(h => h.id !== id) }));
+    if (user) await deleteHabitFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        habits: prev.habits.filter((h) => h.id !== id),
+      }));
   };
 
-  const toggleHabitEntry = async (id: string, dayIndex: number, status: 'done' | 'missed', dateStr: string) => {
-      const habit = data.habits.find(h => h.id === id);
-      if (!habit) return;
+  const toggleHabitEntry = async (
+    id: string,
+    dayIndex: number,
+    status: "done" | "missed",
+    dateStr: string,
+  ) => {
+    const habit = data.habits.find((h) => h.id === id);
+    if (!habit) return;
 
-      const newEntries = { ...habit.entries, [dayIndex]: { status, date: dateStr } };
+    const newEntries = {
+      ...habit.entries,
+      [dayIndex]: { status, date: dateStr },
+    };
 
-      if (user) {
-          await updateHabitFire(user.uid, id, { entries: newEntries });
-      } else {
-          setData(prev => ({
-              ...prev,
-              habits: prev.habits.map(h => h.id === id ? { ...h, entries: newEntries } : h)
-          }));
-      }
+    if (user) {
+      await updateHabitFire(user.uid, id, { entries: newEntries });
+    } else {
+      setData((prev) => ({
+        ...prev,
+        habits: prev.habits.map((h) =>
+          h.id === id ? { ...h, entries: newEntries } : h,
+        ),
+      }));
+    }
   };
 
   // --- WALLETS ---
-  const addWallet = async (w: Omit<Wallet, 'id'>) => {
+  const addWallet = async (w: Omit<Wallet, "id">) => {
     const newWallet: Wallet = { ...w, id: crypto.randomUUID() };
     if (user) await addWalletFire(user.uid, newWallet);
-    else setData(prev => ({ ...prev, wallets: [...(prev.wallets || []), newWallet] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        wallets: [...(prev.wallets || []), newWallet],
+      }));
   };
 
   const updateWallet = async (id: string, updates: Partial<Wallet>) => {
     if (user) await updateWalletFire(user.uid, id, updates);
-    else setData(prev => ({ ...prev, wallets: (prev.wallets || []).map(w => w.id === id ? { ...w, ...updates } : w) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        wallets: (prev.wallets || []).map((w) =>
+          w.id === id ? { ...w, ...updates } : w,
+        ),
+      }));
   };
 
   const deleteWallet = async (id: string) => {
     if (user) await deleteWalletFire(user.uid, id);
-    else setData(prev => ({ ...prev, wallets: (prev.wallets || []).filter(w => w.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        wallets: (prev.wallets || []).filter((w) => w.id !== id),
+      }));
   };
 
   // --- DAILY ROUTINES ---
-  const addDailyRoutine = async (title: string) => {
+  const addDailyRoutine = async (title: string, time?: string) => {
     const newOrder = (data.dailyRoutines || []).length;
-    const newRoutine = { id: crypto.randomUUID(), title, order: newOrder };
+    const routineId = crypto.randomUUID();
+    const eventId = time ? crypto.randomUUID() : undefined;
+
+    const newRoutine: DailyRoutine = {
+      id: routineId,
+      title,
+      order: newOrder,
+      time,
+      eventId,
+    };
+
     if (user) await addDailyRoutineFire(user.uid, newRoutine);
-    else setData(prev => ({ ...prev, dailyRoutines: [...(prev.dailyRoutines || []), newRoutine] }));
+    else
+      setData((prev) => ({
+        ...prev,
+        dailyRoutines: [...(prev.dailyRoutines || []), newRoutine],
+      }));
+
+    if (time && eventId) {
+      const [hours, minutes] = time.split(":");
+      const startDate = new Date();
+      startDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+
+      const newEvent: AgendaEvent = {
+        id: eventId,
+        title: `[Rotina] ${title}`,
+        allDay: false,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isRecurring: true,
+        recurrencePeriod: "daily",
+        updatedAt: new Date().toISOString(),
+      };
+      if (user) await addAgendaEventFire(user.uid, newEvent);
+      else
+        setData((prev) => ({
+          ...prev,
+          agendaEvents: [...(prev.agendaEvents || []), newEvent],
+        }));
+    }
   };
 
   const toggleDailyRoutine = async (id: string, dateStr: string) => {
-    if (user) await updateDailyRoutineFire(user.uid, id, { lastCompletedDate: dateStr });
-    else setData(prev => ({
-      ...prev,
-      dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, lastCompletedDate: dateStr } : r)
-    }));
+    if (user)
+      await updateDailyRoutineFire(user.uid, id, {
+        lastCompletedDate: dateStr,
+      });
+    else
+      setData((prev) => ({
+        ...prev,
+        dailyRoutines: (prev.dailyRoutines || []).map((r) =>
+          r.id === id ? { ...r, lastCompletedDate: dateStr } : r,
+        ),
+      }));
   };
 
   const updateDailyRoutineOrder = async (id: string, newOrder: number) => {
     if (user) await updateDailyRoutineFire(user.uid, id, { order: newOrder });
-    else setData(prev => ({
-       ...prev,
-       dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, order: newOrder } : r)
-    }));
+    else
+      setData((prev) => ({
+        ...prev,
+        dailyRoutines: (prev.dailyRoutines || []).map((r) =>
+          r.id === id ? { ...r, order: newOrder } : r,
+        ),
+      }));
   };
 
-  const updateDailyRoutine = async (id: string, newTitle: string) => {
-    if (user) await updateDailyRoutineFire(user.uid, id, { title: newTitle });
-    else setData(prev => ({
-       ...prev,
-       dailyRoutines: (prev.dailyRoutines || []).map(r => r.id === id ? { ...r, title: newTitle } : r)
-    }));
+  const updateDailyRoutine = async (
+    id: string,
+    newTitle: string,
+    newTime?: string,
+  ) => {
+    const routine = data.dailyRoutines?.find((r) => r.id === id);
+    if (!routine) return;
+
+    let eventId = routine.eventId;
+    let oldEventIdToDelete: string | undefined = undefined;
+
+    if (newTime && !routine.time) {
+      // Did not have time, now it does. Create a new event.
+      eventId = crypto.randomUUID();
+      const [hours, minutes] = newTime.split(":");
+      const startDate = new Date();
+      startDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+
+      const newEvent: AgendaEvent = {
+        id: eventId,
+        title: `[Rotina] ${newTitle}`,
+        allDay: false,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isRecurring: true,
+        recurrencePeriod: "daily",
+        updatedAt: new Date().toISOString(),
+      };
+      if (user) await addAgendaEventFire(user.uid, newEvent);
+      else
+        setData((prev) => ({
+          ...prev,
+          agendaEvents: [...(prev.agendaEvents || []), newEvent],
+        }));
+    } else if (newTime && routine.time && eventId) {
+      // Has time, update existing event
+      const [hours, minutes] = newTime.split(":");
+      const startDate = new Date();
+      startDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1 hour later
+
+      const updates = {
+        title: `[Rotina] ${newTitle}`,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      if (user) await updateAgendaEventFire(user.uid, eventId, updates);
+      else
+        setData((prev) => ({
+          ...prev,
+          agendaEvents: (prev.agendaEvents || []).map((e) =>
+            e.id === eventId ? { ...e, ...updates } : e,
+          ),
+        }));
+    } else if (!newTime && routine.time && eventId) {
+      // Had time, now it doesn't. Delete event.
+      oldEventIdToDelete = eventId;
+      eventId = undefined;
+    }
+
+    if (user)
+      await updateDailyRoutineFire(user.uid, id, {
+        title: newTitle,
+        time: newTime || undefined,
+        eventId: eventId || undefined,
+      });
+    else
+      setData((prev) => ({
+        ...prev,
+        dailyRoutines: (prev.dailyRoutines || []).map((r) =>
+          r.id === id ? { ...r, title: newTitle, time: newTime, eventId } : r,
+        ),
+      }));
+
+    if (oldEventIdToDelete) {
+      if (user) await deleteAgendaEventFire(user.uid, oldEventIdToDelete);
+      else
+        setData((prev) => ({
+          ...prev,
+          agendaEvents: (prev.agendaEvents || []).filter(
+            (e) => e.id !== oldEventIdToDelete,
+          ),
+        }));
+    }
   };
 
   const deleteDailyRoutine = async (id: string) => {
+    const routine = data.dailyRoutines?.find((r) => r.id === id);
+    if (routine?.eventId) {
+      if (user) await deleteAgendaEventFire(user.uid, routine.eventId);
+      else
+        setData((prev) => ({
+          ...prev,
+          agendaEvents: (prev.agendaEvents || []).filter(
+            (e) => e.id !== routine.eventId,
+          ),
+        }));
+    }
+
     if (user) await deleteDailyRoutineFire(user.uid, id);
-    else setData(prev => ({ ...prev, dailyRoutines: (prev.dailyRoutines || []).filter(r => r.id !== id) }));
+    else
+      setData((prev) => ({
+        ...prev,
+        dailyRoutines: (prev.dailyRoutines || []).filter((r) => r.id !== id),
+      }));
   };
 
   // --- CATEGORY ACTIONS ---
   const addCategory = async (cat: Category) => {
-      if (user) await addCategoryFire(user.uid, cat);
-      else setData(prev => ({ ...prev, categories: [...(prev.categories || []), cat] }));
+    if (user) await addCategoryFire(user.uid, cat);
+    else
+      setData((prev) => ({
+        ...prev,
+        categories: [...(prev.categories || []), cat],
+      }));
   };
 
   const deleteCategory = async (id: string) => {
-      if (user) await deleteCategoryFire(user.uid, id);
-      else setData(prev => ({ ...prev, categories: prev.categories.filter(c => c.id !== id) }));
+    if (user) await deleteCategoryFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        categories: prev.categories.filter((c) => c.id !== id),
+      }));
   };
 
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
-      else setData(prev => ({ ...prev, unlockedBadges: [...prev.unlockedBadges, badgeId] }));
+      else
+        setData((prev) => ({
+          ...prev,
+          unlockedBadges: [...prev.unlockedBadges, badgeId],
+        }));
     }
   };
 
   const saveWealthProfile = async (profile: WealthProfile) => {
-      if (user) {
-          await saveWealthProfileFire(user.uid, profile);
-      } else {
-          setData(prev => ({ ...prev, wealthProfile: profile }));
-      }
+    if (user) {
+      await saveWealthProfileFire(user.uid, profile);
+    } else {
+      setData((prev) => ({ ...prev, wealthProfile: profile }));
+    }
   };
 
   const setDriveLink = async (link: string) => {
-      if (user) {
-          await saveDriveLinkFire(user.uid, link);
-      }
-      setData(prev => ({ ...prev, driveLink: link }));
+    if (user) {
+      await saveDriveLinkFire(user.uid, link);
+    }
+    setData((prev) => ({ ...prev, driveLink: link }));
   };
 
   return {
     data,
     setData,
     actions: {
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        toggleTransactionStatus,
-        addInvestment,
-        updateInvestment,
-        deleteInvestment,
-        addBudget,
-        updateBudget,
-        deleteBudget,
-        addDebt,
-        updateDebt,
-        deleteDebt,
-        addShoppingItem,
-        updateShoppingItem,
-        deleteShoppingItem,
-        clearShoppingList,
-        setShoppingBudget,
-        updateScoreSerasa,
-        saveKanbanColumn,
-        deleteKanbanColumn,
-        saveKanbanBoard,
-        deleteKanbanBoard,
-        addNote,
-        updateNote,
-        deleteNote,
-        addPassword,
-        updatePassword,
-        deletePassword,
-        addAgendaEvent,
-        updateAgendaEvent,
-        deleteAgendaEvent,
-        addPixKey,
-        updatePixKey,
-        deletePixKey,
-        addHabit,
-        updateHabit,
-        deleteHabit,
-        toggleHabitEntry,
-        addWallet,
-        updateWallet,
-        deleteWallet,
-        addDailyRoutine,
-        updateDailyRoutine,
-        toggleDailyRoutine,
-        deleteDailyRoutine,
-        updateDailyRoutineOrder,
-        addTaskList,
-        updateTaskList,
-        deleteTaskList,
-        addTask,
-        updateTask,
-        deleteTask,
-        addCategory,
-        deleteCategory,
-        unlockBadge,
-        saveWealthProfile,
-        setDriveLink
-    }
+      addTransaction,
+      updateTransaction,
+      deleteTransaction,
+      toggleTransactionStatus,
+      addInvestment,
+      updateInvestment,
+      deleteInvestment,
+      addBudget,
+      updateBudget,
+      deleteBudget,
+      addDebt,
+      updateDebt,
+      deleteDebt,
+      addShoppingItem,
+      updateShoppingItem,
+      deleteShoppingItem,
+      clearShoppingList,
+      setShoppingBudget,
+      updateScoreSerasa,
+      saveKanbanColumn,
+      deleteKanbanColumn,
+      saveKanbanBoard,
+      deleteKanbanBoard,
+      addNote,
+      updateNote,
+      deleteNote,
+      addPassword,
+      updatePassword,
+      deletePassword,
+      addAgendaEvent,
+      updateAgendaEvent,
+      deleteAgendaEvent,
+      addPixKey,
+      updatePixKey,
+      deletePixKey,
+      addHabit,
+      updateHabit,
+      deleteHabit,
+      toggleHabitEntry,
+      addWallet,
+      updateWallet,
+      deleteWallet,
+      addDailyRoutine,
+      updateDailyRoutine,
+      toggleDailyRoutine,
+      deleteDailyRoutine,
+      updateDailyRoutineOrder,
+      addTaskList,
+      updateTaskList,
+      deleteTaskList,
+      addTask,
+      updateTask,
+      deleteTask,
+      addCategory,
+      deleteCategory,
+      unlockBadge,
+      saveWealthProfile,
+      setDriveLink,
+    },
   };
 };
