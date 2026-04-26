@@ -50,7 +50,6 @@ import { AssetsView } from "./components/AssetsView";
 import { ProductivityView } from "./components/ProductivityView";
 import { UtilitiesView } from "./components/UtilitiesView";
 import { FinancialCalendar } from "./components/FinancialCalendar";
-import { DailyRoutines } from "./components/DailyRoutines";
 
 const PIX_KEY = "028.268.001-24";
 const PIX_NAME = "Alexandre Magno dos Santos Linhares";
@@ -292,11 +291,11 @@ const App: React.FC = () => {
           onUnlockBadge={actions.unlockBadge}
           onNavigate={(view) => setCurrentView(view)}
           onToggleHabitEntry={actions.toggleHabitEntry}
-          onAddDailyRoutine={actions.addDailyRoutine}
-          onToggleDailyRoutine={actions.toggleDailyRoutine}
-          onDeleteDailyRoutine={actions.deleteDailyRoutine}
-          onUpdateDailyRoutineOrder={actions.updateDailyRoutineOrder}
-          onUpdateDailyRoutine={actions.updateDailyRoutine}
+          
+          
+          
+          
+          
         />
       );
     }
@@ -406,12 +405,12 @@ const App: React.FC = () => {
             onAddTask={actions.addTask}
             onUpdateTask={actions.updateTask}
             onDeleteTask={actions.deleteTask}
-            dailyRoutines={data.dailyRoutines}
-            onAddDailyRoutine={actions.addDailyRoutine}
-            onToggleDailyRoutine={actions.toggleDailyRoutine}
-            onDeleteDailyRoutine={actions.deleteDailyRoutine}
-            onUpdateDailyRoutineOrder={actions.updateDailyRoutineOrder}
-            onUpdateDailyRoutine={actions.updateDailyRoutine}
+            
+            
+            
+            
+            
+            
             privacyMode={privacyMode}
             onNavigate={setCurrentView}
           />
@@ -442,11 +441,11 @@ const App: React.FC = () => {
         onUnlockBadge={actions.unlockBadge}
         onNavigate={(view) => setCurrentView(view)}
         onToggleHabitEntry={actions.toggleHabitEntry}
-        onAddDailyRoutine={actions.addDailyRoutine}
-        onToggleDailyRoutine={actions.toggleDailyRoutine}
-        onDeleteDailyRoutine={actions.deleteDailyRoutine}
-        onUpdateDailyRoutineOrder={actions.updateDailyRoutineOrder}
-        onUpdateDailyRoutine={actions.updateDailyRoutine}
+        
+        
+        
+        
+        
       />
     );
   };

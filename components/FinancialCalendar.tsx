@@ -9,8 +9,7 @@ import {
   TaskList,
   Task,
   View,
-  DailyRoutine,
-} from "../types";
+  } from "../types";
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,12 +39,12 @@ import {
   Grid,
   Repeat,
   CheckSquare,
+  Moon,
 } from "lucide-react";
 import { updateTransactionFire } from "../services/storageService";
 import { auth } from "../services/firebase";
 import { AIAgendaAssistant } from "./AIAgendaAssistant";
 import { CurrencyInput } from "./CurrencyInput";
-import { DailyRoutines } from "./DailyRoutines";
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
@@ -53,7 +52,6 @@ interface FinancialCalendarProps {
   agendaEvents?: AgendaEvent[];
   taskLists?: TaskList[];
   tasks?: Task[];
-  dailyRoutines?: DailyRoutine[];
   onAddTransaction: (t: Omit<Transaction, "id">) => void;
   onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
   onAddAgendaEvent?: (e: Omit<AgendaEvent, "id" | "updatedAt">) => void;
@@ -67,11 +65,6 @@ interface FinancialCalendarProps {
   onAddTask?: (task: Omit<Task, "id" | "createdAt" | "updatedAt">) => void;
   onUpdateTask?: (id: string, updates: Partial<Task>) => void;
   onDeleteTask?: (id: string) => void;
-  onAddDailyRoutine?: (title: string, time?: string) => void;
-  onToggleDailyRoutine?: (id: string, dateStr: string) => void;
-  onDeleteDailyRoutine?: (id: string) => void;
-  onUpdateDailyRoutineOrder?: (id: string, newOrder: number) => void;
-  onUpdateDailyRoutine?: (id: string, newTitle: string, newTime?: string) => void;
   privacyMode: boolean;
   onNavigate?: (view: any) => void;
   currentView?: View;
@@ -145,12 +138,6 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
-  dailyRoutines = [],
-  onAddDailyRoutine,
-  onToggleDailyRoutine,
-  onDeleteDailyRoutine,
-  onUpdateDailyRoutineOrder,
-  onUpdateDailyRoutine,
   privacyMode,
   onNavigate,
   currentView,
@@ -161,9 +148,16 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   );
   const [filterType, setFilterType] = useState<ViewFilter>("all");
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  const [collapseEarlyHours, setCollapseEarlyHours] = useState(true);
+  
+  const hourOffset = collapseEarlyHours ? 6 : 0;
+  const hoursToRender = useMemo(() => {
+    return collapseEarlyHours 
+      ? Array.from({ length: 18 }).map((_, i) => i + 6)
+      : Array.from({ length: 24 }).map((_, i) => i);
+  }, [collapseEarlyHours]);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
-  const [isRoutinesModalOpen, setIsRoutinesModalOpen] = useState(false);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [editingListId, setEditingListId] = useState<string | null>(null);
@@ -184,6 +178,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       | "custom_days",
     recurrenceDays: [] as number[],
     recurrenceEndDate: "",
+    isRoutine: false,
   });
   const [taskFormData, setTaskFormData] = useState({
     id: "",
@@ -192,12 +187,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     listId: "",
     dueDate: "",
   });
-  const [routineFormData, setRoutineFormData] = useState({
-    id: "",
-    title: "",
-    time: "",
-  });
-
+  
   // Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -461,9 +451,6 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     return tasks?.filter(t => !t.dueDate && !t.completed) || [];
   }, [tasks]);
 
-  const timelessRoutines = useMemo(() => {
-    return dailyRoutines?.filter(r => !r.time) || [];
-  }, [dailyRoutines]);
 
   const todayTasks = useMemo(() => {
     if (selectedDay === null) return [];
@@ -474,10 +461,6 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     }) || [];
   }, [tasks, selectedDay, month, year]);
 
-  const timedRoutines = useMemo(() => {
-    if (selectedDay === null) return [];
-    return dailyRoutines?.filter(r => !!r.time) || [];
-  }, [dailyRoutines, selectedDay]);
 
   const handleMoveTransaction = (index: number, direction: "up" | "down") => {
     if (!onUpdateTransaction) return;
@@ -591,6 +574,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       recurrencePeriod: "daily",
       recurrenceDays: [],
       recurrenceEndDate: "",
+      isRoutine: false,
     });
     setIsAgendaModalOpen(true);
   };
@@ -615,6 +599,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       recurrencePeriod: event.recurrencePeriod || "daily",
       recurrenceDays: event.recurrenceDays || [],
       recurrenceEndDate: event.recurrenceEndDate || "",
+      isRoutine: event.isRoutine || false,
     });
     setIsAgendaModalOpen(true);
   };
@@ -658,6 +643,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         recurrencePeriod: agendaFormData.recurrencePeriod,
         recurrenceDays: agendaFormData.recurrenceDays,
         recurrenceEndDate: agendaFormData.recurrenceEndDate,
+        isRoutine: agendaFormData.isRoutine,
       });
     } else {
       await onAddAgendaEvent({
@@ -670,6 +656,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         recurrencePeriod: agendaFormData.recurrencePeriod,
         recurrenceDays: agendaFormData.recurrenceDays,
         recurrenceEndDate: agendaFormData.recurrenceEndDate,
+        isRoutine: agendaFormData.isRoutine,
       });
     }
 
@@ -712,15 +699,9 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
 
   const handleRoutineSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!routineFormData.title.trim()) return;
+    
 
-    if (routineFormData.id && onUpdateDailyRoutine) {
-      onUpdateDailyRoutine(routineFormData.id, routineFormData.title.trim(), routineFormData.time || undefined);
-    } else if (onAddDailyRoutine) {
-      onAddDailyRoutine(routineFormData.title.trim(), routineFormData.time || undefined);
-    }
-    setIsRoutinesModalOpen(false);
-    setRoutineFormData({ id: "", title: "", time: "" });
+
   };
 
   const handleTaskSubmit = async (e: React.FormEvent) => {
@@ -1239,6 +1220,25 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                 </label>
               </div>
 
+              <div className="mt-2 mb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agendaFormData.isRoutine}
+                    onChange={(e) =>
+                      setAgendaFormData({
+                        ...agendaFormData,
+                        isRoutine: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700"
+                  />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    É uma Rotina
+                  </span>
+                </label>
+              </div>
+
               {!agendaFormData.allDay && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1427,71 +1427,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         </div>
       )}
 
-      {/* ADD ROUTINE MODAL */}
-      {isRoutinesModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  {routineFormData.id ? "Editar Rotina" : "Nova Rotina"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsRoutinesModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleRoutineSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Título
-                </label>
-                <input
-                  autoFocus
-                  required
-                  type="text"
-                  placeholder="Ex: Ler 10 páginas, Beber Água, etc..."
-                  value={routineFormData.title}
-                  onChange={(e) =>
-                    setRoutineFormData({ ...routineFormData, title: e.target.value })
-                  }
-                  className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-800 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Hora (Opcional - Sessão Fixa)
-                </label>
-                <input
-                  type="time"
-                  value={routineFormData.time}
-                  onChange={(e) =>
-                    setRoutineFormData({ ...routineFormData, time: e.target.value })
-                  }
-                  className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-teal-500 text-slate-800 dark:text-white"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-              >
-                {routineFormData.id ? (
-                  <Check className="w-5 h-5" />
-                ) : (
-                  <Plus className="w-5 h-5" />
-                )}
-                {routineFormData.id ? "Atualizar Rotina" : "Salvar Rotina"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      
 
       {/* ADD TASK MODAL */}
       {isTaskModalOpen && (
@@ -1816,6 +1752,16 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
             <Download className="w-5 h-5" />
           </button>
 
+          {viewMode !== "month" && (
+            <button
+              onClick={() => setCollapseEarlyHours(!collapseEarlyHours)}
+              className={`p-2 border rounded-lg flex items-center justify-center transition-all ${collapseEarlyHours ? 'bg-indigo-50 border-indigo-200 text-indigo-600 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400' : 'bg-white border-slate-200 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
+              title={collapseEarlyHours ? "Mostrar Madrugada (00h-05h)" : "Ocultar Madrugada (00h-05h)"}
+            >
+              <Moon className="w-5 h-5" />
+            </button>
+          )}
+
           <div className="flex items-center bg-indigo-50 dark:bg-indigo-900/30 rounded-xl shadow-sm border border-indigo-200 dark:border-indigo-800 p-1 flex-1 md:flex-none justify-center">
             <button
               onClick={handlePrev}
@@ -1990,12 +1936,12 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               <div className="grid grid-cols-8">
                 {/* Time Labels */}
                 <div className="border-r border-slate-200 dark:border-slate-600">
-                  {Array.from({ length: 24 }).map((_, i) => (
+                  {hoursToRender.map((hour) => (
                     <div
-                      key={i}
+                      key={hour}
                       className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
                     >
-                      <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{`${hour.toString().padStart(2, "0")}:00`}</span>
                     </div>
                   ))}
                 </div>
@@ -2022,9 +1968,9 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       key={dayIdx}
                       className="border-r border-slate-200 dark:border-slate-600 relative"
                     >
-                      {Array.from({ length: 24 }).map((_, i) => (
+                      {hoursToRender.map((hour) => (
                         <div
-                          key={i}
+                          key={hour}
                           className="h-12 border-b border-slate-100 dark:border-slate-700/50"
                         ></div>
                       ))}
@@ -2036,8 +1982,13 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                         const startHour =
                           start.getHours() + start.getMinutes() / 60;
                         const endHour = end.getHours() + end.getMinutes() / 60;
-                        const top = startHour * 48; // 48px per hour (h-12)
-                        const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
+                        
+                        if (collapseEarlyHours && endHour <= 6) return null;
+                        const adjustedStartHour = Math.max(startHour - hourOffset, 0);
+                        const adjustedEndHour = endHour - hourOffset;
+                        
+                        const top = adjustedStartHour * 48; // 48px per hour (h-12)
+                        const height = Math.max((adjustedEndHour - adjustedStartHour) * 48, 20); // Min height 20px
 
                         return (
                           <div
@@ -2175,21 +2126,21 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               <div className="grid grid-cols-[60px_1fr]">
                 {/* Time Labels */}
                 <div className="border-r border-slate-200 dark:border-slate-600">
-                  {Array.from({ length: 24 }).map((_, i) => (
+                  {hoursToRender.map((hour) => (
                     <div
-                      key={i}
+                      key={hour}
                       className="h-12 border-b border-slate-100 dark:border-slate-700/50 text-right pr-2 py-1"
                     >
-                      <span className="text-[10px] text-slate-400 font-medium">{`${i.toString().padStart(2, "0")}:00`}</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{`${hour.toString().padStart(2, "0")}:00`}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Day Column */}
                 <div className="relative">
-                  {Array.from({ length: 24 }).map((_, i) => (
+                  {hoursToRender.map((hour) => (
                     <div
-                      key={i}
+                      key={hour}
                       className="h-12 border-b border-slate-100 dark:border-slate-700/50"
                     ></div>
                   ))}
@@ -2220,8 +2171,13 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       const startHour =
                         start.getHours() + start.getMinutes() / 60;
                       const endHour = end.getHours() + end.getMinutes() / 60;
-                      const top = startHour * 48; // 48px per hour (h-12)
-                      const height = Math.max((endHour - startHour) * 48, 20); // Min height 20px
+                      
+                      if (collapseEarlyHours && endHour <= 6) return null;
+                      const adjustedStartHour = Math.max(startHour - hourOffset, 0);
+                      const adjustedEndHour = endHour - hourOffset;
+                        
+                      const top = adjustedStartHour * 48; // 48px per hour (h-12)
+                      const height = Math.max((adjustedEndHour - adjustedStartHour) * 48, 20); // Min height 20px
 
                       return (
                         <div
@@ -2265,33 +2221,24 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                 : "Resumo do Mês"}
             </h3>
             {selectedDay && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+              <div className="grid grid-cols-3 gap-2 mt-3">
                 <button
                   onClick={handleOpenModal}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-2 px-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
-                  <Plus className="w-3 h-3" /> Transação
+                  <Plus className="w-3 h-3 shrink-0" /> <span className="truncate">Transação</span>
                 </button>
                 <button
                   onClick={handleOpenAgendaModal}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-2 px-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
-                  <CalendarClock className="w-3 h-3" /> Evento
+                  <CalendarClock className="w-3 h-3 shrink-0" /> <span className="truncate">Evento</span>
                 </button>
                 <button
                   onClick={handleOpenTaskModal}
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-2 px-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                 >
-                  <ListTodo className="w-3 h-3" /> Tarefa
-                </button>
-                <button
-                  onClick={() => {
-                    setRoutineFormData({ id: "", title: "", time: "" });
-                    setIsRoutinesModalOpen(true);
-                  }}
-                  className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                >
-                  <CheckSquare className="w-3 h-3" /> Rotinas
+                  <ListTodo className="w-3 h-3 shrink-0" /> <span className="truncate">Tarefa</span>
                 </button>
               </div>
             )}
@@ -2303,8 +2250,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               selectedAgendaEvents.length === 0 &&
               todayTasks.length === 0 &&
               timelessTasks.length === 0 &&
-              timedRoutines.length === 0 &&
-              timelessRoutines.length === 0 && (
+               (
                 <div className="text-center py-10">
                   <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                   <p className="text-slate-400 text-sm">
@@ -2324,7 +2270,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
               </div>
             )}
             {/* ATEMPORAL GROUP */}
-            {selectedDay && (timelessTasks.length > 0 || timelessRoutines.length > 0) && (
+            {selectedDay && (timelessTasks.length > 0) && (
               <div className="mb-6">
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <Clock className="w-3.5 h-3.5 text-indigo-500" /> Atemporal
@@ -2375,177 +2321,18 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                     </div>
                   ))}
 
-                  {/* Timeless Routines */}
-                  {timelessRoutines.map((routine) => {
-                    const dateStr = new Date(year, month, selectedDay).toISOString().split('T')[0];
-                    const completed = (routine as any).lastCompletedDate === dateStr || !!routine.completedDates?.includes(dateStr);
-                    return (
-                      <div
-                        key={routine.id}
-                        className={`group flex items-start justify-between p-3 rounded-lg border ${completed ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60" : "bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <button
-                            onClick={() => onToggleDailyRoutine && onToggleDailyRoutine(routine.id, completed ? '' : dateStr)}
-                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${completed ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 dark:border-slate-500 hover:border-teal-500"}`}
-                          >
-                            {completed && <Check className="w-3 h-3" />}
-                          </button>
-                          <div>
-                            <p className={`font-semibold text-sm ${completed ? "text-slate-500 line-through" : "text-slate-800 dark:text-white"}`}>
-                              {routine.title}
-                            </p>
-                            <p className="text-[10px] uppercase font-bold tracking-wider mt-0.5 text-teal-500 dark:text-teal-400">
-                              ROTINA DIÁRIA
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => {
-                              setRoutineFormData({ id: routine.id, title: routine.title, time: routine.time || "" });
-                              setIsRoutinesModalOpen(true);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
-                            title="Editar Rotina"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteDailyRoutine && onDeleteDailyRoutine(routine.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                            title="Excluir Rotina"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                  </div>
               </div>
             )}
 
             {/* PROGRAMADO GROUP */}
-            {selectedDay && (selectedTransactions.length > 0 || selectedAgendaEvents.length > 0 || todayTasks.length > 0 || timedRoutines.length > 0) && (
+            {selectedDay && (selectedTransactions.length > 0 || selectedAgendaEvents.length > 0 || todayTasks.length > 0 ) && (
               <div className="mb-6">
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
                   <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" /> Programado
                 </h4>
                 <div className="space-y-2">
-                  {/* Timed Routines */}
-                  {timedRoutines.map((routine) => {
-                    const dateStr = new Date(year, month, selectedDay).toISOString().split('T')[0];
-                    const completed = (routine as any).lastCompletedDate === dateStr || !!routine.completedDates?.includes(dateStr);
-                    return (
-                      <div
-                        key={routine.id}
-                        className={`group flex items-start justify-between p-3 rounded-lg border ${completed ? "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60" : "bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <button
-                            onClick={() => onToggleDailyRoutine && onToggleDailyRoutine(routine.id, completed ? '' : dateStr)}
-                            className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${completed ? "bg-teal-500 border-teal-500 text-white" : "border-slate-300 dark:border-slate-500 hover:border-teal-500"}`}
-                          >
-                            {completed && <Check className="w-3 h-3" />}
-                          </button>
-                          <div>
-                            <p className={`font-semibold text-sm ${completed ? "text-slate-500 line-through" : "text-slate-800 dark:text-white"}`}>
-                              {routine.title}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded">
-                                {routine.time}
-                              </span>
-                              <span className="text-[10px] uppercase font-bold tracking-wider text-teal-400 dark:text-teal-500">
-                                ROTINA DIÁRIA
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => {
-                              setRoutineFormData({ id: routine.id, title: routine.title, time: routine.time || "" });
-                              setIsRoutinesModalOpen(true);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded transition-colors"
-                            title="Editar Rotina"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteDailyRoutine && onDeleteDailyRoutine(routine.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                            title="Excluir Rotina"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Agenda Events */}
-                  {selectedAgendaEvents.map(event => (
-                    <div key={event.id} className="group flex items-start justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/50">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="flex flex-col items-center min-w-[3rem] mt-0.5">
-                          <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                            {event.allDay ? "Dia Todo" : new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-slate-800 dark:text-white">
-                            {event.title}
-                          </p>
-                          {event.description && (
-                            <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">
-                              {event.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditAgendaEvent(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Evento"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => onDeleteAgendaEvent && onDeleteAgendaEvent(event.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Evento"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Today Tasks */}
-                  {todayTasks.filter(t => !t.completed).map((task) => (
-                    <div key={task.id} className="group flex items-start justify-between p-3 rounded-lg border bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
-                      <div className="flex items-start gap-3">
-                        <button onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: true })} className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors border-slate-300 dark:border-slate-500 hover:border-indigo-500"></button>
-                        <div>
-                          <p className="font-semibold text-sm text-slate-800 dark:text-white">{task.title}</p>
-                          {task.description && <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">{task.description}</p>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" }); setIsTaskModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => onDeleteTask && onDeleteTask(task.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                  ))}
-                  {/* Today Completed Tasks */}
-                  {todayTasks.filter(t => t.completed).map((task) => (
-                    <div key={task.id} className="group flex items-start justify-between p-3 rounded-lg border bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60">
-                      <div className="flex items-start gap-3">
-                        <button onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: false })} className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors bg-indigo-500 border-indigo-500 text-white"><Check className="w-3 h-3" /></button>
-                        <div>
-                          <p className="font-semibold text-sm text-slate-500 line-through">{task.title}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" }); setIsTaskModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => onDeleteTask && onDeleteTask(task.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Transactions */}
+                   {/* Transactions */}
                   {selectedTransactions.map((t, idx) => {
                     const canMoveUp = idx > 0;
                     const canMoveDown = idx < selectedTransactions.length - 1;
@@ -2583,6 +2370,77 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       </div>
                     );
                   })}
+
+                  {/* Agenda Events */}
+                  {selectedAgendaEvents.map(event => {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay || 1).padStart(2, "0")}`;
+                    const completed = event.completedDates?.includes(dateStr);
+                    
+                    const handleToggleEvent = async () => {
+                      if (!onUpdateAgendaEvent) return;
+                      const newDates = completed 
+                        ? (event.completedDates || []).filter(d => d !== dateStr) 
+                        : [...(event.completedDates || []), dateStr];
+                      await onUpdateAgendaEvent(event.id, { completedDates: newDates });
+                    };
+
+                    return (
+                      <div key={event.id} className={`group flex items-start justify-between p-3 rounded-lg border transition-all ${completed ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30 opacity-75' : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                        <div className="flex items-start gap-4 flex-1">
+                          <button
+                            onClick={handleToggleEvent}
+                            className={`mt-1 w-5 h-5 rounded border flex shrink-0 items-center justify-center transition-colors ${completed ? "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "border-slate-300 dark:border-slate-500 hover:border-emerald-500 dark:hover:border-emerald-400"}`}
+                          >
+                            {completed && <Check className="w-3 h-3" />}
+                          </button>
+                          <div className="flex flex-col items-center min-w-[3rem] mt-0.5">
+                            <span className={`text-[11px] font-bold ${completed ? 'text-emerald-600 dark:text-emerald-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                              {event.allDay ? "Dia Todo" : new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}
+                            </span>
+                          </div>
+                          <div>
+                            <p className={`font-semibold text-sm ${completed ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-800 dark:text-white'}`}>
+                              {event.title}
+                            </p>
+                            {event.isRoutine && (
+                              <span className="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 rounded">Rotina</span>
+                            )}
+                            {event.description && (
+                              <p className={`text-xs mt-0.5 line-clamp-2 ${completed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                                {event.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEditAgendaEvent(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Evento"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => onDeleteAgendaEvent && onDeleteAgendaEvent(event.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Evento"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Today Tasks */}
+                  {todayTasks.map((t) => (
+                    <div key={t.id} className={`group flex items-start justify-between p-3 rounded-lg border ${t.completed ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60' : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                      <div className="flex items-start gap-3">
+                        <button onClick={() => onUpdateTask && onUpdateTask(t.id, { completed: !t.completed })} className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${t.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-500 hover:border-indigo-500'}`}>
+                          {t.completed && <Check className="w-3 h-3" />}
+                        </button>
+                        <div>
+                          <p className={`font-semibold text-sm ${t.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-white'}`}>{t.title}</p>
+                          {t.description && <p className="text-xs text-slate-500 mt-0.5">{t.description}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => {
+                          setTaskFormData({ id: t.id, title: t.title, description: t.description || "", listId: t.listId, dueDate: t.dueDate || "" });
+                          setIsTaskModalOpen(true);
+                        }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => onDeleteTask && onDeleteTask(t.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

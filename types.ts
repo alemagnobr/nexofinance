@@ -220,6 +220,8 @@ export interface AgendaEvent {
   recurrencePeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom_days';
   recurrenceDays?: number[]; // 0=Sunday, 1=Monday... used for custom_days
   recurrenceEndDate?: string;
+  isRoutine?: boolean; // Se é uma rotina
+  completedDates?: string[]; // Datas (YYYY-MM-DD) em que foi concluído
   isGhost?: boolean;
   updatedAt?: string;
 }

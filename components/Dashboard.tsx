@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
 import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2 } from 'lucide-react';
-import { DailyRoutines } from './DailyRoutines';
 
 interface DashboardProps {
   data: AppData;
@@ -11,11 +10,6 @@ interface DashboardProps {
   onUnlockBadge: (id: string) => void;
   onNavigate: (view: View) => void;
   onToggleHabitEntry: (id: string, dayIndex: number, status: 'done' | 'missed', dateStr: string) => void;
-  onAddDailyRoutine: (title: string) => void;
-  onToggleDailyRoutine: (id: string, dateStr: string) => void;
-  onDeleteDailyRoutine: (id: string) => void;
-  onUpdateDailyRoutineOrder: (id: string, newOrder: number) => void;
-  onUpdateDailyRoutine: (id: string, newTitle: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
@@ -134,11 +128,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUnlockBadge, 
   onNavigate, 
   onToggleHabitEntry,
-  onAddDailyRoutine,
-  onToggleDailyRoutine,
-  onDeleteDailyRoutine,
-  onUpdateDailyRoutineOrder,
-  onUpdateDailyRoutine
 }) => {
   
   // History Chart State
@@ -1056,16 +1045,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           if (cardId === 'eisenhower') {
             return (
               <div key="eisenhower" className="h-full min-h-[180px]">
-                <DailyRoutines 
-                  routines={data.dailyRoutines || []}
-                  onAddRoutine={onAddDailyRoutine}
-                  onToggleRoutine={onToggleDailyRoutine}
-                  onDeleteRoutine={onDeleteDailyRoutine}
-                  onUpdateOrder={onUpdateDailyRoutineOrder}
-                  onUpdateRoutine={onUpdateDailyRoutine}
-                  compact={true}
-                  onNavigate={() => onNavigate(View.CALENDAR)}
-                />
+                {/* DailyRoutines has been removed per user request */}
               </div>
             );
           }

@@ -117,7 +117,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const toggleMenu = (menu: string) =>
-    setOpenMenus((prev) => ({ ...prev, [menu]: !prev[menu] }));
+    setOpenMenus((prev) => {
+      if (prev[menu]) {
+        // Se já está aberto, apenas fecha
+        return { ...prev, [menu]: false };
+      }
+      // Se vai abrir, fecha os outros
+      return {
+        planejamento: false,
+        financeiro: false,
+        utilidades: false,
+        [menu]: true,
+      };
+    });
 
   const handleNavClick = (view: View) => {
     onNavigate(view);
