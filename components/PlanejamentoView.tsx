@@ -3,7 +3,8 @@ import { View } from '../types';
 import { KanbanBoard } from './KanbanBoard';
 import { Notes } from './Notes';
 import { HabitTracker } from './HabitTracker';
-import { Wallet, StickyNote, Target, LayoutDashboard } from 'lucide-react';
+import { WorkGoalsView } from './WorkGoalsView';
+import { Wallet, StickyNote, Target, LayoutDashboard, TrendingUp } from 'lucide-react';
 
 interface PlanejamentoViewProps {
   currentView: View;
@@ -44,6 +45,13 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
       icon: StickyNote,
       activeClass: 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-500/30',
       inactiveClass: 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200'
+    },
+    { 
+      id: View.WORK_GOALS, 
+      label: 'Metas', 
+      icon: TrendingUp,
+      activeClass: 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200'
     },
   ];
 
@@ -102,8 +110,24 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
                 <p className="text-slate-500 dark:text-slate-400 text-sm">Crie e organize suas anotações com facilidade.</p>
               </div>
 
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => onNavigate(View.WORK_GOALS)}>
+                <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="w-8 h-8" />
+                  <h3 className="text-lg font-bold">Metas de Trabalho</h3>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Registre trabalhos e acompanhe suas metas de horas.</p>
+              </div>
+
             </div>
           </div>
+        )}
+        {currentView === View.WORK_GOALS && (
+          <WorkGoalsView 
+             goals={data.workGoals || []}
+             onAddGoal={actions.addWorkGoal}
+             onUpdateGoal={actions.updateWorkGoal}
+             onDeleteGoal={actions.deleteWorkGoal}
+          />
         )}
         {currentView === View.PRODUCTIVITY && (
           <HabitTracker 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play, Dumbbell, Apple } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -929,8 +929,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <Target className="w-5 h-5 text-purple-500" /> Produtividade
         </h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {['habits', 'eisenhower', 'notes'].map((cardId) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {['habits', 'eisenhower', 'notes', 'workgoals'].map((cardId) => {
           if (cardId === 'habits') {
             const todayStr = new Date().toISOString().split('T')[0];
             const activeHabits = data.habits || [];
@@ -1065,6 +1065,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
             );
           }
 
+          if (cardId === 'workgoals') {
+            const goals = data.workGoals || [];
+            
+            return (
+              <div key="workgoals" onClick={() => onNavigate(View.WORK_GOALS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
+                  <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-emerald-500" /> Metas de Trab.
+                      </h3>
+                      <button 
+                          onClick={(e) => { e.stopPropagation(); onNavigate(View.WORK_GOALS); }}
+                          className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-1 rounded transition-colors"
+                          title="Ver todas"
+                      >
+                          <ArrowRight className="w-4 h-4" />
+                      </button>
+                  </div>
+                  
+                  {goals.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                          <TrendingUp className="w-6 h-6 opacity-30" />
+                          <p className="text-xs italic text-center">Nenhuma meta cadastrada.</p>
+                      </div>
+                  ) : (
+                      <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar max-h-[120px]">
+                          {goals.slice(0, 3).map(goal => {
+                              const progress = Math.min((goal.completedHours / goal.targetHours) * 100, 100);
+                              return (
+                                  <div key={goal.id} className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                                      <div className="flex justify-between items-center mb-1">
+                                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{goal.title}</span>
+                                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{progress.toFixed(0)}%</span>
+                                      </div>
+                                      <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-1 overflow-hidden">
+                                          <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${progress}%` }} />
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  )}
+              </div>
+            );
+          }
+
           if (cardId === 'notes') return (
         <div key="notes" onClick={() => onNavigate(View.NOTES)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
             {/* Card 5: Notes Widget */}
@@ -1109,6 +1154,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           return null;
         })}
+      </div>
+
+      {/* --- SAÚDE --- */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <Activity className="w-5 h-5 text-rose-500" /> Saúde & Bem-estar
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div onClick={() => onNavigate(View.TREINO)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 text-sm font-bold uppercase">
+                    <Dumbbell className="w-4 h-4" /> Treinos
+                </div>
+                <ArrowRight className="w-4 h-4 text-orange-400" />
+            </div>
+            <p className="text-xs text-slate-500">Registre treinos, cronogramas e rotina diária.</p>
+        </div>
+        <div onClick={() => onNavigate(View.DIETA)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-bold uppercase">
+                    <Apple className="w-4 h-4" /> Dieta
+                </div>
+                <ArrowRight className="w-4 h-4 text-green-400" />
+            </div>
+            <p className="text-xs text-slate-500">Monitore calorias e cálculo IA de macronutrientes.</p>
+        </div>
       </div>
       
       {/* --- DESKTOP VIEW (GRID) --- */}

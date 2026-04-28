@@ -296,6 +296,7 @@ export interface AppData {
   tasks: Task[]; // Novo campo: Tarefas
   pixKeys: PixKey[]; // Novo campo: Chaves Pix
   habits: Habit[]; // Novo campo: Hábitos
+  workGoals?: WorkGoal[]; // Metas de Trabalho
   dailyRoutines?: DailyRoutine[]; // Checklists diárias que resetam
   unlockedBadges: string[];
   wallets?: Wallet[]; // Novo campo: Carteiras/Bancos
@@ -312,6 +313,7 @@ export enum View {
   FINANCEIRO_DASHBOARD = 'FINANCEIRO_DASHBOARD',
   PLANEJAMENTO_DASHBOARD = 'PLANEJAMENTO_DASHBOARD',
   UTILIDADES_DASHBOARD = 'UTILIDADES_DASHBOARD',
+  SAUDE_DASHBOARD = 'SAUDE_DASHBOARD',
   TRANSACTIONS = 'TRANSACTIONS',
   INVESTMENTS = 'INVESTMENTS',
   BUDGETS = 'BUDGETS',
@@ -327,6 +329,9 @@ export enum View {
   PIX_KEYS = 'PIX_KEYS',
   PRODUCTIVITY = 'PRODUCTIVITY',
   DAILY_ROUTINES = 'DAILY_ROUTINES',
+  WORK_GOALS = 'WORK_GOALS',
+  TREINO = 'TREINO',
+  DIETA = 'DIETA',
   WALLETS = 'WALLETS', // Gerenciamento de Carteiras
   SETTINGS = 'SETTINGS'
 }
@@ -339,4 +344,13 @@ export interface DailyRoutine {
   order?: number;
   time?: string; // HH:mm
   eventId?: string; // Links to agenda event
+}
+
+export interface WorkGoal {
+  id: string;
+  title: string;
+  targetHours: number;
+  completedHours: number;
+  deadline?: string;
+  createdAt: string;
 }

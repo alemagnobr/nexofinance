@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronRight,
   CheckSquare,
+  Activity,
 } from "lucide-react";
 import { View } from "../types";
 import { useFocus } from "../contexts/FocusContext";
@@ -182,6 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     View.KANBAN,
     View.NOTES,
     View.PRODUCTIVITY,
+    View.WORK_GOALS,
   ].includes(currentView);
   const isUtilitiesActive = [
     View.UTILIDADES_DASHBOARD,
@@ -190,6 +192,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ].includes(
     currentView,
   );
+  const isSaudeActive = [
+    View.SAUDE_DASHBOARD,
+    View.TREINO,
+    View.DIETA
+  ].includes(currentView);
 
   return (
     <nav
@@ -297,6 +304,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleNavClick(View.UTILIDADES_DASHBOARD)}
           icon={CheckSquare}
           label="Utilidades"
+        />
+
+        <NavItem
+          active={isSaudeActive}
+          onClick={() => handleNavClick(View.SAUDE_DASHBOARD)}
+          icon={Activity}
+          label="Saúde"
         />
 
         {/* Focus Mode & NEXO AI Side-by-Side */}

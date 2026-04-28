@@ -21,6 +21,7 @@ import {
   Habit,
   Wallet,
   DailyRoutine,
+  WorkGoal,
 } from "../types";
 import {
   addTransactionFire,
@@ -1327,6 +1328,31 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       }));
   };
 
+  const addWorkGoal = async (goal: WorkGoal) => {
+    if (user) {
+      // For now, save locally to 'data', or we can optionally implement Firebase later.
+      // Since it's a simple app, let's keep it in local state for guest or directly update data
+    }
+    setData((prev) => ({
+      ...prev,
+      workGoals: [...(prev.workGoals || []), goal],
+    }));
+  };
+
+  const updateWorkGoal = async (id: string, partial: Partial<WorkGoal>) => {
+    setData((prev) => ({
+      ...prev,
+      workGoals: (prev.workGoals || []).map((g) => (g.id === id ? { ...g, ...partial } : g)),
+    }));
+  };
+
+  const deleteWorkGoal = async (id: string) => {
+    setData((prev) => ({
+      ...prev,
+      workGoals: (prev.workGoals || []).filter((g) => g.id !== id),
+    }));
+  };
+
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
@@ -1412,6 +1438,9 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       deleteTask,
       addCategory,
       deleteCategory,
+      addWorkGoal,
+      updateWorkGoal,
+      deleteWorkGoal,
       unlockBadge,
       saveWealthProfile,
       setDriveLink,

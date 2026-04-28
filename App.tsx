@@ -47,6 +47,7 @@ import { SettingsView } from "./components/SettingsView";
 import { FinanceiroView } from "./components/FinanceiroView";
 import { PlanejamentoView } from "./components/PlanejamentoView";
 import { UtilitiesView } from "./components/UtilitiesView";
+import { SaudeView } from "./components/SaudeView";
 import { FinancialCalendar } from "./components/FinancialCalendar";
 
 const PIX_KEY = "028.268.001-24";
@@ -347,7 +348,7 @@ const App: React.FC = () => {
     }
 
     // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower)
-    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
+    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS].includes(currentView)) {
       return (
         <PlanejamentoView
           currentView={currentView}
@@ -405,6 +406,18 @@ const App: React.FC = () => {
           privacyMode={privacyMode}
           hasApiKey={hasKey}
           quickActionSignal={quickActionSignal}
+        />
+      );
+    }
+
+    // 6. Group: Saude (Treino, Dieta)
+    if ([View.SAUDE_DASHBOARD, View.TREINO, View.DIETA].includes(currentView)) {
+      return (
+        <SaudeView
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          data={data}
+          actions={actions}
         />
       );
     }
