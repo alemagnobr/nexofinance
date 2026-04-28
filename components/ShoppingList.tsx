@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, ShoppingCategory } from '../types';
-import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar, History } from 'lucide-react';
 import { generateShoppingListFromRecipe } from '../services/geminiService';
 import { CurrencyInput } from './CurrencyInput';
 
@@ -35,7 +35,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItemCategory, setNewItemCategory] = useState<ShoppingCategory>('Outros');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [newItemDate, setNewItemDate] = useState(new Date().toISOString().split('T')[0]);
   const [newItemObservation, setNewItemObservation] = useState('');
+  
+  const [activeTab, setActiveTab] = useState<'list' | 'timeline'>('list');
   
   // Edit Item Modal
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
@@ -80,6 +83,31 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           groups[cat].push(item);
       });
       return groups;
+  }, [filteredItems]);
+
+  // Timeline Data
+  const timelineData = useMemo(() => {
+    const dates: Record<string, { total: number; items: ShoppingItem[] }> = {};
+    filteredItems.forEach(item => {
+        if (item.purchaseDate && item.actualPrice > 0) {
+            if (!dates[item.purchaseDate]) {
+                dates[item.purchaseDate] = { total: 0, items: [] };
+            }
+            dates[item.purchaseDate].total += (item.actualPrice * item.quantity);
+            dates[item.purchaseDate].items.push(item);
+        }
+    });
+    return Object.entries(dates)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, data]) => {
+            const [y, m, d] = date.split('-');
+            return {
+                fullDate: date,
+                formatted: `${d}/${m}/${y}`,
+                total: data.total,
+                items: data.items
+            };
+        });
   }, [filteredItems]);
 
   const handlePrevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -131,7 +159,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       isChecked: false,
       category: newItemCategory,
       observation: newItemObservation.trim() || undefined,
-      month: monthStr
+      month: newItemDate.slice(0, 7), // Use the chosen date's month
+      purchaseDate: newItemDate
     });
     setNewItemName('');
     setNewItemCategory('Outros'); // Reset to default
@@ -147,7 +176,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
           name: editingItem.name.trim(),
           category: editingItem.category,
           actualPrice: editingItem.actualPrice,
-          observation: editingItem.observation
+          observation: editingItem.observation,
+          purchaseDate: editingItem.purchaseDate,
+          month: editingItem.purchaseDate?.slice(0, 7)
       });
       setEditingItem(null);
   };
@@ -325,8 +356,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                        />
                    </div>
                    
-                   <div className="flex gap-4">
-                       <div className="flex-1">
+                   <div className="grid grid-cols-2 gap-4">
+                       <div>
                            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Categoria</label>
                            <select 
                               value={editingItem.category}
@@ -336,17 +367,27 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                               {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                            </select>
                        </div>
-                       <div className="flex-1">
-                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço (Unidade)</label>
-                           <div className="relative">
-                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                               <input 
-                                  type="text" 
-                                  value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  onChange={(e) => setEditingItem({...editingItem, actualPrice: parseCurrencyInput(e.target.value)})}
-                                  className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold"
-                               />
-                           </div>
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Data da Compra</label>
+                           <input 
+                              type="date"
+                              value={editingItem.purchaseDate || ''}
+                              onChange={(e) => setEditingItem({...editingItem, purchaseDate: e.target.value})}
+                              className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           />
+                       </div>
+                   </div>
+                   
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço (Unidade)</label>
+                       <div className="relative">
+                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                           <CurrencyInput 
+                              placeholder="0,00"
+                              value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice.toString()}
+                              onChangeValue={(val) => setEditingItem({...editingItem, actualPrice: parseFloat(val) || 0})}
+                              className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold"
+                           />
                        </div>
                    </div>
 
@@ -403,7 +444,20 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <ShoppingCart className="w-7 h-7 text-indigo-600" />
                     Lista de Compras
                 </h2>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">Organize sua ida ao mercado.</p>
+                <div className="flex items-center gap-4 mt-1">
+                    <button 
+                        onClick={() => setActiveTab('list')}
+                        className={`text-sm font-bold flex items-center gap-1.5 transition-colors ${activeTab === 'list' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <List className="w-4 h-4" /> Lista
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('timeline')}
+                        className={`text-sm font-bold flex items-center gap-1.5 transition-colors ${activeTab === 'timeline' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        <History className="w-4 h-4" /> Linha do Tempo
+                    </button>
+                </div>
              </div>
              <div className="flex flex-wrap items-center gap-2">
                  <button 
@@ -543,6 +597,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
          <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
                <input 
+                  type="date"
+                  value={newItemDate}
+                  onChange={(e) => {
+                      setNewItemDate(e.target.value);
+                      const selectedMonth = e.target.value.slice(0, 7);
+                      if (selectedMonth !== monthStr) {
+                          const [y, m] = selectedMonth.split('-').map(Number);
+                          setCurrentDate(new Date(y, m - 1, 1));
+                      }
+                  }}
+                  className="w-full p-3 text-sm rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+               />
+            </div>
+            <div className="flex-[2]">
+               <input 
                   type="text"
                   value={newItemObservation}
                   onChange={(e) => setNewItemObservation(e.target.value)}
@@ -562,13 +631,59 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
          </div>
       </form>
 
-      {/* LIST (GROUPED BY CATEGORY) */}
+      {/* LIST (GROUPED BY CATEGORY) OR TIMELINE */}
       <div className="space-y-6">
          {filteredItems.length === 0 ? (
             <div className="p-12 text-center text-slate-400 flex flex-col items-center bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                <ShoppingCart className="w-16 h-16 mb-4 opacity-20" />
                <p className="font-medium text-slate-800 dark:text-white">Sua lista para {formatMonth(currentDate)} está vazia.</p>
                {hasApiKey && <p className="text-sm mt-2 text-purple-500 cursor-pointer hover:underline" onClick={() => setIsAiModalOpen(true)}>Experimente usar a IA para criar uma lista!</p>}
+            </div>
+         ) : activeTab === 'timeline' ? (
+            <div className="space-y-4">
+                {timelineData.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                        <History className="w-12 h-12 mb-3 mx-auto opacity-20" />
+                        <p>Nenhuma compra com valor e data registrada neste mês.</p>
+                    </div>
+                ) : (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Histórico de Valores</h3>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {timelineData.map((item, idx) => (
+                                <div key={idx} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                                <Calendar className="w-4 h-4" />
+                                            </div>
+                                            <span className="font-medium text-slate-700 dark:text-slate-200">{item.formatted}</span>
+                                        </div>
+                                        <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">{formatValue(item.total)}</span>
+                                    </div>
+                                    <div className="pl-11 space-y-2">
+                                        {item.items.map(product => (
+                                            <div key={product.id} className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-600 dark:text-slate-300">
+                                                    {product.name} {product.quantity > 1 ? <span className="text-xs text-slate-400 ml-1">({product.quantity}x)</span> : ''}
+                                                </span>
+                                                <span className="text-slate-500 font-medium">
+                                                    {formatValue(product.actualPrice * product.quantity)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 border-t border-indigo-100 dark:border-indigo-800 flex justify-between items-center">
+                            <span className="text-sm font-bold text-indigo-800 dark:text-indigo-300">Total do Período</span>
+                            <span className="text-xl font-black text-indigo-700 dark:text-indigo-200">{formatValue(total)}</span>
+                        </div>
+                    </div>
+                )}
             </div>
          ) : (
             SHOPPING_CATEGORIES.map(category => {
@@ -606,11 +721,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                        <span className={`font-medium text-lg truncate ${item.isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
                                           {item.name}
                                        </span>
-                                       {item.observation && (
-                                          <span className={`text-xs truncate ${item.isChecked ? 'text-slate-400/70' : 'text-slate-500 dark:text-slate-400'}`}>
-                                             {item.observation}
-                                          </span>
-                                       )}
+                                       <div className="flex items-center gap-2 flex-wrap text-xs">
+                                           {item.purchaseDate && (
+                                              <span className={`flex items-center gap-1 ${item.isChecked ? 'text-slate-400/70' : 'text-indigo-500 font-medium'}`}>
+                                                 <Calendar className="w-3 h-3" />
+                                                 {item.purchaseDate.split('-').reverse().join('/')}
+                                              </span>
+                                           )}
+                                           {item.observation && (
+                                              <span className={`truncate ${item.isChecked ? 'text-slate-400/70' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                 {item.observation}
+                                              </span>
+                                           )}
+                                       </div>
                                     </div>
                                  </div>
 

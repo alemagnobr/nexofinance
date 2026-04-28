@@ -36,6 +36,7 @@ export interface Transaction {
   type: TransactionType;
   category: string;
   date: string;
+  time?: string;
   status: TransactionStatus;
   isRecurring?: boolean;
   paymentMethod?: PaymentMethod;
@@ -106,6 +107,7 @@ export interface ShoppingItem {
   category?: ShoppingCategory; // Novo campo
   observation?: string; // Observação opcional
   month?: string; // Formato "YYYY-MM" para histórico mensal
+  purchaseDate?: string; // Data da compra (YYYY-MM-DD)
 }
 
 // --- KANBAN TYPES ---
@@ -217,7 +219,7 @@ export interface AgendaEvent {
   endDate: string; // ISO datetime or YYYY-MM-DD
   allDay: boolean;
   isRecurring?: boolean;
-  recurrencePeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom_days';
+  recurrencePeriod?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom_days' | 'every_other_day';
   recurrenceDays?: number[]; // 0=Sunday, 1=Monday... used for custom_days
   recurrenceEndDate?: string;
   isRoutine?: boolean; // Se é uma rotina
@@ -269,6 +271,9 @@ export interface Habit {
   icon: string;
   color: string;
   createdAt: string;
+  startDate?: string;
+  description?: string;
+  punishment?: number; // Punição em dias (1 a 5)
   targetDays: number; // Quantidade de dias escolhida
   entries: Record<number, HabitEntry>; // dayIndex (0 to targetDays-1) -> entry
   completedDates?: string[]; // Legacy
@@ -304,6 +309,9 @@ export interface AppData {
 
 export enum View {
   DASHBOARD = 'DASHBOARD',
+  FINANCEIRO_DASHBOARD = 'FINANCEIRO_DASHBOARD',
+  PLANEJAMENTO_DASHBOARD = 'PLANEJAMENTO_DASHBOARD',
+  UTILIDADES_DASHBOARD = 'UTILIDADES_DASHBOARD',
   TRANSACTIONS = 'TRANSACTIONS',
   INVESTMENTS = 'INVESTMENTS',
   BUDGETS = 'BUDGETS',

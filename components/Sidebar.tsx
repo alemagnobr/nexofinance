@@ -112,7 +112,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
     planejamento: false,
-    financeiro: false,
     utilidades: false,
   });
 
@@ -167,12 +166,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   // Group Logic Helpers to determine active state
+  const isFinanceiroActive = [
+    View.FINANCEIRO_DASHBOARD,
+    View.TRANSACTIONS,
+    View.SUBSCRIPTIONS,
+    View.DEBTS,
+    View.INVESTMENTS,
+    View.BUDGETS,
+    View.WEALTH_PLANNER,
+    View.PIX_KEYS,
+  ].includes(currentView);
+  
   const isProductivityActive = [
+    View.PLANEJAMENTO_DASHBOARD,
     View.KANBAN,
     View.NOTES,
     View.PRODUCTIVITY,
   ].includes(currentView);
-  const isUtilitiesActive = [View.SHOPPING_LIST, View.PASSWORDS].includes(
+  const isUtilitiesActive = [
+    View.UTILIDADES_DASHBOARD,
+    View.SHOPPING_LIST, 
+    View.PASSWORDS
+  ].includes(
     currentView,
   );
 
@@ -263,131 +278,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label="Agenda"
         />
 
-        <button
-          onClick={() => toggleMenu("financeiro")}
-          className="w-full flex items-center justify-between px-2 mb-2 mt-4 group"
-        >
-          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider group-hover:text-indigo-300 transition-colors">
-            Financeiro
-          </span>
-          {openMenus.financeiro ? (
-            <ChevronDown className="w-3 h-3 text-indigo-400/50" />
-          ) : (
-            <ChevronRight className="w-3 h-3 text-indigo-400/50" />
-          )}
-        </button>
-        {openMenus.financeiro && (
-          <div className="space-y-1 pl-2 border-l border-slate-800/50 ml-2 mb-2">
-            <NavItem
-              active={currentView === View.TRANSACTIONS}
-              onClick={() => handleNavClick(View.TRANSACTIONS)}
-              icon={ArrowLeftRight}
-              label="Transações"
-            />
-            <NavItem
-              active={currentView === View.SUBSCRIPTIONS}
-              onClick={() => handleNavClick(View.SUBSCRIPTIONS)}
-              icon={Repeat}
-              label="Assinaturas"
-            />
-            <NavItem
-              active={currentView === View.DEBTS}
-              onClick={() => handleNavClick(View.DEBTS)}
-              icon={ShieldAlert}
-              label="Gestão de Dívidas"
-            />
-            <NavItem
-              active={currentView === View.INVESTMENTS}
-              onClick={() => handleNavClick(View.INVESTMENTS)}
-              icon={LineChart}
-              label="Investimentos"
-            />
-            <NavItem
-              active={currentView === View.BUDGETS}
-              onClick={() => handleNavClick(View.BUDGETS)}
-              icon={Target}
-              label="Orçamentos"
-            />
-            <NavItem
-              active={currentView === View.WEALTH_PLANNER}
-              onClick={() => handleNavClick(View.WEALTH_PLANNER)}
-              icon={Landmark}
-              label="Patrimônio"
-            />
-            <NavItem
-              active={currentView === View.PIX_KEYS}
-              onClick={() => handleNavClick(View.PIX_KEYS)}
-              icon={Key}
-              label="Chaves Pix"
-            />
-          </div>
-        )}
+        <NavItem
+          active={isFinanceiroActive}
+          onClick={() => handleNavClick(View.FINANCEIRO_DASHBOARD)}
+          icon={Landmark}
+          label="Financeiro"
+        />
 
-        <button
-          onClick={() => toggleMenu("planejamento")}
-          className="w-full flex items-center justify-between px-2 mb-2 mt-4 group"
-        >
-          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider group-hover:text-emerald-300 transition-colors">
-            Planejamento
-          </span>
-          {openMenus.planejamento ? (
-            <ChevronDown className="w-3 h-3 text-emerald-400/50" />
-          ) : (
-            <ChevronRight className="w-3 h-3 text-emerald-400/50" />
-          )}
-        </button>
-        {openMenus.planejamento && (
-          <div className="space-y-1 pl-2 border-l border-slate-800/50 ml-2 mb-2">
-            <NavItem
-              active={currentView === View.PRODUCTIVITY}
-              onClick={() => handleNavClick(View.PRODUCTIVITY)}
-              icon={Target}
-              label="Hábitos"
-            />
-            <NavItem
-              active={currentView === View.KANBAN}
-              onClick={() => handleNavClick(View.KANBAN)}
-              icon={Wallet}
-              label="NEXO Flow"
-            />
-            <NavItem
-              active={currentView === View.NOTES}
-              onClick={() => handleNavClick(View.NOTES)}
-              icon={StickyNote}
-              label="NEXO Notes"
-            />
-          </div>
-        )}
+        <NavItem
+          active={isProductivityActive}
+          onClick={() => handleNavClick(View.PLANEJAMENTO_DASHBOARD)}
+          icon={Target}
+          label="Planejamento"
+        />
 
-        <button
-          onClick={() => toggleMenu("utilidades")}
-          className="w-full flex items-center justify-between px-2 mb-2 mt-4 group"
-        >
-          <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider group-hover:text-pink-300 transition-colors">
-            Utilidades
-          </span>
-          {openMenus.utilidades ? (
-            <ChevronDown className="w-3 h-3 text-pink-400/50" />
-          ) : (
-            <ChevronRight className="w-3 h-3 text-pink-400/50" />
-          )}
-        </button>
-        {openMenus.utilidades && (
-          <div className="space-y-1 pl-2 border-l border-slate-800/50 ml-2 mb-2">
-            <NavItem
-              active={currentView === View.SHOPPING_LIST}
-              onClick={() => handleNavClick(View.SHOPPING_LIST)}
-              icon={ShoppingCart}
-              label="Lista de Compras"
-            />
-            <NavItem
-              active={currentView === View.PASSWORDS}
-              onClick={() => handleNavClick(View.PASSWORDS)}
-              icon={Key}
-              label="Cofre de Senhas"
-            />
-          </div>
-        )}
+        <NavItem
+          active={isUtilitiesActive}
+          onClick={() => handleNavClick(View.UTILIDADES_DASHBOARD)}
+          icon={CheckSquare}
+          label="Utilidades"
+        />
 
         {/* Focus Mode & NEXO AI Side-by-Side */}
         <div className="mt-6 pt-4 border-t border-slate-800 grid grid-cols-2 gap-2">

@@ -23,7 +23,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
 }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
+  const [formData, setFormData] = useState({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21, startDate: new Date().toISOString().split('T')[0], description: '', punishment: 0 });
   
   // Entry Modal State
   const [entryModal, setEntryModal] = useState<{ habitId: string, dayIndex: number, status: 'done' | 'missed', date: string } | null>(null);
@@ -32,18 +32,42 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
     if (!formData.name.trim() || formData.targetDays < 1) return;
     
     if (editingId) {
-      onUpdate(editingId, { name: formData.name, icon: formData.icon, color: formData.color, targetDays: formData.targetDays });
+      onUpdate(editingId, { 
+          name: formData.name, 
+          icon: formData.icon, 
+          color: formData.color, 
+          targetDays: formData.targetDays,
+          startDate: formData.startDate,
+          description: formData.description,
+          punishment: formData.punishment
+      });
     } else {
-      onAdd({ name: formData.name, icon: formData.icon, color: formData.color, targetDays: formData.targetDays });
+      onAdd({ 
+          name: formData.name, 
+          icon: formData.icon, 
+          color: formData.color, 
+          targetDays: formData.targetDays,
+          startDate: formData.startDate,
+          description: formData.description,
+          punishment: formData.punishment
+      });
     }
     
     setIsAdding(false);
     setEditingId(null);
-    setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
+    setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21, startDate: new Date().toISOString().split('T')[0], description: '', punishment: 0 });
   };
 
   const startEdit = (habit: Habit) => {
-    setFormData({ name: habit.name, icon: habit.icon, color: habit.color, targetDays: habit.targetDays || 21 });
+    setFormData({ 
+        name: habit.name, 
+        icon: habit.icon, 
+        color: habit.color, 
+        targetDays: habit.targetDays || 21,
+        startDate: habit.startDate || new Date().toISOString().split('T')[0],
+        description: habit.description || '',
+        punishment: habit.punishment || 0
+    });
     setEditingId(habit.id);
     setIsAdding(true);
   };
@@ -72,7 +96,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
         </div>
         <button
           onClick={() => {
-            setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21 });
+            setFormData({ name: '', icon: '🎯', color: '#3b82f6', targetDays: 21, startDate: new Date().toISOString().split('T')[0], description: '', punishment: 0 });
             setIsAdding(true);
             setEditingId(null);
           }}
@@ -93,7 +117,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Hábito</label>
               <input
@@ -107,6 +131,16 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
             </div>
             
             <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data Inicial</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dias (Meta)</label>
               <input
                 type="number"
@@ -119,17 +153,40 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cor</label>
-              <div className="flex flex-wrap gap-2">
-                {COLORS.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setFormData({ ...formData, color })}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform ${formData.color === color ? 'scale-110 ring-2 ring-offset-2 dark:ring-offset-slate-800 ring-indigo-500' : 'hover:scale-110'}`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Punição (Falha)</label>
+              <input
+                type="number"
+                value={formData.punishment}
+                onChange={(e) => setFormData({ ...formData, punishment: Math.max(0, Math.min(5, parseInt(e.target.value) || 0)) })}
+                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="0 a 5 dias"
+                min="0"
+                max="5"
+              />
+            </div>
+          </div>
+          
+          <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações (Opcional)</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-20"
+                placeholder="Descreva o porquê de fazer esse hábito..."
+              />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cor</label>
+            <div className="flex flex-wrap gap-2">
+              {COLORS.map(color => (
+                <button
+                  key={color}
+                  onClick={() => setFormData({ ...formData, color })}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform ${formData.color === color ? 'scale-110 ring-2 ring-offset-2 dark:ring-offset-slate-800 ring-indigo-500' : 'hover:scale-110'}`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
             </div>
           </div>
 
@@ -202,11 +259,28 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-slate-800 dark:text-white break-words">{habit.name}</h4>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                      <div className="flex items-center gap-2 flex-wrap text-[10px] sm:text-xs text-slate-500 mt-1">
+                        {habit.startDate && (
+                            <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400 bg-slate-200/50 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
+                                <CalendarIcon className="w-3 h-3" />
+                                {habit.startDate.split('-').reverse().join('/')}
+                            </span>
+                        )}
                         <span>Meta: {targetDays} dias</span>
                         <span>•</span>
                         <span className="text-emerald-600 dark:text-emerald-400 font-medium">{completedCount} concluídos</span>
+                        {!!habit.punishment && (
+                           <>
+                              <span>•</span>
+                              <span className="text-red-500 font-medium bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">Punição: +{habit.punishment}</span>
+                           </>
+                        )}
                       </div>
+                      {habit.description && (
+                          <div className="mt-1.5 text-xs text-slate-600 dark:text-slate-400 italic">
+                             {habit.description}
+                          </div>
+                      )}
                     </div>
                   </div>
                   

@@ -1067,18 +1067,31 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     const habit = data.habits.find((h) => h.id === id);
     if (!habit) return;
 
+    const currentEntry = habit.entries[dayIndex];
+    const isCurrentlyMissed = currentEntry?.status === 'missed';
+    const isBecomingMissed = status === 'missed';
+
+    let newTargetDays = habit.targetDays || 21;
+    const punishment = habit.punishment || 0;
+
+    if (!isCurrentlyMissed && isBecomingMissed) {
+        newTargetDays += punishment;
+    } else if (isCurrentlyMissed && !isBecomingMissed) {
+        newTargetDays = Math.max(1, newTargetDays - punishment);
+    }
+
     const newEntries = {
       ...habit.entries,
       [dayIndex]: { status, date: dateStr },
     };
 
     if (user) {
-      await updateHabitFire(user.uid, id, { entries: newEntries });
+      await updateHabitFire(user.uid, id, { entries: newEntries, targetDays: newTargetDays });
     } else {
       setData((prev) => ({
         ...prev,
         habits: prev.habits.map((h) =>
-          h.id === id ? { ...h, entries: newEntries } : h,
+          h.id === id ? { ...h, entries: newEntries, targetDays: newTargetDays } : h,
         ),
       }));
     }

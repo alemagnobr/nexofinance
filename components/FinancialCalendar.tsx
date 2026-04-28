@@ -40,11 +40,18 @@ import {
   Repeat,
   CheckSquare,
   Moon,
+  Banknote,
 } from "lucide-react";
 import { updateTransactionFire } from "../services/storageService";
 import { auth } from "../services/firebase";
 import { AIAgendaAssistant } from "./AIAgendaAssistant";
 import { CurrencyInput } from "./CurrencyInput";
+
+import { AddTransactionModal } from "./calendar/AddTransactionModal";
+import { AddAgendaEventModal } from "./calendar/AddAgendaEventModal";
+import { AddTaskModal } from "./calendar/AddTaskModal";
+import { ListManagerModal } from "./calendar/ListManagerModal";
+import { DetailsSidebar } from "./calendar/DetailsSidebar";
 
 interface FinancialCalendarProps {
   transactions: Transaction[];
@@ -159,6 +166,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingListName, setEditingListName] = useState("");
@@ -172,6 +180,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     isRecurring: false,
     recurrencePeriod: "daily" as
       | "daily"
+      | "every_other_day"
       | "weekly"
       | "monthly"
       | "yearly"
@@ -198,6 +207,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     paymentMethod: "credit_card" as PaymentMethod,
     status: "pending" as TransactionStatus,
     observation: "",
+    time: "",
   });
 
   const year = currentDate.getFullYear();
@@ -395,6 +405,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
           e.recurrencePeriod === "custom_days"
         ) {
           currentInstanceStart.setDate(currentInstanceStart.getDate() + 1);
+        } else if (e.recurrencePeriod === "every_other_day") {
+          currentInstanceStart.setDate(currentInstanceStart.getDate() + 2);
         } else if (e.recurrencePeriod === "weekly") {
           currentInstanceStart.setDate(currentInstanceStart.getDate() + 7);
         } else if (e.recurrencePeriod === "monthly") {
@@ -426,9 +438,18 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         if (a.status === "pending" && b.status === "paid") return 1;
 
         // 2. Custom order
-        const orderA = a.order || 0;
-        const orderB = b.order || 0;
-        return orderA - orderB;
+        if (a.order !== undefined || b.order !== undefined) {
+          const orderA = a.order || 0;
+          const orderB = b.order || 0;
+          return orderA - orderB;
+        }
+
+        // 3. Time
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        if (a.time && !b.time) return -1; // timed before all-day
+        if (!a.time && b.time) return 1;
+
+        return 0;
       });
   }, [displayedTransactions, selectedDay]);
 
@@ -547,7 +568,9 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   };
 
   const handleOpenModal = () => {
-    if (!selectedDay || !onAddTask || !onUpdateTask) return;
+    if (!selectedDay) {
+      setSelectedDay(new Date().getDate());
+    }
     // Reset form
     setFormData({
       description: "",
@@ -557,12 +580,15 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       paymentMethod: "credit_card",
       status: "pending",
       observation: "",
+      time: "",
     });
     setIsModalOpen(true);
   };
 
   const handleOpenAgendaModal = () => {
-    if (!selectedDay) return;
+    if (!selectedDay) {
+      setSelectedDay(new Date().getDate());
+    }
     setAgendaFormData({
       id: "",
       title: "",
@@ -675,6 +701,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       type: formData.type,
       category: formData.category,
       date: dateStr,
+      time: formData.time || undefined,
       status: formData.status,
       paymentMethod: formData.paymentMethod,
       isRecurring: false, // Simple add via calendar is usually one-off
@@ -685,8 +712,12 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   };
 
   const handleOpenTaskModal = () => {
-    if (!selectedDay) return;
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`;
+    let day = selectedDay;
+    if (!day) {
+      day = new Date().getDate();
+      setSelectedDay(day);
+    }
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setTaskFormData({
       id: "",
       title: "",
@@ -942,774 +973,60 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       )}
 
       {/* ADD TRANSACTION MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  Nova Transação
-                </h3>
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
-                  <CalendarClock className="w-3 h-3" />
-                  {selectedDay} de{" "}
-                  {currentDate.toLocaleDateString("pt-BR", {
-                    month: "long",
-                  })}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  O que é?
-                </label>
-                <div className="relative">
-                  <AlignLeft className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    autoFocus
-                    required
-                    type="text"
-                    placeholder="Ex: Mercado, Conta de Luz..."
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        description: e.target.value,
-                      })
-                    }
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                    Valor (R$)
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                    <CurrencyInput
-                      required
-                      placeholder="0,00"
-                      value={formData.amount}
-                      onChangeValue={(val) =>
-                        setFormData({ ...formData, amount: val })
-                      }
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                    Tipo
-                  </label>
-                  <div className="flex bg-slate-100 dark:bg-slate-700 rounded-xl p-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, type: "expense" })
-                      }
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "expense" ? "bg-white dark:bg-slate-600 text-rose-600 shadow-sm" : "text-slate-500"}`}
-                    >
-                      Saída
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({ ...formData, type: "income" })
-                      }
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors ${formData.type === "income" ? "bg-white dark:bg-slate-600 text-emerald-600 shadow-sm" : "text-slate-500"}`}
-                    >
-                      Entrada
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                    Categoria
-                  </label>
-                  <div className="relative">
-                    <Tag className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                    <select
-                      value={formData.category}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          category: e.target.value,
-                        })
-                      }
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                    Pagamento
-                  </label>
-                  <div className="relative">
-                    <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                    <select
-                      value={formData.paymentMethod}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          paymentMethod: e.target.value as PaymentMethod,
-                        })
-                      }
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
-                    >
-                      {PAYMENT_METHODS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
-                  Status
-                </label>
-                <div className="flex gap-3">
-                  <label
-                    className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "paid" ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-700"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="status"
-                      className="hidden"
-                      checked={formData.status === "paid"}
-                      onChange={() =>
-                        setFormData({ ...formData, status: "paid" })
-                      }
-                    />
-                    <Check className="w-4 h-4" />
-                    <span className="text-sm font-semibold">
-                      Pago / Recebido
-                    </span>
-                  </label>
-                  <label
-                    className={`flex-1 cursor-pointer border rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${formData.status === "pending" ? "bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-900/20" : "border-slate-200 dark:border-slate-700"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="status"
-                      className="hidden"
-                      checked={formData.status === "pending"}
-                      onChange={() =>
-                        setFormData({ ...formData, status: "pending" })
-                      }
-                    />
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm font-semibold">Pendente</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Observações (Opcional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Detalhes adicionais..."
-                  value={formData.observation}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      observation: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-              >
-                <Plus className="w-5 h-5" /> Adicionar Transação
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddTransactionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        formData={formData}
+        setFormData={setFormData}
+        onSubmit={handleSubmit}
+        selectedDay={selectedDay}
+        currentDate={currentDate}
+        categories={CATEGORIES}
+        paymentMethods={PAYMENT_METHODS}
+      />
 
       {/* ADD AGENDA EVENT MODAL */}
-      {isAgendaModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  {agendaFormData.id ? "Editar Evento" : "Novo Evento"}
-                </h3>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                  <CalendarClock className="w-3 h-3" />
-                  {selectedDay} de{" "}
-                  {currentDate.toLocaleDateString("pt-BR", {
-                    month: "long",
-                  })}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsAgendaModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAgendaSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Título
-                </label>
-                <input
-                  autoFocus
-                  required
-                  type="text"
-                  placeholder="Ex: Reunião, Consulta..."
-                  value={agendaFormData.title}
-                  onChange={(e) =>
-                    setAgendaFormData({
-                      ...agendaFormData,
-                      title: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agendaFormData.allDay}
-                    onChange={(e) =>
-                      setAgendaFormData({
-                        ...agendaFormData,
-                        allDay: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                  />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Dia inteiro
-                  </span>
-                </label>
-              </div>
-
-              <div className="mt-2 mb-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agendaFormData.isRoutine}
-                    onChange={(e) =>
-                      setAgendaFormData({
-                        ...agendaFormData,
-                        isRoutine: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700"
-                  />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    É uma Rotina
-                  </span>
-                </label>
-              </div>
-
-              {!agendaFormData.allDay && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Início
-                    </label>
-                    <input
-                      required
-                      type="time"
-                      value={agendaFormData.startTime}
-                      onChange={(e) =>
-                        setAgendaFormData({
-                          ...agendaFormData,
-                          startTime: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Fim
-                    </label>
-                    <input
-                      required
-                      type="time"
-                      value={agendaFormData.endTime}
-                      onChange={(e) =>
-                        setAgendaFormData({
-                          ...agendaFormData,
-                          endTime: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <label className="flex items-center gap-2 cursor-pointer mb-3">
-                  <input
-                    type="checkbox"
-                    checked={agendaFormData.isRecurring}
-                    onChange={(e) =>
-                      setAgendaFormData({
-                        ...agendaFormData,
-                        isRecurring: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
-                  />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                    <Repeat className="w-4 h-4" /> Repetir evento
-                  </span>
-                </label>
-
-                {agendaFormData.isRecurring && (
-                  <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 mb-4 text-left">
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Frequência
-                      </label>
-                      <select
-                        value={agendaFormData.recurrencePeriod}
-                        onChange={(e) =>
-                          setAgendaFormData({
-                            ...agendaFormData,
-                            recurrencePeriod: e.target.value as any,
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      >
-                        <option value="daily">Todos os dias</option>
-                        <option value="weekly">Semanalmente</option>
-                        <option value="monthly">Mensalmente</option>
-                        <option value="yearly">Anualmente</option>
-                        <option value="custom_days">
-                          Dias Específicos da Semana
-                        </option>
-                      </select>
-                    </div>
-
-                    {agendaFormData.recurrencePeriod === "custom_days" && (
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
-                          Dias da Semana
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            "Dom",
-                            "Seg",
-                            "Ter",
-                            "Qua",
-                            "Qui",
-                            "Sex",
-                            "Sáb",
-                          ].map((day, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const currentlySelected = (
-                                  agendaFormData.recurrenceDays || []
-                                ).includes(index);
-                                const newDays = currentlySelected
-                                  ? (
-                                      agendaFormData.recurrenceDays || []
-                                    ).filter((d: number) => d !== index)
-                                  : [
-                                      ...(agendaFormData.recurrenceDays || []),
-                                      index,
-                                    ];
-                                setAgendaFormData({
-                                  ...agendaFormData,
-                                  recurrenceDays: newDays,
-                                });
-                              }}
-                              className={`w-9 h-9 flex items-center justify-center rounded-full text-xs font-bold border transition-colors ${
-                                (agendaFormData.recurrenceDays || []).includes(
-                                  index,
-                                )
-                                  ? "bg-blue-600 border-blue-600 text-white"
-                                  : "bg-white border-slate-300 text-slate-500 hover:border-blue-400 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300"
-                              }`}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                        Término em (Opcional)
-                      </label>
-                      <input
-                        type="date"
-                        value={agendaFormData.recurrenceEndDate || ""}
-                        onChange={(e) =>
-                          setAgendaFormData({
-                            ...agendaFormData,
-                            recurrenceEndDate: e.target.value,
-                          })
-                        }
-                        min={new Date().toISOString().split("T")[0]}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Descrição (Opcional)
-                </label>
-                <textarea
-                  placeholder="Detalhes adicionais..."
-                  value={agendaFormData.description}
-                  onChange={(e) =>
-                    setAgendaFormData({
-                      ...agendaFormData,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-              >
-                {agendaFormData.id ? (
-                  <Check className="w-5 h-5" />
-                ) : (
-                  <Plus className="w-5 h-5" />
-                )}
-                {agendaFormData.id ? "Atualizar Evento" : "Salvar Evento"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddAgendaEventModal
+        isOpen={isAgendaModalOpen}
+        onClose={() => setIsAgendaModalOpen(false)}
+        formData={agendaFormData}
+        setFormData={setAgendaFormData}
+        onSubmit={handleAgendaSubmit}
+        selectedDay={selectedDay}
+        currentDate={currentDate}
+      />
 
       
 
-      {/* ADD TASK MODAL */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                  {taskFormData.id ? "Editar Tarefa" : "Nova Tarefa"}
-                </h3>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                  <ListTodo className="w-3 h-3" />
-                  {selectedDay} de{" "}
-                  {currentDate.toLocaleDateString("pt-BR", {
-                    month: "long",
-                  })}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsTaskModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Título
-                </label>
-                <input
-                  autoFocus
-                  required
-                  type="text"
-                  placeholder="Ex: Pagar conta de luz, Comprar leite..."
-                  value={taskFormData.title}
-                  onChange={(e) =>
-                    setTaskFormData({
-                      ...taskFormData,
-                      title: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Data de Vencimento
-                </label>
-                <input
-                  required
-                  type="date"
-                  value={taskFormData.dueDate}
-                  onChange={(e) =>
-                    setTaskFormData({
-                      ...taskFormData,
-                      dueDate: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {taskLists && taskLists.length > 0 && (
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                      Lista
-                    </label>
-                    <select
-                      value={taskFormData.listId}
-                      onChange={(e) =>
-                        setTaskFormData({
-                          ...taskFormData,
-                          listId: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      {taskLists.map((list) => (
-                        <option key={list.id} value={list.id}>
-                          {list.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsListManagerOpen(true)}
-                    className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition-colors border border-slate-200 dark:border-slate-600"
-                    title="Gerenciar Listas"
-                  >
-                    <Layers className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                  </button>
-                </div>
-              )}
-
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-                  Descrição (Opcional)
-                </label>
-                <textarea
-                  placeholder="Detalhes adicionais..."
-                  value={taskFormData.description}
-                  onChange={(e) =>
-                    setTaskFormData({
-                      ...taskFormData,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 mt-4"
-              >
-                {taskFormData.id ? (
-                  <Check className="w-5 h-5" />
-                ) : (
-                  <Plus className="w-5 h-5" />
-                )}
-                {taskFormData.id ? "Atualizar Tarefa" : "Salvar Tarefa"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <AddTaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        formData={taskFormData}
+        setFormData={setTaskFormData}
+        onSubmit={handleTaskSubmit}
+        selectedDay={selectedDay}
+        currentDate={currentDate}
+        taskLists={taskLists}
+        onOpenListManager={() => setIsListManagerOpen(true)}
+      />
 
       {/* LIST MANAGER MODAL */}
-      {isListManagerOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
-            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-500" />
-                Gerenciar Listas
-              </h3>
-              <button
-                onClick={() => setIsListManagerOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nome da nova lista..."
-                  value={newListName}
-                  onChange={(e) => setNewListName(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      if (!newListName.trim() || !onAddTaskList) return;
-                      const newListId = crypto.randomUUID();
-                      await onAddTaskList({
-                        id: newListId,
-                        title: newListName.trim(),
-                      });
-                      setNewListName("");
-                      setTaskFormData((prev) => ({
-                        ...prev,
-                        listId: newListId,
-                      }));
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!newListName.trim() || !onAddTaskList) return;
-                    const newListId = crypto.randomUUID();
-                    await onAddTaskList({
-                      id: newListId,
-                      title: newListName.trim(),
-                    });
-                    setNewListName("");
-                    setTaskFormData((prev) => ({
-                      ...prev,
-                      listId: newListId,
-                    }));
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-indigo-500/20"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {taskLists?.map((list) => (
-                  <div
-                    key={list.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
-                  >
-                    {editingListId === list.id ? (
-                      <input
-                        autoFocus
-                        type="text"
-                        value={editingListName}
-                        onChange={(e) => setEditingListName(e.target.value)}
-                        onBlur={async () => {
-                          if (
-                            editingListName.trim() &&
-                            editingListName !== list.title &&
-                            onUpdateTaskList
-                          ) {
-                            await onUpdateTaskList(list.id, {
-                              title: editingListName.trim(),
-                            });
-                          }
-                          setEditingListId(null);
-                        }}
-                        onKeyDown={async (e) => {
-                          if (e.key === "Enter") {
-                            if (
-                              editingListName.trim() &&
-                              editingListName !== list.title &&
-                              onUpdateTaskList
-                            ) {
-                              await onUpdateTaskList(list.id, {
-                                title: editingListName.trim(),
-                              });
-                            }
-                            setEditingListId(null);
-                          }
-                        }}
-                        className="flex-1 px-2 py-1 rounded border border-indigo-500 dark:bg-slate-700 dark:text-white outline-none"
-                      />
-                    ) : (
-                      <span className="font-medium text-slate-700 dark:text-slate-200">
-                        {list.title}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingListId(list.id);
-                          setEditingListName(list.title);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 rounded transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (
-                            window.confirm(
-                              "Excluir esta lista apagará todas as tarefas nela. Continuar?",
-                            )
-                          ) {
-                            if (onDeleteTaskList)
-                              await onDeleteTaskList(list.id);
-                            if (taskFormData.listId === list.id) {
-                              setTaskFormData((prev) => ({
-                                ...prev,
-                                listId:
-                                  taskLists.find((l) => l.id !== list.id)?.id ||
-                                  "",
-                              }));
-                            }
-                          }
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ListManagerModal
+        isOpen={isListManagerOpen}
+        onClose={() => setIsListManagerOpen(false)}
+        taskLists={taskLists}
+        newListName={newListName}
+        setNewListName={setNewListName}
+        editingListId={editingListId}
+        setEditingListId={setEditingListId}
+        editingListName={editingListName}
+        setEditingListName={setEditingListName}
+        onAddTaskList={onAddTaskList}
+        onUpdateTaskList={onUpdateTaskList}
+        onDeleteTaskList={onDeleteTaskList}
+        setTaskFormData={setTaskFormData}
+        taskFormData={taskFormData}
+      />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -2213,240 +1530,72 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
         )}
 
         {/* Details Sidebar */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-0 overflow-hidden flex flex-col h-full min-h-[400px]">
-          <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-              {selectedDay
-                ? `${selectedDay} de ${currentDate.toLocaleDateString("pt-BR", { month: "long" })}`
-                : "Resumo do Mês"}
-            </h3>
-            {selectedDay && (
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                <button
-                  onClick={handleOpenModal}
-                  className="w-full py-2 px-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                >
-                  <Plus className="w-3 h-3 shrink-0" /> <span className="truncate">Transação</span>
-                </button>
-                <button
-                  onClick={handleOpenAgendaModal}
-                  className="w-full py-2 px-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                >
-                  <CalendarClock className="w-3 h-3 shrink-0" /> <span className="truncate">Evento</span>
-                </button>
-                <button
-                  onClick={handleOpenTaskModal}
-                  className="w-full py-2 px-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
-                >
-                  <ListTodo className="w-3 h-3 shrink-0" /> <span className="truncate">Tarefa</span>
-                </button>
-              </div>
-            )}
-          </div>
+        <DetailsSidebar
+          selectedDay={selectedDay}
+          currentDate={currentDate}
+          handleOpenModal={handleOpenModal}
+          handleOpenAgendaModal={handleOpenAgendaModal}
+          handleOpenTaskModal={handleOpenTaskModal}
+          selectedTransactions={selectedTransactions}
+          selectedAgendaEvents={selectedAgendaEvents}
+          todayTasks={todayTasks}
+          timelessTasks={timelessTasks}
+          onUpdateTask={onUpdateTask}
+          setTaskFormData={setTaskFormData}
+          setIsTaskModalOpen={setIsTaskModalOpen}
+          onDeleteTask={onDeleteTask}
+          onUpdateTransaction={onUpdateTransaction}
+          handleMoveTransaction={handleMoveTransaction}
+          onUpdateAgendaEvent={onUpdateAgendaEvent}
+          handleEditAgendaEvent={handleEditAgendaEvent}
+          onDeleteAgendaEvent={onDeleteAgendaEvent}
+          year={year}
+          month={month}
+        />
+      </div>
+      {/* Floating Add Menu */}
+      <div className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 flex flex-col items-end gap-3">
+        {/* Menu Items */}
+        <div className={`flex flex-col items-end gap-3 transition-all duration-200 origin-bottom ${isFabOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}>
+          <button 
+            onClick={() => { setIsFabOpen(false); handleOpenTaskModal(); }}
+            className="flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-lg shadow-blue-500/10 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+          >
+            <span className="font-medium text-sm">Nova Tarefa</span>
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center">
+              <CheckSquare className="w-4 h-4" />
+            </div>
+          </button>
+          
+          <button 
+            onClick={() => { setIsFabOpen(false); handleOpenAgendaModal(); }}
+            className="flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-lg shadow-purple-500/10 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+          >
+            <span className="font-medium text-sm">Novo Evento</span>
+            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex items-center justify-center">
+              <CalendarClock className="w-4 h-4" />
+            </div>
+          </button>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {selectedDay &&
-              selectedTransactions.length === 0 &&
-              selectedAgendaEvents.length === 0 &&
-              todayTasks.length === 0 &&
-              timelessTasks.length === 0 &&
-               (
-                <div className="text-center py-10">
-                  <CalendarClock className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm">
-                    Nenhuma movimentação, evento ou tarefa.
-                  </p>
-                </div>
-              )}
-            {!selectedDay && (
-              <div className="text-center py-10">
-                <div className="inline-block p-4 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
-                  <CalendarIcon className="w-8 h-8 text-indigo-500" />
-                </div>
-                <p className="text-slate-500 font-medium">Selecione um dia</p>
-                <p className="text-slate-400 text-xs mt-1">
-                  Clique no calendário para ver detalhes ou adicionar contas e eventos.
-                </p>
-              </div>
-            )}
-            {/* ATEMPORAL GROUP */}
-            {selectedDay && (timelessTasks.length > 0) && (
-              <div className="mb-6">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <Clock className="w-3.5 h-3.5 text-indigo-500" /> Atemporal
-                </h4>
-                <div className="space-y-2">
-                  {/* Timeless Tasks */}
-                  {timelessTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="group flex items-start justify-between p-3 rounded-lg border bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => onUpdateTask && onUpdateTask(task.id, { completed: !task.completed })}
-                          className="mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors border-slate-300 dark:border-slate-500 hover:border-indigo-500"
-                        >
-                        </button>
-                        <div>
-                          <p className="font-semibold text-sm text-slate-800 dark:text-white">
-                            {task.title}
-                          </p>
-                          {task.description && (
-                            <p className="text-xs mt-0.5 line-clamp-2 text-slate-500 dark:text-slate-400">
-                              {task.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => {
-                            setTaskFormData({ id: task.id, title: task.title, description: task.description || "", listId: task.listId, dueDate: task.dueDate || "" });
-                            setIsTaskModalOpen(true);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
-                          title="Editar Tarefa"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteTask && onDeleteTask(task.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                          title="Excluir Tarefa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  </div>
-              </div>
-            )}
-
-            {/* PROGRAMADO GROUP */}
-            {selectedDay && (selectedTransactions.length > 0 || selectedAgendaEvents.length > 0 || todayTasks.length > 0 ) && (
-              <div className="mb-6">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3 px-1 border-b border-slate-100 dark:border-slate-700/50 pb-2">
-                  <CalendarIcon className="w-3.5 h-3.5 text-indigo-500" /> Programado
-                </h4>
-                <div className="space-y-2">
-                   {/* Transactions */}
-                  {selectedTransactions.map((t, idx) => {
-                    const canMoveUp = idx > 0;
-                    const canMoveDown = idx < selectedTransactions.length - 1;
-                    return (
-                      <div key={t.id} className="group p-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-700/50">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${t.type === "income" ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"}`}>
-                              {t.type === "income" ? <ArrowUp className="w-5 h-5" /> : <ArrowDown className="w-5 h-5" />}
-                            </div>
-                            <div>
-                              <p className="font-bold text-sm text-slate-800 dark:text-white">{t.description}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-[10px] font-bold text-slate-500 uppercase">{t.category}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-right">
-                              <p className={`font-bold text-sm ${t.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}>R$ {t.amount.toFixed(2)}</p>
-                              {t.type === "expense" && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                                  {t.status === "pending" ? "Pendente" : "Pago"}
-                                </span>
-                              )}
-                            </div>
-                            {onUpdateTransaction && (
-                              <div className="flex flex-col gap-0.5 border-l border-slate-100 dark:border-slate-700 pl-2 ml-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => handleMoveTransaction(idx, "up")} disabled={!canMoveUp} className={`p-0.5 rounded ${canMoveUp ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}><ChevronUp className="w-4 h-4" /></button>
-                                <button onClick={() => handleMoveTransaction(idx, "down")} disabled={!canMoveDown} className={`p-0.5 rounded ${canMoveDown ? "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-indigo-600" : "text-slate-200 dark:text-slate-600 cursor-not-allowed"}`}><ChevronDown className="w-4 h-4" /></button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Agenda Events */}
-                  {selectedAgendaEvents.map(event => {
-                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(selectedDay || 1).padStart(2, "0")}`;
-                    const completed = event.completedDates?.includes(dateStr);
-                    
-                    const handleToggleEvent = async () => {
-                      if (!onUpdateAgendaEvent) return;
-                      const newDates = completed 
-                        ? (event.completedDates || []).filter(d => d !== dateStr) 
-                        : [...(event.completedDates || []), dateStr];
-                      await onUpdateAgendaEvent(event.id, { completedDates: newDates });
-                    };
-
-                    return (
-                      <div key={event.id} className={`group flex items-start justify-between p-3 rounded-lg border transition-all ${completed ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30 opacity-75' : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
-                        <div className="flex items-start gap-4 flex-1">
-                          <button
-                            onClick={handleToggleEvent}
-                            className={`mt-1 w-5 h-5 rounded border flex shrink-0 items-center justify-center transition-colors ${completed ? "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "border-slate-300 dark:border-slate-500 hover:border-emerald-500 dark:hover:border-emerald-400"}`}
-                          >
-                            {completed && <Check className="w-3 h-3" />}
-                          </button>
-                          <div className="flex flex-col items-center min-w-[3rem] mt-0.5">
-                            <span className={`text-[11px] font-bold ${completed ? 'text-emerald-600 dark:text-emerald-500' : 'text-blue-600 dark:text-blue-400'}`}>
-                              {event.allDay ? "Dia Todo" : new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}
-                            </span>
-                          </div>
-                          <div>
-                            <p className={`font-semibold text-sm ${completed ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-800 dark:text-white'}`}>
-                              {event.title}
-                            </p>
-                            {event.isRoutine && (
-                              <span className="inline-block mt-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 rounded">Rotina</span>
-                            )}
-                            {event.description && (
-                              <p className={`text-xs mt-0.5 line-clamp-2 ${completed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                                {event.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEditAgendaEvent(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Evento"><Edit2 className="w-4 h-4" /></button>
-                          <button onClick={() => onDeleteAgendaEvent && onDeleteAgendaEvent(event.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Evento"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Today Tasks */}
-                  {todayTasks.map((t) => (
-                    <div key={t.id} className={`group flex items-start justify-between p-3 rounded-lg border ${t.completed ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60' : 'bg-white dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
-                      <div className="flex items-start gap-3">
-                        <button onClick={() => onUpdateTask && onUpdateTask(t.id, { completed: !t.completed })} className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${t.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-500 hover:border-indigo-500'}`}>
-                          {t.completed && <Check className="w-3 h-3" />}
-                        </button>
-                        <div>
-                          <p className={`font-semibold text-sm ${t.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-white'}`}>{t.title}</p>
-                          {t.description && <p className="text-xs text-slate-500 mt-0.5">{t.description}</p>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => {
-                          setTaskFormData({ id: t.id, title: t.title, description: t.description || "", listId: t.listId, dueDate: t.dueDate || "" });
-                          setIsTaskModalOpen(true);
-                        }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors" title="Editar Tarefa"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => onDeleteTask && onDeleteTask(t.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors" title="Excluir Tarefa"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
+          <button 
+            onClick={() => { setIsFabOpen(false); handleOpenModal(); }}
+            className="flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-2 rounded-full shadow-lg shadow-emerald-500/10 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+          >
+            <span className="font-medium text-sm">Nova Transação</span>
+            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center">
+              <Banknote className="w-4 h-4" />
+            </div>
+          </button>
         </div>
+
+        {/* Main FAB Button */}
+        <button 
+          onClick={() => setIsFabOpen(!isFabOpen)}
+          className={`w-14 h-14 text-white rounded-full flex items-center justify-center transition-all shadow-lg ${isFabOpen ? 'rotate-45 bg-rose-500 hover:bg-rose-600 shadow-rose-500/40' : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-110 active:scale-95 shadow-indigo-600/40'}`}
+          title="Adicionar"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
       </div>
     </div>
   );

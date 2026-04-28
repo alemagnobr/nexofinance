@@ -126,6 +126,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     type: 'expense' as TransactionType,
     category: 'Outros',
     date: new Date().toISOString().split('T')[0],
+    time: '',
     status: 'paid' as TransactionStatus,
     paymentMethod: 'credit_card' as PaymentMethod,
     walletId: '',
@@ -431,7 +432,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
   };
 
   const resetForm = () => {
-    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], status: 'paid', paymentMethod: 'credit_card', walletId: wallets && wallets.length > 0 ? wallets[0].id : '', isRecurring: false, autoPay: false, installments: '', observation: '' });
+    setNewTransaction({ description: '', amount: '', type: 'expense', category: 'Outros', date: new Date().toISOString().split('T')[0], time: '', status: 'paid', paymentMethod: 'credit_card', walletId: wallets && wallets.length > 0 ? wallets[0].id : '', isRecurring: false, autoPay: false, installments: '', observation: '' });
     setEditingId(null);
     setRecurrenceMode('monthly');
     setSelectedDays([]);
@@ -451,6 +452,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         type: t.type || 'expense', 
         category: t.category || 'Outros', 
         date: t.date || new Date().toISOString().split('T')[0], 
+        time: t.time || '',
         status: t.status || 'paid', 
         paymentMethod: t.paymentMethod || (t.type === 'income' ? 'pix' : 'credit_card'), 
         walletId: t.walletId || '',
@@ -582,6 +584,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
       type: txData.type, 
       category: txData.category, 
       date: txData.date, 
+      time: txData.time || undefined,
       status: txData.status, 
       paymentMethod: txData.paymentMethod, 
       walletId: txData.walletId,
@@ -1167,13 +1170,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           </select>
 
           <div>
-              <input
-                required
-                type="date"
-                value={newTransaction.date}
-                onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 w-full"
-              />
+              <div className="flex gap-2">
+                <input
+                  required
+                  type="date"
+                  value={newTransaction.date}
+                  onChange={e => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 flex-1"
+                />
+                <input
+                  type="time"
+                  value={newTransaction.time || ''}
+                  onChange={e => setNewTransaction({ ...newTransaction, time: e.target.value })}
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg p-2 w-auto"
+                />
+              </div>
               
               {/* BUSINESS DAY OPTION FOR SALARY - Moved here */}
               {newTransaction.category === 'Salário' && newTransaction.type === 'income' && (
@@ -1507,6 +1518,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                                   <AlertCircle className="w-3 h-3" /> Atrasada
                                                               </span>
                                                           )}
+                                                          {t.time && (
+                                                              <span className="flex items-center gap-0.5 text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded font-bold" title="Horário">
+                                                                  <Clock className="w-3 h-3" /> {t.time}
+                                                              </span>
+                                                          )}
                                                       </div>
                                                   </div>
                                                   
@@ -1605,6 +1621,11 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
                                                           {t.status === 'pending' && t.date < todayStr && (
                                                               <span className="text-[10px] text-rose-600 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5" title="Atrasada">
                                                                   <AlertCircle className="w-3 h-3" /> Atrasada
+                                                              </span>
+                                                          )}
+                                                          {t.time && (
+                                                              <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5 font-bold" title="Horário">
+                                                                  <Clock className="w-3 h-3" /> {t.time}
                                                               </span>
                                                           )}
                                                       </div>

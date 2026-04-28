@@ -42,12 +42,10 @@ import { AppModals } from "./components/AppModals";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { useAppData } from "./hooks/useAppData";
 import { SettingsView } from "./components/SettingsView";
-import { PixKeyManager } from "./components/PixKeyManager";
 
 // New Wrapper Views
-import { MovementsView } from "./components/MovementsView";
-import { AssetsView } from "./components/AssetsView";
-import { ProductivityView } from "./components/ProductivityView";
+import { FinanceiroView } from "./components/FinanceiroView";
+import { PlanejamentoView } from "./components/PlanejamentoView";
 import { UtilitiesView } from "./components/UtilitiesView";
 import { FinancialCalendar } from "./components/FinancialCalendar";
 
@@ -322,43 +320,21 @@ const App: React.FC = () => {
       );
     }
 
-    if (currentView === View.PIX_KEYS) {
-      return (
-        <div className="max-w-4xl mx-auto p-4 md:p-8 animate-fade-in">
-          <PixKeyManager
-            pixKeys={data.pixKeys || []}
-            onAdd={actions.addPixKey}
-            onDelete={actions.deletePixKey}
-          />
-        </div>
-      );
-    }
-
-    // 2. Group: Movements (Transactions, Subscriptions, Debts)
+    // 2. Group: Financeiro (Transactions, Subscriptions, Debts, Investments, Budgets, Wealth Planner, Pix Keys)
     if (
-      [View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS].includes(currentView)
+      [
+        View.FINANCEIRO_DASHBOARD,
+        View.TRANSACTIONS, 
+        View.SUBSCRIPTIONS, 
+        View.DEBTS, 
+        View.INVESTMENTS, 
+        View.BUDGETS, 
+        View.WEALTH_PLANNER, 
+        View.PIX_KEYS
+      ].includes(currentView)
     ) {
       return (
-        <MovementsView
-          currentView={currentView}
-          onNavigate={setCurrentView}
-          data={data}
-          actions={actions}
-          privacyMode={privacyMode}
-          hasApiKey={hasKey}
-          quickActionSignal={quickActionSignal}
-        />
-      );
-    }
-
-    // 3. Group: Assets (Investments, Budgets, Wealth Planner)
-    if (
-      [View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER].includes(
-        currentView,
-      )
-    ) {
-      return (
-        <AssetsView
+        <FinanceiroView
           currentView={currentView}
           onNavigate={setCurrentView}
           data={data}
@@ -371,9 +347,9 @@ const App: React.FC = () => {
     }
 
     // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower)
-    if ([View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
+    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY].includes(currentView)) {
       return (
-        <ProductivityView
+        <PlanejamentoView
           currentView={currentView}
           onNavigate={setCurrentView}
           data={data}
@@ -419,7 +395,7 @@ const App: React.FC = () => {
     }
 
     // 5. Group: Utilities (Shopping, Passwords)
-    if ([View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
+    if ([View.UTILIDADES_DASHBOARD, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
       return (
         <UtilitiesView
           currentView={currentView}

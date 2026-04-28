@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2 } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -1044,8 +1044,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           if (cardId === 'eisenhower') {
             return (
-              <div key="eisenhower" className="h-full min-h-[180px]">
-                {/* DailyRoutines has been removed per user request */}
+              <div key="eisenhower" onClick={() => onNavigate(View.PRODUCTIVITY)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer group">
+                {/* Card 4: Flow Widget */}
+                <div>
+                   <div className="flex items-center justify-between mb-2">
+                       <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Modo Flow</h3>
+                       <Timer className="w-4 h-4 text-orange-500" />
+                   </div>
+                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 line-clamp-2">
+                       Mantenha o foco em suas tarefas com a técnica Pomodoro.
+                   </p>
+                </div>
+                
+                <div className="flex items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/30 rounded-lg group-hover:bg-orange-100 dark:group-hover:bg-orange-900/40 transition-colors">
+                    <span className="text-sm font-bold text-orange-600 dark:text-orange-400 flex items-center gap-2">
+                        <Play className="w-4 h-4" /> Iniciar Sessão
+                    </span>
+                </div>
               </div>
             );
           }
