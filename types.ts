@@ -102,7 +102,9 @@ export interface ShoppingItem {
   id: string;
   name: string;
   quantity: number;
+  unit?: string; // e.g., 'un', 'kg', 'g', 'cx', 'pct', 'L'
   actualPrice: number; // O valor que o usuário digita no mercado (calculadora)
+  referencePrice?: number; // Previsão de custo
   isChecked: boolean; // Se já pegou o item
   category?: ShoppingCategory; // Novo campo
   observation?: string; // Observação opcional

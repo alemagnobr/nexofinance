@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingItem, ShoppingCategory } from '../types';
-import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar, History } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, Check, CreditCard, ArrowRight, Calculator, Minus, X, Sparkles, ChefHat, Tag, AlertTriangle, List, Edit2, ChevronLeft, ChevronRight, Calendar, History, Copy } from 'lucide-react';
 import { generateShoppingListFromRecipe } from '../services/geminiService';
 import { CurrencyInput } from './CurrencyInput';
 
@@ -34,8 +34,11 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<ShoppingCategory>('Outros');
   const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemRefPrice, setNewItemRefPrice] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
+  const [newItemUnit, setNewItemUnit] = useState('un');
   const [newItemDate, setNewItemDate] = useState(new Date().toISOString().split('T')[0]);
+  const [repeatDates, setRepeatDates] = useState<string[]>([]);
   const [newItemObservation, setNewItemObservation] = useState('');
   
   const [activeTab, setActiveTab] = useState<'list' | 'timeline'>('list');
@@ -43,7 +46,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   // Edit Item Modal
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   
-  const [isFinishing, setIsFinishing] = useState(false);
+  // Add Item Modal
+  const [isAddingItem, setIsAddingItem] = useState(false);
   
   // AI Modal
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -58,18 +62,23 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const [isEditingBudget, setIsEditingBudget] = useState(false);
   const [tempBudget, setTempBudget] = useState(shoppingBudget.toString());
 
-  // Checkout State
-  const [checkoutCategory, setCheckoutCategory] = useState('Alimentos');
-  const [checkoutMethod, setCheckoutMethod] = useState('debit_card');
-
   // Filtered Items by Month
   const filteredItems = useMemo(() => {
     return items.filter(item => item.month === monthStr);
   }, [items, monthStr]);
 
   // Calculated Total
-  const total = useMemo(() => {
-    return filteredItems.reduce((acc, item) => acc + (item.actualPrice * item.quantity), 0);
+  const forecastTotal = useMemo(() => {
+    return filteredItems.reduce((acc, item) => {
+        const itemPrice = item.isChecked ? item.actualPrice : (item.referencePrice || item.actualPrice || 0);
+        return acc + (itemPrice * item.quantity);
+    }, 0);
+  }, [filteredItems]);
+
+  const spentTotal = useMemo(() => {
+    return filteredItems.reduce((acc, item) => {
+        return acc + (item.isChecked ? (item.actualPrice * item.quantity) : 0);
+    }, 0);
   }, [filteredItems]);
 
   // Grouped Items
@@ -89,7 +98,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   const timelineData = useMemo(() => {
     const dates: Record<string, { total: number; items: ShoppingItem[] }> = {};
     filteredItems.forEach(item => {
-        if (item.purchaseDate && item.actualPrice > 0) {
+        if (item.purchaseDate) {
             if (!dates[item.purchaseDate]) {
                 dates[item.purchaseDate] = { total: 0, items: [] };
             }
@@ -135,6 +144,28 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     });
   };
 
+  const handleRepeatNextMonth = () => {
+    if (window.confirm('Copiar os itens deste mês para o mês seguinte? O valor real atual será salvo como preço de referência no próximo.')) {
+        const [year, month] = monthStr.split('-');
+        const nextDate = new Date(parseInt(year), parseInt(month), 1);
+        const nextMonthStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        filteredItems.forEach(item => {
+            onAdd({
+                name: item.name,
+                quantity: item.quantity,
+                unit: item.unit,
+                actualPrice: 0,
+                referencePrice: item.actualPrice > 0 ? item.actualPrice : item.referencePrice,
+                isChecked: false,
+                category: item.category,
+                observation: item.observation,
+                month: nextMonthStr
+            });
+        });
+    }
+  };
+
   const formatCurrencyInput = (value: string) => {
     const numericValue = value.replace(/\D/g, '');
     if (!numericValue) return '';
@@ -152,20 +183,30 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     e.preventDefault();
     if (!newItemName.trim()) return;
     
-    onAdd({
-      name: newItemName.trim(),
-      quantity: newItemQuantity,
-      actualPrice: parseCurrencyInput(newItemPrice),
-      isChecked: false,
-      category: newItemCategory,
-      observation: newItemObservation.trim() || undefined,
-      month: newItemDate.slice(0, 7), // Use the chosen date's month
-      purchaseDate: newItemDate
+    const dates = [newItemDate, ...repeatDates];
+    
+    dates.forEach(date => {
+      onAdd({
+        name: newItemName.trim(),
+        quantity: newItemQuantity,
+        unit: newItemUnit,
+        actualPrice: parseCurrencyInput(newItemPrice),
+        referencePrice: parseCurrencyInput(newItemRefPrice),
+        isChecked: false,
+        category: newItemCategory,
+        observation: newItemObservation.trim() || undefined,
+        month: date.slice(0, 7),
+        purchaseDate: date
+      });
     });
+
     setNewItemName('');
     setNewItemCategory('Outros'); // Reset to default
     setNewItemPrice('');
+    setNewItemRefPrice('');
     setNewItemQuantity(1);
+    setNewItemUnit('un');
+    setRepeatDates([]);
     setNewItemObservation('');
   };
 
@@ -175,7 +216,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
       onUpdate(editingItem.id, {
           name: editingItem.name.trim(),
           category: editingItem.category,
+          unit: editingItem.unit,
           actualPrice: editingItem.actualPrice,
+          referencePrice: editingItem.referencePrice,
           observation: editingItem.observation,
           purchaseDate: editingItem.purchaseDate,
           month: editingItem.purchaseDate?.slice(0, 7)
@@ -204,18 +247,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   };
 
   const handleQuantity = (id: string, current: number, delta: number) => {
-    const newQty = Math.max(1, current + delta);
+    const newQty = Math.max(0.01, current + delta);
     onUpdate(id, { quantity: newQty });
-  };
-
-  const handleFinish = () => {
-    if (total === 0) {
-      alert("O valor total está zerado. Adicione preços aos itens para lançar a despesa.");
-      return;
-    }
-    onFinishShopping(total, checkoutMethod, checkoutCategory);
-    // Budget reset? Maybe optional. For now, we keep it.
-    setIsFinishing(false);
   };
 
   const handleSaveBudget = () => {
@@ -231,7 +264,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
     return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
-  const budgetPercentage = shoppingBudget > 0 ? (total / shoppingBudget) * 100 : 0;
+  const budgetPercentage = shoppingBudget > 0 ? (forecastTotal / shoppingBudget) * 100 : 0;
   let budgetColor = 'bg-emerald-500';
   if (budgetPercentage > 100) budgetColor = 'bg-rose-500';
   else if (budgetPercentage > 85) budgetColor = 'bg-amber-500';
@@ -239,63 +272,6 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
   return (
     <div className="space-y-6 animate-fade-in relative pb-32 md:pb-0">
       
-      {/* Checkout Modal */}
-      {isFinishing && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-sm p-6 border border-emerald-500/30 animate-scale-in">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                   <CreditCard className="w-6 h-6 text-emerald-500" /> Finalizar Compra
-                </h3>
-                <button onClick={() => setIsFinishing(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
-             </div>
-             
-             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl mb-6 text-center border border-emerald-100 dark:border-emerald-800">
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 uppercase font-bold mb-1">Valor Final a Lançar</p>
-                <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">{formatValue(total)}</p>
-             </div>
-
-             <div className="space-y-4">
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Categoria da Despesa</label>
-                   <select 
-                      value={checkoutCategory}
-                      onChange={(e) => setCheckoutCategory(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none"
-                   >
-                      <option value="Alimentos">Alimentos</option>
-                      <option value="Casa">Casa</option>
-                      <option value="Lazer">Lazer</option>
-                      <option value="Pets">Pets</option>
-                      <option value="Outros">Outros</option>
-                   </select>
-                </div>
-                <div>
-                   <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Forma de Pagamento</label>
-                   <select 
-                      value={checkoutMethod}
-                      onChange={(e) => setCheckoutMethod(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none"
-                   >
-                      <option value="credit_card">Cartão de Crédito</option>
-                      <option value="debit_card">Cartão de Débito</option>
-                      <option value="cash">Dinheiro</option>
-                      <option value="pix">PIX</option>
-                      <option value="ticket">Vale Alimentação/Refeição</option>
-                   </select>
-                </div>
-                
-                <button 
-                  onClick={handleFinish}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 mt-4"
-                >
-                   <Check className="w-5 h-5" /> Confirmar e Lançar
-                </button>
-             </div>
-          </div>
-        </div>
-      )}
-
       {/* AI Modal */}
       {isAiModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -345,15 +321,35 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                </div>
                
                <form onSubmit={handleSaveEdit} className="space-y-4">
-                   <div>
-                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome do Item</label>
-                       <input 
-                          autoFocus
-                          type="text"
-                          value={editingItem.name}
-                          onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
-                          className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                       />
+                   <div className="grid grid-cols-[1fr_100px] gap-4">
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome do Item</label>
+                           <input 
+                              autoFocus
+                              type="text"
+                              value={editingItem.name}
+                              onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
+                              className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           />
+                       </div>
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unid.</label>
+                           <select
+                               value={editingItem.unit || 'un'}
+                               onChange={(e) => setEditingItem({...editingItem, unit: e.target.value})}
+                               className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                           >
+                               <option value="un">UN</option>
+                               <option value="kg">KG</option>
+                               <option value="g">g</option>
+                               <option value="L">L</option>
+                               <option value="ml">ml</option>
+                               <option value="cx">CX</option>
+                               <option value="pct">PCT</option>
+                               <option value="pc">PÇ</option>
+                               <option value="bdj">BDJ</option>
+                           </select>
+                       </div>
                    </div>
                    
                    <div className="grid grid-cols-2 gap-4">
@@ -378,16 +374,30 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                        </div>
                    </div>
                    
-                   <div>
-                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço (Unidade)</label>
-                       <div className="relative">
-                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                           <CurrencyInput 
-                              placeholder="0,00"
-                              value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice.toString()}
-                              onChangeValue={(val) => setEditingItem({...editingItem, actualPrice: parseFloat(val) || 0})}
-                              className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold"
-                           />
+                   <div className="grid grid-cols-2 gap-4">
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço Ref.</label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                               <CurrencyInput 
+                                  placeholder="0,00"
+                                  value={!editingItem.referencePrice ? '' : editingItem.referencePrice.toString()}
+                                  onChangeValue={(val) => setEditingItem({...editingItem, referencePrice: parseFloat(val) || 0})}
+                                  className="w-full pl-8 pr-3 py-3 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold text-sm"
+                               />
+                           </div>
+                       </div>
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço Real</label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                               <CurrencyInput 
+                                  placeholder="0,00"
+                                  value={editingItem.actualPrice === 0 ? '' : editingItem.actualPrice.toString()}
+                                  onChangeValue={(val) => setEditingItem({...editingItem, actualPrice: parseFloat(val) || 0})}
+                                  className="w-full pl-8 pr-3 py-3 rounded-lg border border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-100 outline-none focus:ring-2 focus:ring-emerald-500 text-right font-bold text-sm"
+                               />
+                           </div>
                        </div>
                    </div>
 
@@ -479,18 +489,18 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <Trash2 className="w-4 h-4" /> Limpar Lista
                  </button>
                  <button 
+                    onClick={handleRepeatNextMonth}
+                    disabled={filteredItems.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 disabled:opacity-50"
+                 >
+                    <Copy className="w-4 h-4" /> Repetir para Mês que Vem
+                 </button>
+                 <button 
                     onClick={() => setIsAiModalOpen(true)}
                     disabled={!hasApiKey}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm ${!hasApiKey ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300'}`}
                  >
                     <Sparkles className="w-4 h-4" /> Gerar com IA
-                 </button>
-                 <button 
-                    onClick={() => setIsFinishing(true)}
-                    disabled={filteredItems.length === 0}
-                    className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 disabled:opacity-50"
-                 >
-                    <CreditCard className="w-4 h-4" /> Finalizar
                  </button>
              </div>
         </div>
@@ -498,9 +508,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         {/* Budget Control Bar */}
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
              <div className="flex justify-between items-end mb-2">
-                 <div>
-                     <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Total Calculado</p>
-                     <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatValue(total)}</p>
+                 <div className="flex gap-4 sm:gap-6">
+                     <div>
+                         <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Previsão</p>
+                         <p className="text-xl font-bold text-slate-800 dark:text-white">{formatValue(forecastTotal)}</p>
+                     </div>
+                     <div>
+                         <p className="text-[10px] font-bold uppercase text-emerald-500 tracking-wider mb-1 flex items-center gap-1"><Check className="w-3 h-3" /> Real</p>
+                         <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatValue(spentTotal)}</p>
+                     </div>
                  </div>
                  
                  <div className="text-right">
@@ -545,91 +561,181 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
         </div>
       </div>
 
-      {/* ADD ITEM INPUT */}
-      <form onSubmit={handleAddItem} className="flex flex-col gap-3 bg-indigo-50/80 dark:bg-indigo-950/30 p-5 rounded-2xl shadow-sm border-2 border-indigo-100 dark:border-indigo-900/50 mb-6">
-         <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1">
-               <input 
-                  id="new-item-input"
-                  type="text"
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="Nome do item..."
-                  className="w-full p-3 rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                  autoComplete="off"
-               />
-            </div>
-            
-            <div className="flex gap-3">
-               <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl p-1 border border-indigo-100 dark:border-indigo-800/50 h-12 shadow-sm">
-                  <button type="button" onClick={() => setNewItemQuantity(Math.max(1, newItemQuantity - 1))} className="p-2 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
-                  <span className="w-8 text-center font-bold text-slate-700 dark:text-white text-sm">{newItemQuantity}</span>
-                  <button type="button" onClick={() => setNewItemQuantity(newItemQuantity + 1)} className="p-2 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
-               </div>
-               <div className="relative flex-1 md:w-32 flex flex-col">
-                  <div className="relative">
-                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
-                     <input 
-                        type="text" 
-                        placeholder="0,00"
-                        value={newItemPrice}
-                        onChange={(e) => setNewItemPrice(formatCurrencyInput(e.target.value))}
-                        className="w-full pl-8 pr-3 py-3 h-12 text-sm font-bold text-right rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                     />
-                  </div>
-                  {newItemQuantity > 1 && parseCurrencyInput(newItemPrice) > 0 && (
-                     <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mt-1 text-right px-1">
-                        Subtotal: {formatValue(newItemQuantity * parseCurrencyInput(newItemPrice))}
-                     </span>
-                  )}
-               </div>
-               
-               <select
-                   value={newItemCategory}
-                   onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
-                   className="flex-1 md:w-40 p-3 h-12 rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
-               >
-                   {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-               </select>
-            </div>
-         </div>
-         
-         <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1">
-               <input 
-                  type="date"
-                  value={newItemDate}
-                  onChange={(e) => {
-                      setNewItemDate(e.target.value);
-                      const selectedMonth = e.target.value.slice(0, 7);
-                      if (selectedMonth !== monthStr) {
-                          const [y, m] = selectedMonth.split('-').map(Number);
-                          setCurrentDate(new Date(y, m - 1, 1));
-                      }
-                  }}
-                  className="w-full p-3 text-sm rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-               />
-            </div>
-            <div className="flex-[2]">
-               <input 
-                  type="text"
-                  value={newItemObservation}
-                  onChange={(e) => setNewItemObservation(e.target.value)}
-                  placeholder="Observação (opcional)"
-                  className="w-full p-3 text-sm rounded-xl border border-indigo-100 dark:border-indigo-800/50 bg-white dark:bg-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                  autoComplete="off"
-               />
-            </div>
-            
-            <button 
-               type="submit" 
-               disabled={!newItemName.trim()}
-               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 font-bold"
-            >
-               <Plus className="w-5 h-5" /> <span className="md:hidden">Adicionar Item</span>
-            </button>
-         </div>
-      </form>
+      {/* ADD ITEM FAB */}
+      <button 
+          onClick={() => setIsAddingItem(true)}
+          className="fixed bottom-24 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-40 hover:-translate-y-1 group"
+      >
+          <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+      </button>
+
+      {/* ADD ITEM MODAL */}
+      {isAddingItem && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg p-6 border border-slate-200 dark:border-slate-700 animate-scale-in">
+             <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                   <Plus className="w-6 h-6 text-indigo-500" /> Adicionar Item
+                </h3>
+                <button onClick={() => setIsAddingItem(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+             </div>
+             <form onSubmit={(e) => { handleAddItem(e); setIsAddingItem(false); }} className="flex flex-col gap-4">
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome do Item</label>
+                    <input 
+                       autoFocus
+                       id="new-item-input"
+                       type="text"
+                       value={newItemName}
+                       onChange={(e) => setNewItemName(e.target.value)}
+                       placeholder="Nome do item..."
+                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                       autoComplete="off"
+                    />
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Qtd / Unidade</label>
+                        <div className="flex gap-2">
+                             <div className="flex items-center bg-slate-50 dark:bg-slate-900 rounded-xl p-1 border border-slate-300 dark:border-slate-600 shadow-sm flex-1">
+                                 <button type="button" onClick={() => setNewItemQuantity(Math.max(1, newItemQuantity - 1))} className="p-2 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
+                                 <input type="number" step="any" value={newItemQuantity} onChange={(e) => setNewItemQuantity(Number(e.target.value) || 1)} className="flex-1 w-full min-w-0 text-center font-bold text-slate-700 dark:text-white text-sm bg-transparent outline-none" />
+                                 <button type="button" onClick={() => setNewItemQuantity(newItemQuantity + 1)} className="p-2 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
+                             </div>
+                             <select
+                                 value={newItemUnit}
+                                 onChange={(e) => setNewItemUnit(e.target.value)}
+                                 className="w-20 p-2 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm font-bold"
+                             >
+                                 <option value="un">UN</option>
+                                 <option value="kg">KG</option>
+                                 <option value="g">g</option>
+                                 <option value="L">L</option>
+                                 <option value="ml">ml</option>
+                                 <option value="cx">CX</option>
+                                 <option value="pct">PCT</option>
+                                 <option value="pc">PÇ</option>
+                                 <option value="bdj">BDJ</option>
+                             </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço Ref.</label>
+                            <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                               <input 
+                                  type="text" 
+                                  placeholder="0,00"
+                                  value={newItemRefPrice}
+                                  onChange={(e) => setNewItemRefPrice(formatCurrencyInput(e.target.value))}
+                                  className="w-full pl-8 pr-2 py-3 font-bold text-right rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                               />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço Real</label>
+                            <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                               <input 
+                                  type="text" 
+                                  placeholder="0,00"
+                                  value={newItemPrice}
+                                  onChange={(e) => setNewItemPrice(formatCurrencyInput(e.target.value))}
+                                  className="w-full pl-8 pr-2 py-3 font-bold text-right rounded-xl border border-emerald-300 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-100 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm text-sm"
+                               />
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Categoria</label>
+                        <select
+                            value={newItemCategory}
+                            onChange={(e) => setNewItemCategory(e.target.value as ShoppingCategory)}
+                            className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-sm"
+                        >
+                            {SHOPPING_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Data(s)</label>
+                        <div className="flex flex-col gap-2">
+                             <input 
+                                type="date"
+                                value={newItemDate}
+                                onChange={(e) => setNewItemDate(e.target.value)}
+                                className="w-full p-3 text-sm rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                             />
+                             {repeatDates.map((date, idx) => (
+                                 <div key={idx} className="flex gap-2 items-center">
+                                     <input 
+                                        type="date"
+                                        value={date}
+                                        onChange={(e) => {
+                                            const newDates = [...repeatDates];
+                                            newDates[idx] = e.target.value;
+                                            setRepeatDates(newDates);
+                                        }}
+                                        className="w-full p-3 text-sm rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                     />
+                                     <button type="button" onClick={() => {
+                                         const newDates = repeatDates.filter((_, i) => i !== idx);
+                                         setRepeatDates(newDates);
+                                     }} className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl">
+                                         <X className="w-4 h-4" />
+                                     </button>
+                                 </div>
+                             ))}
+                             <button type="button" onClick={() => setRepeatDates([...repeatDates, newItemDate])} className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 mt-1">
+                                 <Plus className="w-3 h-3" /> Repetir em outra data
+                             </button>
+                        </div>
+                    </div>
+                 </div>
+
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Observação</label>
+                    <input 
+                       type="text"
+                       value={newItemObservation}
+                       onChange={(e) => setNewItemObservation(e.target.value)}
+                       placeholder="Observação (opcional)"
+                       className="w-full p-3 text-sm rounded-xl border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                       autoComplete="off"
+                    />
+                 </div>
+
+                 <button 
+                    type="submit" 
+                    disabled={!newItemName.trim()}
+                    className="w-full mt-2 px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 font-bold text-lg"
+                 >
+                    <Plus className="w-5 h-5" /> Adicionar Item
+                 </button>
+             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Categoria Anchors */}
+      {activeTab === 'list' && filteredItems.length > 0 && (
+          <div className="flex overflow-x-auto no-scrollbar gap-2 mb-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm sticky top-[72px] z-20">
+             <span className="text-xs font-bold text-slate-500 uppercase flex items-center pr-2 border-r border-slate-200 dark:border-slate-700">Ir para</span>
+             {SHOPPING_CATEGORIES.filter(c => groupedItems[c]?.length > 0).map(cat => (
+                 <button 
+                     key={cat} 
+                     onClick={() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: 'smooth' })}
+                     className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg text-xs font-bold whitespace-nowrap transition-colors"
+                 >
+                     {cat}
+                 </button>
+             ))}
+          </div>
+      )}
 
       {/* LIST (GROUPED BY CATEGORY) OR TIMELINE */}
       <div className="space-y-6">
@@ -663,16 +769,88 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                         </div>
                                         <span className="text-lg font-black text-indigo-600 dark:text-indigo-400">{formatValue(item.total)}</span>
                                     </div>
-                                    <div className="pl-11 space-y-2">
+                                    <div className="flex flex-col border-t border-slate-100 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700 mt-2">
                                         {item.items.map(product => (
-                                            <div key={product.id} className="flex justify-between items-center text-sm">
-                                                <span className="text-slate-600 dark:text-slate-300">
-                                                    {product.name} {product.quantity > 1 ? <span className="text-xs text-slate-400 ml-1">({product.quantity}x)</span> : ''}
-                                                </span>
-                                                <span className="text-slate-500 font-medium">
-                                                    {formatValue(product.actualPrice * product.quantity)}
-                                                </span>
-                                            </div>
+                                             <div key={product.id} className={`py-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-colors ${product.isChecked ? 'bg-slate-50/50 dark:bg-slate-700/30' : ''}`}>
+                                                
+                                                {/* Check & Name */}
+                                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                   <button 
+                                                      onClick={() => onUpdate(product.id, { isChecked: !product.isChecked })}
+                                                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                                                         product.isChecked 
+                                                         ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                                         : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-emerald-400'
+                                                      }`}
+                                                   >
+                                                      <Check className="w-4 h-4" />
+                                                   </button>
+                                                   <div className="flex flex-col min-w-0">
+                                                      <span className={`font-medium text-lg truncate ${product.isChecked ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                         {product.name}
+                                                      </span>
+                                                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                                                          {product.observation && (
+                                                             <span className={`truncate ${product.isChecked ? 'text-slate-400/70' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                {product.observation}
+                                                             </span>
+                                                          )}
+                                                      </div>
+                                                   </div>
+                                                </div>
+                                                
+                                                {/* Controls (Qty & Price) */}
+                                                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+                                                   
+                                                   {/* Quantity */}
+                                                   <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                                                      <button onClick={() => handleQuantity(product.id, product.quantity, -1)} className="p-1.5 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
+                                                      <div className="w-16 text-center font-bold text-slate-700 dark:text-white text-sm flex items-center justify-center gap-1">
+                                                          <span>{product.quantity}</span>
+                                                          {product.unit && <span className="text-[10px] text-slate-400">{product.unit.toUpperCase()}</span>}
+                                                      </div>
+                                                      <button onClick={() => handleQuantity(product.id, product.quantity, 1)} className="p-1.5 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
+                                                   </div>
+                                                   
+                                                   {/* Price Input (Calculator Mode) */}
+                                                   <div className="relative flex flex-col items-end">
+                                                      <div className="relative">
+                                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                                                         <CurrencyInput 
+                                                            placeholder="0,00"
+                                                            value={product.actualPrice === 0 ? '' : product.actualPrice.toString()}
+                                                            onChangeValue={(val) => onUpdate(product.id, { actualPrice: parseFloat(val) || 0 })}
+                                                            className={`w-28 pl-8 pr-2 py-2 rounded-lg border outline-none font-bold text-right transition-colors ${
+                                                               product.actualPrice > 0 
+                                                               ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
+                                                               : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:border-indigo-500'
+                                                            }`}
+                                                         />
+                                                      </div>
+                                                      {product.quantity > 1 && product.actualPrice > 0 && (
+                                                         <span className="text-[10px] text-slate-400 font-medium mt-1">
+                                                            Subtotal: {formatValue(product.quantity * product.actualPrice)}
+                                                         </span>
+                                                      )}
+                                                   </div>
+                                                   
+                                                   {/* Edit */}
+                                                   <button 
+                                                      onClick={() => setEditingItem(product)}
+                                                       className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"
+                                                   >
+                                                      <Edit2 className="w-5 h-5" />
+                                                   </button>
+                                                   
+                                                   {/* Delete */}
+                                                   <button 
+                                                      onClick={() => onDelete(product.id)}
+                                                      className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
+                                                   >
+                                                      <Trash2 className="w-5 h-5" />
+                                                   </button>
+                                                </div>
+                                             </div>
                                         ))}
                                     </div>
                                 </div>
@@ -680,7 +858,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                         </div>
                         <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 border-t border-indigo-100 dark:border-indigo-800 flex justify-between items-center">
                             <span className="text-sm font-bold text-indigo-800 dark:text-indigo-300">Total do Período</span>
-                            <span className="text-xl font-black text-indigo-700 dark:text-indigo-200">{formatValue(total)}</span>
+                            <span className="text-xl font-black text-indigo-700 dark:text-indigo-200">{formatValue(spentTotal)}</span>
                         </div>
                     </div>
                 )}
@@ -690,8 +868,21 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                 const categoryItems = groupedItems[category];
                 if (!categoryItems || categoryItems.length === 0) return null;
 
+                const groupedByDate = categoryItems.reduce((acc, item) => {
+                    const d = item.purchaseDate || 'Sem Data';
+                    if (!acc[d]) acc[d] = [];
+                    acc[d].push(item);
+                    return acc;
+                }, {} as Record<string, typeof categoryItems>);
+                
+                const sortedDates = Object.keys(groupedByDate).sort((a,b) => {
+                    if (a === 'Sem Data') return 1;
+                    if (b === 'Sem Data') return -1;
+                    return new Date(a).getTime() - new Date(b).getTime();
+                });
+
                 return (
-                    <div key={category} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div key={category} id={`cat-${category}`} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 scroll-mt-24">
                         <div className="bg-slate-50 dark:bg-slate-900/50 px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
                             <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                                 <List className="w-3 h-3" /> {category}
@@ -701,8 +892,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                             </span>
                         </div>
                         
-                        <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                           {categoryItems.map(item => (
+                        <div className="divide-y divide-slate-100 dark:divide-slate-700 pb-2">
+                           {sortedDates.map(dateKey => (
+                               <div key={dateKey} className="pt-2">
+                                   <div className="px-4 py-1 flex items-center gap-2">
+                                       <Calendar className="w-3 h-3 text-slate-400" />
+                                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                           {dateKey === 'Sem Data' ? 'Sem Data' : new Date(dateKey + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                       </span>
+                                   </div>
+                                   <div className="flex flex-col">
+                                       {groupedByDate[dateKey].map(item => (
                               <div key={item.id} className={`p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-colors ${item.isChecked ? 'bg-slate-50/50 dark:bg-slate-700/30' : ''}`}>
                                  
                                  {/* Check & Name */}
@@ -743,7 +943,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                     {/* Quantity */}
                                     <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
                                        <button onClick={() => handleQuantity(item.id, item.quantity, -1)} className="p-1.5 text-slate-500 hover:text-indigo-600"><Minus className="w-4 h-4" /></button>
-                                       <span className="w-8 text-center font-bold text-slate-700 dark:text-white text-sm">{item.quantity}</span>
+                                       <div className="w-16 text-center font-bold text-slate-700 dark:text-white text-sm flex items-center justify-center gap-1">
+                                           <span>{item.quantity}</span>
+                                           {item.unit && <span className="text-[10px] text-slate-400">{item.unit.toUpperCase()}</span>}
+                                       </div>
                                        <button onClick={() => handleQuantity(item.id, item.quantity, 1)} className="p-1.5 text-slate-500 hover:text-indigo-600"><Plus className="w-4 h-4" /></button>
                                     </div>
 
@@ -787,35 +990,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                                  </div>
                               </div>
                            ))}
+                                   </div>
+                               </div>
+                           ))}
                         </div>
                     </div>
                 );
             })
          )}
-      </div>
-
-      {/* FLOAT ACTION BUTTON FOR MOBILE FINISH */}
-      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 md:hidden z-30 flex gap-2 w-[90%] max-w-sm">
-           <button 
-             onClick={() => setIsAiModalOpen(true)}
-             disabled={!hasApiKey}
-             className="bg-white dark:bg-slate-800 text-purple-600 p-4 rounded-full shadow-lg border border-purple-100 dark:border-purple-900 disabled:opacity-50"
-           >
-              <Sparkles className="w-6 h-6" />
-           </button>
-           <button 
-             onClick={() => setIsFinishing(true)}
-             disabled={filteredItems.length === 0}
-             className="flex-1 bg-slate-900 text-white rounded-full shadow-xl font-bold flex items-center justify-between px-6 hover:scale-105 transition-transform disabled:opacity-70 disabled:scale-100"
-           >
-              <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[10px] text-emerald-400 uppercase font-bold">Total</span>
-                  <span className="text-lg">{formatValue(total)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm bg-white/10 px-3 py-1.5 rounded-lg">
-                  Finalizar <ArrowRight className="w-4 h-4" />
-              </div>
-           </button>
       </div>
 
     </div>

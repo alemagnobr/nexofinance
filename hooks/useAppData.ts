@@ -70,6 +70,9 @@ import {
   addDailyRoutineFire,
   updateDailyRoutineFire,
   deleteDailyRoutineFire,
+  addWorkGoalFire,
+  updateWorkGoalFire,
+  deleteWorkGoalFire,
   addWalletFire,
   updateWalletFire,
   deleteWalletFire,
@@ -1330,27 +1333,35 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
   const addWorkGoal = async (goal: WorkGoal) => {
     if (user) {
-      // For now, save locally to 'data', or we can optionally implement Firebase later.
-      // Since it's a simple app, let's keep it in local state for guest or directly update data
+      await addWorkGoalFire(user.uid, goal);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workGoals: [...(prev.workGoals || []), goal],
+      }));
     }
-    setData((prev) => ({
-      ...prev,
-      workGoals: [...(prev.workGoals || []), goal],
-    }));
   };
 
   const updateWorkGoal = async (id: string, partial: Partial<WorkGoal>) => {
-    setData((prev) => ({
-      ...prev,
-      workGoals: (prev.workGoals || []).map((g) => (g.id === id ? { ...g, ...partial } : g)),
-    }));
+    if (user) {
+      await updateWorkGoalFire(user.uid, id, partial);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workGoals: (prev.workGoals || []).map((g) => (g.id === id ? { ...g, ...partial } : g)),
+      }));
+    }
   };
 
   const deleteWorkGoal = async (id: string) => {
-    setData((prev) => ({
-      ...prev,
-      workGoals: (prev.workGoals || []).filter((g) => g.id !== id),
-    }));
+    if (user) {
+      await deleteWorkGoalFire(user.uid, id);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workGoals: (prev.workGoals || []).filter((g) => g.id !== id),
+      }));
+    }
   };
 
   const unlockBadge = (badgeId: string) => {

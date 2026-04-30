@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine, WorkGoal } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -280,6 +280,13 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar carteiras");
   });
 
+  const unsubWorkGoals = onSnapshot(collection(db, 'users', uid, 'workGoals'), (snapshot) => {
+    const workGoals = snapshot.docs.map(doc => doc.data() as WorkGoal);
+    onUpdate({ workGoals });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar metas de trabalho");
+  });
+
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -331,6 +338,7 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubHabits();
     unsubDailyRoutines();
     unsubWallets();
+    unsubWorkGoals();
     unsubCategories();
     unsubUserDoc();
   };
@@ -774,6 +782,29 @@ export const deleteDailyRoutineFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'dailyRoutines', id));
   } catch (error) {
     handleFirestoreError(error, "Erro ao excluir rotina diária");
+  }
+};
+
+// --- WORK GOALS ---
+export const addWorkGoalFire = async (uid: string, goal: WorkGoal) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'workGoals', goal.id), goal);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar meta de trabalho");
+  }
+};
+export const updateWorkGoalFire = async (uid: string, id: string, data: Partial<WorkGoal>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'workGoals', id), data);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar meta de trabalho");
+  }
+};
+export const deleteWorkGoalFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'workGoals', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao excluir meta de trabalho");
   }
 };
 

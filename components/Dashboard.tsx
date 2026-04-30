@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line, ReferenceLine } from 'recharts';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play, Dumbbell, Apple } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play, Dumbbell, Apple, Key, ShoppingCart, KeyRound, QrCode, FileText, CheckSquare } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -130,17 +129,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onToggleHabitEntry,
 }) => {
   
-  // History Chart State
-  const [historyStartMonth, setHistoryStartMonth] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 5); // Default to last 6 months
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return `${d.getFullYear()}-${m}`;
-  });
-
-  // Mobile Tabs State
-  const [activeMobileTab, setActiveMobileTab] = useState<'flow' | 'allocation' | 'history'>('flow');
-
   // Greeting Logic
   const greeting = useMemo(() => {
     const h = new Date().getHours();
@@ -358,68 +346,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return [...agreements, ...others].slice(0, 2);
   }, [data.debts]);
 
-  // Expense History
-  const expenseHistoryData = useMemo(() => {
-    const expenseMap = new Map<string, number>();
-    const [startYear, startMonth] = historyStartMonth.split('-').map(Number);
-    const currentDate = new Date(startYear, startMonth - 1, 1);
-    const today = new Date();
-    
-    while (currentDate <= today || (currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear())) {
-        const y = currentDate.getFullYear();
-        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
-        expenseMap.set(`${y}-${m}`, 0);
-        currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-    data.transactions.forEach(t => {
-        if (t.type === 'expense') {
-            const m = t.date.slice(0, 7); 
-            if (expenseMap.has(m)) expenseMap.set(m, (expenseMap.get(m) || 0) + t.amount);
-        }
-    });
-    return Array.from(expenseMap.entries()).map(([key, value]) => {
-        const [y, m] = key.split('-').map(Number);
-        return {
-            name: new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-            amount: value,
-            fullDate: key
-        };
-    });
-  }, [data.transactions, historyStartMonth]);
-
-  // Comparative Data
-  const comparativeData = useMemo(() => {
-    const map = new Map<string, { income: number; expense: number }>();
-    for (let i = 5; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        map.set(d.toISOString().slice(0, 7), { income: 0, expense: 0 });
-    }
-    data.transactions.forEach(t => {
-        const m = t.date.slice(0, 7);
-        if (map.has(m)) {
-            const current = map.get(m)!;
-            if (t.type === 'income') current.income += t.amount;
-            else current.expense += t.amount;
-        }
-    });
-    return Array.from(map.entries()).map(([key, value]) => {
-        const [y, m] = key.split('-');
-        return {
-            name: new Date(parseInt(y), parseInt(m) - 1, 2).toLocaleDateString('pt-BR', { month: 'short' }),
-            Receitas: value.income,
-            Despesas: value.expense
-        };
-    });
-  }, [data.transactions]);
-
-  // Pie Chart Data
-  const pieChartData = [
-    { name: 'Saldo Livre', value: Math.max(0, currentBalance), color: '#10b981' },
-    { name: 'Contas Pendentes', value: totalPending, color: '#ef4444' },
-    { name: 'Investido', value: totalInvested, color: '#3b82f6' },
-  ].filter(d => d.value > 0);
-
   const exportData = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + "Data,Descricao,Categoria,Tipo,Valor,Status\n"
@@ -432,120 +358,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     link.click();
     document.body.removeChild(link);
   };
-
-  // --- CHART COMPONENTS (Reused for Mobile/Desktop) ---
-
-  const renderFlowChart = (
-    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 h-full">
-         <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-5 h-5 text-indigo-500" />
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Fluxo de Caixa (6 Meses)</h3>
-         </div>
-         <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={comparativeData} margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} width={60} />
-                  <RechartsTooltip 
-                     cursor={{ fill: 'transparent' }}
-                     contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                     formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`, '']}
-                  />
-                  <Legend iconType="circle" />
-                  <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-               </BarChart>
-            </ResponsiveContainer>
-         </div>
-    </div>
-  );
-
-  const renderAllocationChart = (
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 h-full">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-            <PieChartIcon className="w-5 h-5 text-indigo-500" />
-            Distribuição de Patrimônio
-        </h3>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={5} dataKey="value">
-                {pieChartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <RechartsTooltip formatter={(value: number) => privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR')}`} />
-              <Legend verticalAlign="bottom" height={36} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-  );
-
-  const renderHistoryChart = (
-      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
-                  <TrendingDown className="w-5 h-5 text-rose-500" />
-                  Tendência de Despesas
-              </h3>
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Início:</span>
-                  <input 
-                      type="month" 
-                      value={historyStartMonth}
-                      onChange={(e) => setHistoryStartMonth(e.target.value)}
-                      className="bg-transparent text-sm text-slate-700 dark:text-slate-200 focus:outline-none font-medium"
-                  />
-              </div>
-          </div>
-          {/* Adjusted height to 200px to make it even smaller as requested */}
-          <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={expenseHistoryData} margin={{ top: 10, right: 10, bottom: 25, left: 10 }}>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                       <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#94a3b8', fontSize: 12}} 
-                          dy={10} 
-                          padding={{ left: 10, right: 10 }}
-                       />
-                       <YAxis 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#94a3b8', fontSize: 12}} 
-                          tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`}
-                          width={60}
-                       />
-                       <RechartsTooltip 
-                            cursor={{ stroke: '#f43f5e', strokeWidth: 1, strokeDasharray: '5 5' }}
-                            contentStyle={{ 
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                                borderRadius: '12px', 
-                                border: 'none', 
-                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' 
-                            }}
-                            formatter={(value: number) => [privacyMode ? '••••' : `R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'Despesas']}
-                            labelStyle={{ color: '#64748b', marginBottom: '0.25rem' }}
-                       />
-                       <Line 
-                          type="monotone" 
-                          dataKey="amount" 
-                          stroke="#f43f5e" 
-                          strokeWidth={3} 
-                          dot={{r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff'}} 
-                          activeDot={{r: 6, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff'}} 
-                          isAnimationActive={false}
-                       />
-                  </LineChart>
-              </ResponsiveContainer>
-          </div>
-      </div>
-  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -923,14 +735,126 @@ export const Dashboard: React.FC<DashboardProps> = ({
         })}
       </div>
 
+      {/* --- PLANEJAMENTO --- */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-indigo-500" /> Planejamento
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Calendário Preview */}
+        <div onClick={() => onNavigate(View.CALENDAR)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-sm font-bold uppercase">
+                    <CalendarClock className="w-4 h-4" /> Calendário
+                </div>
+                <ArrowRight className="w-4 h-4 text-indigo-400" />
+            </div>
+            {data.agendaEvents?.filter(e => new Date(e.startDate) >= new Date()).slice(0, 3).length > 0 ? (
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
+                    {data.agendaEvents.filter(e => new Date(e.startDate) >= new Date()).sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3).map(event => (
+                        <div key={event.id} className="text-xs flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                            <div className="w-2 h-2 rounded-full flex-shrink-0 bg-indigo-500" />
+                            <div className="flex-1 truncate">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">{event.title}</span>
+                                <span className="block text-slate-500 text-[10px]">{new Date(event.startDate).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500 mt-2">Acompanhe vencimentos e fluxo de caixa diário.</p>
+            )}
+        </div>
+
+        {/* Kanban Preview */}
+        <div onClick={() => onNavigate(View.KANBAN)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-sm font-bold uppercase">
+                    <Layers className="w-4 h-4" /> Kanban
+                </div>
+                <ArrowRight className="w-4 h-4 text-purple-400" />
+            </div>
+            {data.kanbanBoards && data.kanbanBoards.length > 0 ? (
+                <div className="flex-1 flex flex-col gap-2">
+                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {data.kanbanBoards.length} quadro(s) de tarefas.
+                     </span>
+                     <div className="flex items-center gap-2 mt-2">
+                        <div className="flex-1 bg-slate-100 dark:bg-slate-700/50 h-10 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500">
+                            {data.kanbanBoards.reduce((acc, b) => acc + Object.values(b.columns).reduce((acc2, col) => acc2 + col.cards.length, 0), 0)} tarefas
+                        </div>
+                     </div>
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500 mt-2">Organize tarefas em quadros visuais.</p>
+            )}
+        </div>
+
+        {/* Orçamentos Preview */}
+        <div onClick={() => onNavigate(View.BUDGETS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-sm font-bold uppercase">
+                    <Target className="w-4 h-4" /> Orçamentos
+                </div>
+                <ArrowRight className="w-4 h-4 text-rose-400" />
+            </div>
+            {data.budgets && data.budgets.length > 0 ? (
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
+                    {data.budgets.slice(0, 2).map((budget: any) => {
+                        const totalSpent = data.transactions.filter(t => t.type === 'expense' && t.category === budget.category && new Date(t.date).getMonth() === new Date().getMonth()).reduce((acc, t) => acc + t.amount, 0);
+                        const progress = Math.min((totalSpent / budget.limit) * 100, 100);
+                        return (
+                            <div key={budget.id} className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate">{budget.category}</span>
+                                    <span className="text-[10px] font-bold text-rose-500">{progress.toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-1 overflow-hidden">
+                                    <div className={`h-full rounded-full ${progress >= 100 ? 'bg-rose-500' : progress >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${progress}%` }} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {data.budgets.length > 2 && <span className="text-[10px] text-center text-slate-500">+ {data.budgets.length - 2} orçamentos</span>}
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500 mt-2">Defina tetos de gastos por categoria.</p>
+            )}
+        </div>
+
+        {/* Rotina Diária Preview */}
+        <div onClick={() => onNavigate(View.DAILY_ROUTINES)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm font-bold uppercase">
+                    <CheckSquare className="w-4 h-4" /> Rotina Diária
+                </div>
+                <ArrowRight className="w-4 h-4 text-blue-400" />
+            </div>
+            {data.dailyRoutines && data.dailyRoutines.length > 0 ? (
+                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
+                    {data.dailyRoutines.slice(0, 3).map((r: any) => (
+                        <div key={r.id} className="flex items-center gap-2">
+                             {r.completed ? <CheckSquare className="w-3 h-3 text-emerald-500" /> : <div className="w-3 h-3 border-2 border-slate-300 dark:border-slate-500 rounded-sm" />}
+                             <span className={`text-xs truncate ${r.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{r.time} - {r.title}</span>
+                        </div>
+                    ))}
+                    {data.dailyRoutines.length > 3 && <span className="text-[10px] text-center text-slate-500">+ {data.dailyRoutines.length - 3} rotinas</span>}
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500 mt-2">Planeje seu dia com checklists organizados.</p>
+            )}
+        </div>
+      </div>
+
       {/* --- PRODUTIVIDADE --- */}
       <div className="mb-3 mt-6">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
           <Target className="w-5 h-5 text-purple-500" /> Produtividade
         </h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {['habits', 'eisenhower', 'notes', 'workgoals'].map((cardId) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {['habits', 'notes', 'workgoals'].map((cardId) => {
           if (cardId === 'habits') {
             const todayStr = new Date().toISOString().split('T')[0];
             const activeHabits = data.habits || [];
@@ -1038,29 +962,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                       </div>
                   )}
-              </div>
-            );
-          }
-
-          if (cardId === 'eisenhower') {
-            return (
-              <div key="eisenhower" onClick={() => onNavigate(View.PRODUCTIVITY)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer group">
-                {/* Card 4: Flow Widget */}
-                <div>
-                   <div className="flex items-center justify-between mb-2">
-                       <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Modo Flow</h3>
-                       <Timer className="w-4 h-4 text-orange-500" />
-                   </div>
-                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 mb-4 line-clamp-2">
-                       Mantenha o foco em suas tarefas com a técnica Pomodoro.
-                   </p>
-                </div>
-                
-                <div className="flex items-center justify-center p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/30 rounded-lg group-hover:bg-orange-100 dark:group-hover:bg-orange-900/40 transition-colors">
-                    <span className="text-sm font-bold text-orange-600 dark:text-orange-400 flex items-center gap-2">
-                        <Play className="w-4 h-4" /> Iniciar Sessão
-                    </span>
-                </div>
               </div>
             );
           }
@@ -1183,55 +1084,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
       
-      {/* --- DESKTOP VIEW (GRID) --- */}
-      <div className="hidden lg:block space-y-6">
-        <div className="grid grid-cols-2 gap-6 h-full">
-           {renderFlowChart}
-           {renderAllocationChart}
-        </div>
-        {renderHistoryChart}
+      {/* --- UTILIDADES --- */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <Key className="w-5 h-5 text-amber-500" /> Utilidades
+        </h2>
       </div>
-
-      {/* --- MOBILE VIEW (TABS) --- */}
-      <div className="lg:hidden space-y-4">
-          <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl gap-1 border border-slate-200 dark:border-slate-700">
-              <button 
-                  onClick={() => setActiveMobileTab('flow')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
-                    ${activeMobileTab === 'flow' 
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  Fluxo
-              </button>
-              <button 
-                  onClick={() => setActiveMobileTab('allocation')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
-                    ${activeMobileTab === 'allocation' 
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              >
-                  <PieChartIcon className="w-3.5 h-3.5" />
-                  Carteira
-              </button>
-              <button 
-                  onClick={() => setActiveMobileTab('history')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5
-                    ${activeMobileTab === 'history' 
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-              >
-                  <TrendingDown className="w-3.5 h-3.5" />
-                  Histórico
-              </button>
-          </div>
-
-          <div className="min-h-[350px]">
-             {activeMobileTab === 'flow' && renderFlowChart}
-             {activeMobileTab === 'allocation' && renderAllocationChart}
-             {activeMobileTab === 'history' && renderHistoryChart}
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div onClick={() => onNavigate(View.SHOPPING_LIST)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 text-sm font-bold uppercase">
+                    <ShoppingCart className="w-4 h-4" /> Compras
+                </div>
+                <ArrowRight className="w-4 h-4 text-sky-400" />
+            </div>
+            <p className="text-xs text-slate-500">Lista inteligente de supermercado.</p>
+        </div>
+        <div onClick={() => onNavigate(View.PASSWORDS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-bold uppercase">
+                    <KeyRound className="w-4 h-4" /> Senhas
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400" />
+            </div>
+            <p className="text-xs text-slate-500">Cofre seguro para senhas criptografadas.</p>
+        </div>
+        <div onClick={() => onNavigate(View.PIX_KEYS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 text-sm font-bold uppercase">
+                    <QrCode className="w-4 h-4" /> Chaves Pix
+                </div>
+                <ArrowRight className="w-4 h-4 text-teal-400" />
+            </div>
+            <p className="text-xs text-slate-500">Gerencie todas suas chaves Pix.</p>
+        </div>
       </div>
     </div>
   );
