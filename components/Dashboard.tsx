@@ -94,7 +94,7 @@ const AVAILABLE_BADGES: Badge[] = [
   {
     id: 'club_10k',
     name: 'Clube dos 10k',
-    description: 'Patrimônio total superou R$ 10.000.',
+    description: 'Seu montante para aposentadoria superou R$ 10.000.',
     icon: '💎',
     condition: (d) => {
       const totalInvest = d.investments.reduce((acc, i) => acc + i.amount, 0);
@@ -692,7 +692,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {totalInvested > 0 && currentBalance > 0 && (
                   <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">Patrimônio Alocado</span>
+                          <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">Ativos para Aposentadoria</span>
                           <span className="text-xs font-black text-indigo-700 dark:text-indigo-400">
                               {((totalInvested / (totalInvested + currentBalance)) * 100).toFixed(0)}%
                           </span>
@@ -1072,15 +1072,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <ArrowRight className="w-4 h-4 text-orange-400" />
             </div>
             <p className="text-xs text-slate-500">Registre treinos, cronogramas e rotina diária.</p>
-        </div>
-        <div onClick={() => onNavigate(View.DIETA)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-bold uppercase">
-                    <Apple className="w-4 h-4" /> Dieta
-                </div>
-                <ArrowRight className="w-4 h-4 text-green-400" />
-            </div>
-            <p className="text-xs text-slate-500">Monitore calorias e cálculo IA de macronutrientes.</p>
         </div>
       </div>
       

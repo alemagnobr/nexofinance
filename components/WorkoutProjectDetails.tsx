@@ -12,9 +12,13 @@ interface WorkoutProjectDetailsProps {
 }
 
 export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ project, onBack, data, actions }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'routines'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'routines' | 'dietas'>('info');
   const [editingRoutine, setEditingRoutine] = useState<WorkoutRoutine | null | 'new'>(null);
   const [viewingRoutine, setViewingRoutine] = useState<WorkoutRoutine | null>(null);
+
+  const [isEditingObjective, setIsEditingObjective] = useState(false);
+  const [objectiveInput, setObjectiveInput] = useState(project.objective);
+  const [descriptionInput, setDescriptionInput] = useState(project.description || '');
 
   const statusColors = {
     'Planejado': 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
@@ -60,6 +64,9 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
         routine={upToDateRoutine} 
         onBack={() => setViewingRoutine(null)} 
         onEdit={() => setEditingRoutine(upToDateRoutine)} 
+        onUpdateRoutine={(r: WorkoutRoutine) => {
+          actions.updateWorkoutRoutine?.(r.id, r);
+        }}
       />
     );
   }
@@ -109,17 +116,76 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
         >
           Fichas de Treino
         </button>
+        <button
+          onClick={() => setActiveTab('dietas')}
+          className={`px-4 py-2 font-bold text-sm border-b-2 transition-colors ${activeTab === 'dietas' ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+        >
+          Dietas
+        </button>
       </div>
+
+      {activeTab === 'dietas' && (
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-center">
+          <p className="text-slate-500 dark:text-slate-400">
+            Acompanhamento de dieta por projeto será desenvolvido em breve.
+          </p>
+        </div>
+      )}
 
       {activeTab === 'info' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2 mb-3">
-              <Target className="w-4 h-4" /> Objetivo Principal
-            </h3>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{project.objective}</p>
-            {project.description && (
-              <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm">{project.description}</p>
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative group">
+            <div className="flex justify-between items-start mb-3">
+              <h3 className="text-sm font-bold text-slate-500 uppercase flex items-center gap-2">
+                <Target className="w-4 h-4" /> Objetivo Principal
+              </h3>
+              {!isEditingObjective && (
+                 <button onClick={() => {
+                   setObjectiveInput(project.objective);
+                   setDescriptionInput(project.description || '');
+                   setIsEditingObjective(true);
+                 }} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700/50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                   <Edit2 className="w-4 h-4" />
+                 </button>
+              )}
+            </div>
+            
+            {isEditingObjective ? (
+              <div className="space-y-3">
+                <input 
+                  type="text"
+                  value={objectiveInput}
+                  onChange={e => setObjectiveInput(e.target.value)}
+                  className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none focus:border-indigo-500 font-semibold"
+                  placeholder="Seu objetivo principal"
+                />
+                <textarea 
+                  value={descriptionInput}
+                  onChange={e => setDescriptionInput(e.target.value)}
+                  className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none focus:border-indigo-500 text-sm"
+                  placeholder="Descrição ou detalhes (opcional)"
+                  rows={3}
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setIsEditingObjective(false)} className="text-sm font-bold text-slate-500 hover:text-slate-700 px-3 py-1">Cancelar</button>
+                  <button onClick={() => {
+                    if (actions.updateWorkoutProject && objectiveInput.trim()) {
+                      actions.updateWorkoutProject(project.id, { 
+                        objective: objectiveInput, 
+                        description: descriptionInput 
+                      });
+                    }
+                    setIsEditingObjective(false);
+                  }} className="text-sm font-bold bg-indigo-600 text-white px-3 py-1 rounded-lg hover:bg-indigo-700">Salvar</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-lg font-semibold text-slate-800 dark:text-white">{project.objective}</p>
+                {project.description && (
+                  <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm whitespace-pre-wrap">{project.description}</p>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -10,6 +10,9 @@ import {
   PlusCircle,
   ShoppingCart,
   AppWindow,
+  Landmark,
+  CheckSquare,
+  Activity
 } from "lucide-react";
 import {
   View,
@@ -410,8 +413,8 @@ const App: React.FC = () => {
       );
     }
 
-    // 6. Group: Saude (Treino, Dieta)
-    if ([View.SAUDE_DASHBOARD, View.TREINO, View.DIETA].includes(currentView)) {
+    // 6. Group: Saude (Treino)
+    if ([View.SAUDE_DASHBOARD, View.TREINO].includes(currentView)) {
       return (
         <SaudeView
           currentView={currentView}
@@ -535,71 +538,88 @@ const App: React.FC = () => {
           {/* Quick Actions Bar - Only visible on Dashboard usually, but keeping global for now as user likes it */}
 
           {currentView === View.DASHBOARD && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
               <button
-                onClick={() => triggerQuickAction(View.TRANSACTIONS)}
+                onClick={() => triggerQuickAction(View.FINANCEIRO_DASHBOARD)}
                 className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-blue-100 dark:border-blue-900/30 hover:border-blue-300 transition-all group"
               >
                 <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600 dark:text-blue-400">
-                  <PlusCircle className="w-5 h-5" />
+                  <Landmark className="w-5 h-5" />
                 </div>
                 <div className="text-left">
                   <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Nova
+                    Acessar
                   </p>
-                  <p className="font-bold text-slate-700 dark:text-white">
-                    Transação
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Financeiro
                   </p>
                 </div>
               </button>
 
               <button
-                onClick={() => triggerQuickAction(View.SHOPPING_LIST)}
+                onClick={() => triggerQuickAction(View.PLANEJAMENTO_DASHBOARD)}
                 className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 transition-all group"
               >
                 <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors text-emerald-600 dark:text-emerald-400">
-                  <ShoppingCart className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Calculadora
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white">
-                    Mercado
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => triggerQuickAction(View.DEBTS)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
-              >
-                <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Registrar
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white">
-                    Dívida
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => triggerQuickAction(View.BUDGETS)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-pink-100 dark:border-pink-900/30 hover:border-pink-300 transition-all group"
-              >
-                <div className="bg-pink-100 dark:bg-pink-900/40 p-2.5 rounded-lg group-hover:bg-pink-600 group-hover:text-white transition-colors text-pink-600 dark:text-pink-400">
                   <Target className="w-5 h-5" />
                 </div>
                 <div className="text-left">
                   <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Definir
+                    Acessar
                   </p>
-                  <p className="font-bold text-slate-700 dark:text-white">
-                    Meta/Limite
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Planejamento
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => triggerQuickAction(View.UTILIDADES_DASHBOARD)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-amber-100 dark:border-amber-900/30 hover:border-amber-300 transition-all group"
+              >
+                <div className="bg-amber-100 dark:bg-amber-900/40 p-2.5 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors text-amber-600 dark:text-amber-400">
+                  <CheckSquare className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Acessar
+                  </p>
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Utilidades
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => triggerQuickAction(View.SAUDE_DASHBOARD)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
+              >
+                <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Acessar
+                  </p>
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Saúde
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => triggerQuickAction(View.CALENDAR)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-purple-100 dark:border-purple-900/30 hover:border-purple-300 transition-all group"
+              >
+                <div className="bg-purple-100 dark:bg-purple-900/40 p-2.5 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors text-purple-600 dark:text-purple-400">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Acessar
+                  </p>
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Agenda
                   </p>
                 </div>
               </button>

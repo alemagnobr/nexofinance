@@ -199,6 +199,7 @@ export interface WealthProfile {
   retirementAge: number;
   riskProfile: RiskProfile;
   monthlyContributionOverride?: number; // Se o usuário quiser simular aportar diferente do real
+  retirementRate?: number; // Taxa de rendimento mensal alvo (ex: 1%)
 }
 
 export interface PasswordEntry {
@@ -340,7 +341,6 @@ export enum View {
   DAILY_ROUTINES = 'DAILY_ROUTINES',
   WORK_GOALS = 'WORK_GOALS',
   TREINO = 'TREINO',
-  DIETA = 'DIETA',
   WALLETS = 'WALLETS', // Gerenciamento de Carteiras
   SETTINGS = 'SETTINGS'
 }
@@ -414,6 +414,9 @@ export interface RoutineExercise {
   rest: string;
   technique?: string;
   notes?: string;
+  currentLoad?: string;
+  progressionMethod?: string;
+  loadHistory?: { date: string; load: string; reps?: string; notes?: string; id: string }[];
 }
 
 export interface RoutineDay {
@@ -439,5 +442,6 @@ export interface WorkGoal {
   targetHours: number;
   completedHours: number;
   deadline?: string;
+  history?: { id: string; date: string; hours: number; notes?: string }[];
   createdAt: string;
 }

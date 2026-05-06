@@ -5,7 +5,7 @@ import { SubscriptionManager } from './SubscriptionManager';
 import { DebtManager } from './DebtManager';
 import { InvestmentList } from './InvestmentList';
 import { BudgetList } from './BudgetList';
-import { WealthPlanner } from './WealthPlanner';
+import { RetirementMachine } from './RetirementMachine';
 import { PixKeyManager } from './PixKeyManager';
 import { Receipt, Repeat, ShieldAlert, LineChart, Target, Landmark, Key, LayoutDashboard } from 'lucide-react';
 
@@ -68,7 +68,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
     },
     { 
       id: View.WEALTH_PLANNER, 
-      label: 'Patrimônio', 
+      label: 'Aposentadoria', 
       icon: Landmark,
       activeClass: 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-500/30',
       inactiveClass: 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-200'
@@ -148,9 +148,9 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-amber-300 transition-colors" onClick={() => onNavigate(View.WEALTH_PLANNER)}>
                 <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
                   <Landmark className="w-8 h-8" />
-                  <h3 className="text-lg font-bold">Patrimônio</h3>
+                  <h3 className="text-lg font-bold">Máquina de Aposentadoria</h3>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">Consolide seus bens e analise seu patrimônio líquido.</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Calcule quanto precisa para pagar seus custos fixos com investimentos.</p>
               </div>
 
               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-purple-300 transition-colors" onClick={() => onNavigate(View.SUBSCRIPTIONS)}>
@@ -232,9 +232,11 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
           />
         )}
         {currentView === View.WEALTH_PLANNER && (
-          <WealthPlanner 
+          <RetirementMachine 
              data={data}
+             actions={actions}
              onSaveProfile={actions.saveWealthProfile}
+             onNavigateToInvestments={() => onNavigate(View.INVESTMENTS)}
              privacyMode={privacyMode}
              hasApiKey={hasApiKey}
           />

@@ -2,7 +2,6 @@ import React from 'react';
 import { View } from '../types';
 import { Activity, Dumbbell, Apple, LayoutDashboard } from 'lucide-react';
 import { TreinoView } from './TreinoView';
-import { DietaView } from './DietaView';
 
 interface SaudeViewProps {
   currentView: View;
@@ -22,18 +21,11 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
     },
     { 
       id: View.TREINO, 
-      label: 'Treino', 
+      label: 'Gestão de Treinos', 
       icon: Dumbbell,
       activeClass: 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-500/30',
       inactiveClass: 'bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-900/30 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-200'
-    },
-    { 
-      id: View.DIETA, 
-      label: 'Dieta', 
-      icon: Apple,
-      activeClass: 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/30',
-      inactiveClass: 'bg-white dark:bg-slate-800 text-green-600 dark:text-green-400 border-green-100 dark:border-green-900/30 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-200'
-    },
+    }
   ];
 
   return (
@@ -84,17 +76,9 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-orange-300 transition-colors" onClick={() => onNavigate(View.TREINO)}>
                 <div className="flex items-center gap-3 text-orange-600 dark:text-orange-400">
                   <Dumbbell className="w-8 h-8" />
-                  <h3 className="text-lg font-bold">Treinos</h3>
+                  <h3 className="text-lg font-bold">Gestão de Treinos e Projetos</h3>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">Registre seus treinos, acompanhe cargas e cronograma.</p>
-              </div>
-
-              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-green-300 transition-colors" onClick={() => onNavigate(View.DIETA)}>
-                <div className="flex items-center gap-3 text-green-600 dark:text-green-400">
-                  <Apple className="w-8 h-8" />
-                  <h3 className="text-lg font-bold">Dieta</h3>
-                </div>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">Monitore refeições, deixe a IA calcular macros e calorias.</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Registre seus projetos, fichas de treino, dietas e acompanhe as progressões de carga.</p>
               </div>
 
             </div>
@@ -103,10 +87,6 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
 
         {currentView === View.TREINO && (
           <TreinoView data={data} actions={actions} />
-        )}
-
-        {currentView === View.DIETA && (
-          <DietaView />
         )}
       </div>
     </div>

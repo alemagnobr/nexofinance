@@ -128,53 +128,52 @@ export const TreinoView: React.FC<TreinoViewProps> = ({ data, actions }) => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {projects.map((proj: WorkoutProject) => (
             <div 
               key={proj.id} 
               onClick={() => setSelectedProject(proj)}
-              className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm relative group flex flex-col transition-transform hover:-translate-y-1 hover:shadow-md cursor-pointer"
+              className="bg-white dark:bg-slate-800 rounded-3xl p-8 border border-slate-200 dark:border-slate-700 shadow-sm relative group flex flex-col transition-transform hover:-translate-y-1 hover:shadow-lg cursor-pointer min-h-[250px]"
             >
-              <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleOpenProjectModal(proj); }}
-                  className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-700/50 dark:hover:bg-indigo-900/50 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm("Deseja mesmo excluir este projeto? O histórico detalhado será perdido.")) {
-                      actions.deleteWorkoutProject?.(proj.id);
-                    }
-                  }}
-                  className="p-2 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 dark:bg-slate-700/50 dark:hover:bg-rose-900/50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              {/* Top Bar: Status + Actions */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center flex-wrap gap-2 pt-1">
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${statusColors[proj.status]}`}>
+                    {proj.status}
+                  </span>
+                  <span className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${priorityColors[proj.priority]}`}>
+                    <Activity className="w-3 h-3" /> {proj.priority} (Prio)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleOpenProjectModal(proj); }}
+                    className="p-1 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 dark:bg-slate-700/50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm("Deseja mesmo excluir este projeto? O histórico detalhado será perdido.")) {
+                        actions.deleteWorkoutProject?.(proj.id);
+                      }
+                    }}
+                    className="p-1 text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 dark:bg-slate-700/50 dark:hover:bg-rose-900/40 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 mb-4">
-                <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${statusColors[proj.status]}`}>
-                  {proj.status}
-                </span>
-                <span className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${priorityColors[proj.priority]}`}>
-                  <Activity className="w-3 h-3" /> {proj.priority} (Prio)
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-1 pr-14 leading-tight">{proj.name}</h3>
-              <p className="text-sm text-indigo-600 dark:text-indigo-400 font-semibold mb-4 flex items-start gap-1.5">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 leading-tight">{proj.name}</h3>
+              <p className="text-sm text-indigo-600 dark:text-indigo-400 font-semibold mb-4 flex items-start gap-1.5 leading-relaxed">
                 <Target className="w-4 h-4 shrink-0 mt-0.5" />
                 {proj.objective}
               </p>
 
-              {proj.description && (
-                <p className="text-slate-600 dark:text-slate-300 text-sm mb-6 flex-1 bg-slate-50 dark:bg-slate-700/30 p-3 rounded-xl border border-slate-100 dark:border-slate-700/50 line-clamp-3">
-                  {proj.description}
-                </p>
-              )}
+              <div className="flex-1 mb-6"></div>
 
               <div className="flex items-center gap-4 mt-auto pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div className="flex flex-col">

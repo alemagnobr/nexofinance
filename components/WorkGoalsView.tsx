@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Edit2, TrendingUp, Clock, CalendarDays } from "lucide-react";
+import { Plus, Trash2, Edit2, TrendingUp, Clock, CalendarDays, History, X } from "lucide-react";
 import { WorkGoal } from "../types";
 
 interface WorkGoalsViewProps {
@@ -16,7 +16,8 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
   onDeleteGoal,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAddHoursModalOpen, setIsAddHoursModalOpen] = useState<{ isOpen: boolean; goalId: string | null; hours: string }>({ isOpen: false, goalId: null, hours: "" });
+  const [isAddHoursModalOpen, setIsAddHoursModalOpen] = useState<{ isOpen: boolean; goalId: string | null; hours: string; notes: string }>({ isOpen: false, goalId: null, hours: "", notes: "" });
+  const [selectedGoalHistoryId, setSelectedGoalHistoryId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     id: "",
@@ -75,12 +76,30 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
 
     const goal = goals.find(g => g.id === isAddHoursModalOpen.goalId);
     if (goal) {
+      const newEntry = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        hours: hours,
+        notes: isAddHoursModalOpen.notes
+      };
       onUpdateGoal(goal.id, {
-        completedHours: goal.completedHours + hours
+        completedHours: goal.completedHours + hours,
+        history: goal.history ? [newEntry, ...goal.history] : [newEntry]
       });
     }
-    setIsAddHoursModalOpen({ isOpen: false, goalId: null, hours: "" });
+    setIsAddHoursModalOpen({ isOpen: false, goalId: null, hours: "", notes: "" });
   }
+
+  const handleDeleteHistoryEntry = (goalId: string, historyId: string, hours: number) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (goal && goal.history) {
+      const updatedHistory = goal.history.filter(h => h.id !== historyId);
+      onUpdateGoal(goal.id, {
+        completedHours: Math.max(0, goal.completedHours - hours),
+        history: updatedHistory
+      });
+    }
+  };
 
   return (
     <div className="p-4 md:p-8 space-y-8 animate-fade-in">
@@ -112,6 +131,9 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
                   {goal.title}
                 </h3>
                 <div className="flex gap-1 ml-2 shrink-0">
+                  <button onClick={() => setSelectedGoalHistoryId(goal.id)} className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Histórico de Horas">
+                    <History className="w-4 h-4" />
+                  </button>
                   <button onClick={() => handleOpenModal(goal)} className="p-1.5 text-slate-400 hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700 rounded-lg transition-colors">
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -182,7 +204,7 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
 
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                 <button
-                  onClick={() => setIsAddHoursModalOpen({ isOpen: true, goalId: goal.id, hours: "" })}
+                  onClick={() => setIsAddHoursModalOpen({ isOpen: true, goalId: goal.id, hours: "", notes: "" })}
                   className="w-full py-2.5 bg-slate-100 hover:bg-emerald-50 text-emerald-700 dark:bg-slate-700 dark:text-emerald-400 dark:hover:bg-slate-600 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600 dark:hover:border-emerald-500/50 hover:border-emerald-300"
                 >
                   <Plus className="w-4 h-4" /> Registrar Horas
@@ -279,10 +301,19 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
                   placeholder="Ex: 2 ou 1.5"
                 />
               </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Observações / Tarefas (Opcional)</label>
+                <input
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  value={isAddHoursModalOpen.notes}
+                  onChange={(e) => setIsAddHoursModalOpen(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="O que você fez?"
+                />
+              </div>
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsAddHoursModalOpen({ isOpen: false, goalId: null, hours: "" })}
+                  onClick={() => setIsAddHoursModalOpen({ isOpen: false, goalId: null, hours: "", notes: "" })}
                   className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
                 >
                   Cancelar
@@ -295,6 +326,68 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedGoalHistoryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col md:max-h-[85vh] max-h-screen animate-scale-in">
+            {(() => {
+              const goal = goals.find(g => g.id === selectedGoalHistoryId);
+              if (!goal) return null;
+              
+              return (
+                <>
+                  <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/80 sticky top-0 z-10">
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-800 dark:text-white leading-tight">Histórico de Sessões</h3>
+                      <p className="text-xs text-slate-500 font-medium">{goal.title}</p>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedGoalHistoryId(null)} 
+                      className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors shrink-0"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="p-4 md:p-6 overflow-y-auto">
+                    <div className="space-y-3">
+                      {(!goal.history || goal.history.length === 0) ? (
+                        <p className="text-center text-sm text-slate-400 py-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                          Nenhum registro de horas.
+                        </p>
+                      ) : (
+                        goal.history.map((h) => (
+                          <div key={h.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl flex items-start justify-between group">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">+{h.hours}h</span>
+                                <span className="text-[10px] text-slate-400 font-medium bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                                  {new Date(h.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                                </span>
+                              </div>
+                              {h.notes && (
+                                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+                                  {h.notes}
+                                </p>
+                              )}
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteHistoryEntry(goal.id, h.id, h.hours)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 mt-0.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
