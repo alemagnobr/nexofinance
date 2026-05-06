@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Wallet, WalletType, Transaction } from '../types';
-import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle, Utensils, Wallet as WalletIcon } from 'lucide-react';
+import { Plus, Trash2, Pencil, Landmark, CreditCard, Banknote, MoreHorizontal, CheckCircle, X, ChevronDown, ChevronUp, ArrowRightLeft, AlertCircle, Utensils, Wallet as WalletIcon, Save } from 'lucide-react';
 import { CurrencyInput } from './CurrencyInput';
 
 interface WalletsViewProps {
@@ -164,98 +164,103 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
       {isExpanded && (
         <>
           {isFormOpen && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 animate-scale-in">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-base font-bold text-slate-800 dark:text-white">
-                  {editingId ? 'Editar Conta' : 'Nova Conta'}
-                </h3>
-                <button onClick={resetForm} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-full transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col my-auto max-h-[90vh] animate-scale-in border border-slate-200 dark:border-slate-700">
+                <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur z-20">
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">
+                    {editingId ? 'Editar Conta' : 'Nova Conta'}
+                  </h3>
+                  <button onClick={resetForm} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200 rounded-xl transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Conta</label>
-                <input
-                  required
-                  type="text"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Nubank, Itaú, Vale Refeição"
-                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
-                <select
-                  value={formData.type}
-                  onChange={e => setFormData({ ...formData, type: e.target.value as WalletType })}
-                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                >
-                  {WALLET_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="p-4 md:p-6 overflow-y-auto">
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Conta</label>
+                        <input
+                          required
+                          type="text"
+                          value={formData.name}
+                          onChange={e => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="Ex: Nubank, Itaú, Vale Refeição"
+                          className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
+                        <select
+                          value={formData.type}
+                          onChange={e => setFormData({ ...formData, type: e.target.value as WalletType })}
+                          className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        >
+                          {WALLET_TYPES.map(type => (
+                            <option key={type.value} value={type.value}>{type.label}</option>
+                          ))}
+                        </select>
+                      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Saldo Atual</label>
-                <CurrencyInput
-                  required
-                  value={formData.balance}
-                  onChangeValue={val => setFormData({ ...formData, balance: parseFloat(val) || 0 })}
-                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Saldo Atual</label>
+                        <CurrencyInput
+                          required
+                          value={formData.balance}
+                          onChangeValue={val => setFormData({ ...formData, balance: parseFloat(val) || 0 })}
+                          className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
 
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
-                <textarea
-                  value={formData.observation || ''}
-                  onChange={e => setFormData({ ...formData, observation: e.target.value })}
-                  placeholder="Ex: Cartão vence dia 10, conta conjunta..."
-                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-20"
-                />
-              </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
+                        <textarea
+                          value={formData.observation || ''}
+                          onChange={e => setFormData({ ...formData, observation: e.target.value })}
+                          placeholder="Ex: Cartão vence dia 10, conta conjunta..."
+                          className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-20"
+                        />
+                      </div>
 
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cor</label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {COLORS.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, color })}
-                      className={`w-8 h-8 rounded-full bg-${color}-500 flex items-center justify-center transition-transform hover:scale-110 ${formData.color === color ? 'ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-slate-800 scale-110' : ''}`}
-                    >
-                      {formData.color === color && <CheckCircle className="w-4 h-4 text-white" />}
-                    </button>
-                  ))}
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Cor</label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {COLORS.map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, color })}
+                              className={`w-8 h-8 rounded-full bg-${color}-500 flex items-center justify-center transition-transform hover:scale-110 shadow-sm ${formData.color === color ? 'ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-slate-800 scale-110' : ''}`}
+                            >
+                              {formData.color === color && <CheckCircle className="w-4 h-4 text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-6 sticky bottom-0 bg-white/95 dark:bg-slate-800/95 pt-4 pb-2 border-t border-slate-100 dark:border-slate-700 z-10 w-full -mx-4 -mb-4 px-4 md:-mx-6 md:-mb-6 md:px-6">
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        {editingId ? 'Salvar Alterações' : 'Criar Conta'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 font-bold"
-              >
-                {editingId ? 'Salvar Alterações' : 'Criar Conta'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          )}
 
       {walletError && (
         <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-sm font-medium flex items-start gap-2 mb-4 animate-fade-in">
