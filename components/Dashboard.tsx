@@ -847,10 +847,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* --- PRODUTIVIDADE --- */}
+      {/* --- PRODUTIVIDADE & UTILIDADES --- */}
       <div className="mb-3 mt-6">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Target className="w-5 h-5 text-purple-500" /> Produtividade
+          <Target className="w-5 h-5 text-purple-500" /> Produtividade & Utilidades
         </h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1055,6 +1055,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           return null;
         })}
+
+        <div onClick={() => onNavigate(View.SHOPPING_LIST)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 text-xs font-bold uppercase">
+                    <ShoppingCart className="w-4 h-4" /> Compras
+                </div>
+                <ArrowRight className="w-4 h-4 text-sky-400" />
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                <ShoppingCart className="w-6 h-6 opacity-30" />
+                <p className="text-xs italic text-center">Lista inteligente de supermercado.</p>
+            </div>
+        </div>
+
+        <div onClick={() => onNavigate(View.PASSWORDS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-xs font-bold uppercase">
+                    <KeyRound className="w-4 h-4" /> Senhas
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400" />
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                <KeyRound className="w-6 h-6 opacity-30" />
+                <p className="text-xs italic text-center">Cofre seguro para senhas.</p>
+            </div>
+        </div>
+
+        <div onClick={() => onNavigate(View.PIX_KEYS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase">
+                    <QrCode className="w-4 h-4" /> Chaves Pix
+                </div>
+                <ArrowRight className="w-4 h-4 text-teal-400" />
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
+                <QrCode className="w-6 h-6 opacity-30" />
+                <p className="text-xs italic text-center">Gerencie todas suas chaves Pix.</p>
+            </div>
+        </div>
       </div>
 
       {/* --- SAÚDE --- */}
@@ -1072,42 +1111,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <ArrowRight className="w-4 h-4 text-orange-400" />
             </div>
             <p className="text-xs text-slate-500">Registre treinos, cronogramas e rotina diária.</p>
-        </div>
-      </div>
-      
-      {/* --- UTILIDADES --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Key className="w-5 h-5 text-amber-500" /> Utilidades
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div onClick={() => onNavigate(View.SHOPPING_LIST)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 text-sm font-bold uppercase">
-                    <ShoppingCart className="w-4 h-4" /> Compras
-                </div>
-                <ArrowRight className="w-4 h-4 text-sky-400" />
-            </div>
-            <p className="text-xs text-slate-500">Lista inteligente de supermercado.</p>
-        </div>
-        <div onClick={() => onNavigate(View.PASSWORDS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-bold uppercase">
-                    <KeyRound className="w-4 h-4" /> Senhas
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-            </div>
-            <p className="text-xs text-slate-500">Cofre seguro para senhas criptografadas.</p>
-        </div>
-        <div onClick={() => onNavigate(View.PIX_KEYS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 text-sm font-bold uppercase">
-                    <QrCode className="w-4 h-4" /> Chaves Pix
-                </div>
-                <ArrowRight className="w-4 h-4 text-teal-400" />
-            </div>
-            <p className="text-xs text-slate-500">Gerencie todas suas chaves Pix.</p>
         </div>
       </div>
     </div>

@@ -184,14 +184,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     View.NOTES,
     View.PRODUCTIVITY,
     View.WORK_GOALS,
-  ].includes(currentView);
-  const isUtilitiesActive = [
-    View.UTILIDADES_DASHBOARD,
-    View.SHOPPING_LIST, 
+    View.SHOPPING_LIST,
     View.PASSWORDS
-  ].includes(
-    currentView,
-  );
+  ].includes(currentView);
   const isSaudeActive = [
     View.SAUDE_DASHBOARD,
     View.TREINO
@@ -296,13 +291,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleNavClick(View.PLANEJAMENTO_DASHBOARD)}
           icon={Target}
           label="Planejamento"
-        />
-
-        <NavItem
-          active={isUtilitiesActive}
-          onClick={() => handleNavClick(View.UTILIDADES_DASHBOARD)}
-          icon={CheckSquare}
-          label="Utilidades"
         />
 
         <NavItem

@@ -4,7 +4,9 @@ import { KanbanBoard } from './KanbanBoard';
 import { Notes } from './Notes';
 import { HabitTracker } from './HabitTracker';
 import { WorkGoalsView } from './WorkGoalsView';
-import { Wallet, StickyNote, Target, LayoutDashboard, TrendingUp } from 'lucide-react';
+import { ShoppingList } from './ShoppingList';
+import { PasswordManager } from './PasswordManager';
+import { Wallet, StickyNote, Target, LayoutDashboard, TrendingUp, ShoppingCart, Key } from 'lucide-react';
 
 interface PlanejamentoViewProps {
   currentView: View;
@@ -12,11 +14,31 @@ interface PlanejamentoViewProps {
   data: any;
   actions: any;
   privacyMode: boolean;
+  hasApiKey: boolean;
+  quickActionSignal: number;
 }
 
 export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({ 
-  currentView, onNavigate, data, actions, privacyMode 
+  currentView, onNavigate, data, actions, privacyMode, hasApiKey, quickActionSignal 
 }) => {
+  // Logic to finish shopping (Convert cart to expense)
+  const finishShopping = async (total: number, paymentMethod: string, category: string) => {
+     const transaction = {
+         description: `Compra de Mercado (${new Date().toLocaleDateString()})`,
+         amount: total,
+         type: 'expense',
+         category: category,
+         date: new Date().toISOString().split('T')[0],
+         status: 'paid',
+         paymentMethod: paymentMethod,
+         isRecurring: false
+     };
+     await actions.addTransaction(transaction);
+     await actions.clearShoppingList();
+     alert("Compra finalizada! Despesa registrada com sucesso.");
+     onNavigate(View.TRANSACTIONS);
+  };
+
   const tabs = [
     { 
       id: View.PLANEJAMENTO_DASHBOARD, 
@@ -52,6 +74,20 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
       icon: TrendingUp,
       activeClass: 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/30',
       inactiveClass: 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-200'
+    },
+    { 
+      id: View.SHOPPING_LIST, 
+      label: 'Compras', 
+      icon: ShoppingCart,
+      activeClass: 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:border-rose-200'
+    },
+    { 
+      id: View.PASSWORDS, 
+      label: 'Senhas', 
+      icon: Key,
+      activeClass: 'bg-sky-600 border-sky-600 text-white shadow-lg shadow-sky-500/30',
+      inactiveClass: 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border-sky-100 dark:border-sky-900/30 hover:bg-sky-50 dark:hover:bg-sky-900/20 hover:border-sky-200'
     },
   ];
 
@@ -118,6 +154,22 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
                 <p className="text-slate-500 dark:text-slate-400 text-sm">Registre trabalhos e acompanhe suas metas de horas.</p>
               </div>
 
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-rose-300 transition-colors" onClick={() => onNavigate(View.SHOPPING_LIST)}>
+                <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                  <ShoppingCart className="w-8 h-8" />
+                  <h3 className="text-lg font-bold">Lista de Compras</h3>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Organize suas idas ao mercado focando nas categorias.</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-sky-300 transition-colors" onClick={() => onNavigate(View.PASSWORDS)}>
+                <div className="flex items-center gap-3 text-sky-600 dark:text-sky-400">
+                  <Key className="w-8 h-8" />
+                  <h3 className="text-lg font-bold">Cofre de Senhas</h3>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Suas senhas seguras dentro da sua conta pessoal.</p>
+              </div>
+
             </div>
           </div>
         )}
@@ -161,7 +213,32 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
              privacyMode={privacyMode}
           />
         )}
+        {currentView === View.SHOPPING_LIST && (
+          <ShoppingList 
+             items={data.shoppingList || []}
+             onAdd={actions.addShoppingItem}
+             onUpdate={actions.updateShoppingItem}
+             onDelete={actions.deleteShoppingItem}
+             onClearList={actions.clearShoppingList}
+             onFinishShopping={finishShopping}
+             shoppingBudget={data.shoppingBudget}
+             onUpdateBudget={actions.setShoppingBudget}
+             hasApiKey={hasApiKey}
+             privacyMode={privacyMode}
+             quickActionSignal={quickActionSignal}
+          />
+        )}
+        {currentView === View.PASSWORDS && (
+          <PasswordManager
+             passwords={data.passwords || []}
+             onAdd={actions.addPassword}
+             onUpdate={actions.updatePassword}
+             onDelete={actions.deletePassword}
+             privacyMode={privacyMode}
+          />
+        )}
       </div>
     </div>
   );
 };
+
