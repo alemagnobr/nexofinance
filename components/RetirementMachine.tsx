@@ -267,64 +267,56 @@ export const RetirementMachine: React.FC<RetirementMachineProps> = ({ data, acti
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(() => {
-              let currentInvested = totalInvested;
-              const sortedExpenses = [...fixedExpenses].sort((a, b) => a.amount - b.amount);
-              
-              return sortedExpenses.map((expense) => {
-                const needed = calculateNeededCapital(expense.amount);
-                const allocated = Math.min(needed, Math.max(0, currentInvested));
-                const progress = needed > 0 ? (allocated / needed) * 100 : 0;
-                const isCovered = allocated >= needed && needed > 0;
-                
-                currentInvested -= allocated;
+            {fixedExpenses.map((expense) => {
+              const needed = calculateNeededCapital(expense.amount);
+              const progress = (totalInvested / needed) * 100;
+              const isCovered = totalInvested >= needed;
 
-                return (
-                  <div key={expense.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition-colors">
-                    <div className="flex justify-between items-start mb-4 relative z-10">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl ${isCovered ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
-                          {expense.description.toLowerCase().includes('luz') || expense.description.toLowerCase().includes('energia') ? <Zap className="w-5 h-5" /> :
-                           expense.description.toLowerCase().includes('net') || expense.description.toLowerCase().includes('internet') ? <Wifi className="w-5 h-5" /> :
-                           expense.description.toLowerCase().includes('aluguel') ? <Home className="w-5 h-5" /> :
-                           <DollarSign className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 dark:text-white">{expense.description}</h4>
-                          <p className="text-xs text-slate-500 uppercase font-black tracking-tighter">{formatValue(expense.amount)} /mês</p>
-                        </div>
+              return (
+                <div key={expense.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition-colors">
+                  <div className="flex justify-between items-start mb-4 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${isCovered ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                        {expense.description.toLowerCase().includes('luz') || expense.description.toLowerCase().includes('energia') ? <Zap className="w-5 h-5" /> :
+                         expense.description.toLowerCase().includes('net') || expense.description.toLowerCase().includes('internet') ? <Wifi className="w-5 h-5" /> :
+                         expense.description.toLowerCase().includes('aluguel') ? <Home className="w-5 h-5" /> :
+                         <DollarSign className="w-5 h-5" />}
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Capital p/ Sustentar</p>
-                        <p className="font-bold text-indigo-600">{formatValue(needed)}</p>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white">{expense.description}</h4>
+                        <p className="text-xs text-slate-500 uppercase font-black tracking-tighter">{formatValue(expense.amount)} /mês</p>
                       </div>
                     </div>
-
-                    {/* Progress bar to cover THIS specific expense */}
-                    <div className="mt-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Status de Quitação via Rendimento</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isCovered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {isCovered ? 'CONTA QUITADA' : `${Math.floor(progress)}% Coberto`}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ${isCovered ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                          style={{ width: `${Math.min(100, progress)}%` }}
-                        ></div>
-                      </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Capital p/ Sustentar</p>
+                      <p className="font-bold text-indigo-600">{formatValue(needed)}</p>
                     </div>
-
-                    {isCovered && (
-                      <div className="absolute top-0 right-0 w-8 h-8 bg-emerald-500 text-white flex items-center justify-center rounded-bl-xl">
-                        <ShieldCheck className="w-4 h-4" />
-                      </div>
-                    )}
                   </div>
-                );
-              });
-            })()}
+
+                  {/* Progress bar to cover THIS specific expense */}
+                  <div className="mt-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Status de Quitação via Rendimento</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isCovered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {isCovered ? 'CONTA QUITADA' : `${Math.floor(progress)}% Coberto`}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${isCovered ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                        style={{ width: `${Math.min(100, progress)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {isCovered && (
+                    <div className="absolute top-0 right-0 w-8 h-8 bg-emerald-500 text-white flex items-center justify-center rounded-bl-xl">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

@@ -49,6 +49,7 @@ import { SettingsView } from "./components/SettingsView";
 // New Wrapper Views
 import { FinanceiroView } from "./components/FinanceiroView";
 import { PlanejamentoView } from "./components/PlanejamentoView";
+import { UtilitiesView } from "./components/UtilitiesView";
 import { SaudeView } from "./components/SaudeView";
 import { FinancialCalendar } from "./components/FinancialCalendar";
 
@@ -349,8 +350,8 @@ const App: React.FC = () => {
       );
     }
 
-    // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower, Utilities)
-    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
+    // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower)
+    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS].includes(currentView)) {
       return (
         <PlanejamentoView
           currentView={currentView}
@@ -358,8 +359,6 @@ const App: React.FC = () => {
           data={data}
           actions={actions}
           privacyMode={privacyMode}
-          hasApiKey={hasKey}
-          quickActionSignal={quickActionSignal}
         />
       );
     }
@@ -396,6 +395,21 @@ const App: React.FC = () => {
             onNavigate={setCurrentView}
           />
         </div>
+      );
+    }
+
+    // 5. Group: Utilities (Shopping, Passwords)
+    if ([View.UTILIDADES_DASHBOARD, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
+      return (
+        <UtilitiesView
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          data={data}
+          actions={actions}
+          privacyMode={privacyMode}
+          hasApiKey={hasKey}
+          quickActionSignal={quickActionSignal}
+        />
       );
     }
 
@@ -555,6 +569,23 @@ const App: React.FC = () => {
                   </p>
                   <p className="font-bold text-slate-700 dark:text-white leading-tight">
                     Planejamento
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => triggerQuickAction(View.UTILIDADES_DASHBOARD)}
+                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-amber-100 dark:border-amber-900/30 hover:border-amber-300 transition-all group"
+              >
+                <div className="bg-amber-100 dark:bg-amber-900/40 p-2.5 rounded-lg group-hover:bg-amber-600 group-hover:text-white transition-colors text-amber-600 dark:text-amber-400">
+                  <CheckSquare className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Acessar
+                  </p>
+                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
+                    Utilidades
                   </p>
                 </div>
               </button>

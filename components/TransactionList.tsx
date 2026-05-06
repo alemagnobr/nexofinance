@@ -999,25 +999,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         </div>
       </div>
 
-      {/* 4. FORM MODAL */}
+      {/* 4. FORM */}
+      <div ref={formRef} className="scroll-mt-24">
       {isFormOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col my-auto max-h-[90vh] animate-scale-in border border-slate-200 dark:border-slate-700">
-             <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur z-20">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">
-                  {editingId ? 'Editar Transação' : 'Adicionar Transação'}
-                </h3>
-                <button 
-                  onClick={() => setIsFormOpen(false)} 
-                  className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200 rounded-xl transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-             </div>
-
-             <div className="p-4 md:p-6 overflow-y-auto" id="modal-content">
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-down">
           <div className="col-span-1 md:col-span-2">
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                {editingId ? 'Editar Transação' : 'Adicionar Transação'}
+            </h3>
             {transactionError && (
               <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-rose-600 dark:text-rose-400 p-3 rounded-xl text-sm font-medium flex items-start gap-2 mb-2 animate-fade-in">
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -1371,19 +1360,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             )}
           </div>
 
-          <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-4 sticky bottom-0 bg-white/95 dark:bg-slate-800/95 pt-4 pb-2 border-t border-slate-100 dark:border-slate-700 z-10 w-full">
-            <button type="button" onClick={() => setIsFormOpen(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors">
+          <div className="col-span-1 md:col-span-2 flex justify-end gap-2 mt-2">
+            <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
               Cancelar
             </button>
-            <button type="submit" className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/30 transition-all">
+            <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
               {editingId ? 'Atualizar' : 'Salvar'}
             </button>
           </div>
         </form>
-             </div>
-          </div>
-        </div>
       )}
+      </div>
 
       {/* 5. TABS (View Filter) */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-1 flex overflow-x-auto hide-scrollbar">
