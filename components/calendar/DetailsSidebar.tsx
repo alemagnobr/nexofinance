@@ -213,11 +213,17 @@ export const DetailsSidebar = ({
                         {completed && <Check className="w-3 h-3" />}
                       </button>
                       <div className="flex flex-col items-center min-w-[3rem] mt-0.5">
-                        <span className={`text-[11px] font-bold ${completed ? 'text-emerald-600 dark:text-emerald-500' : 'text-blue-600 dark:text-blue-400'}`}>
-                          {event.allDay ? "Dia Todo" : new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}
+                        <span className={`text-[11px] font-bold whitespace-nowrap ${completed ? 'text-emerald-600 dark:text-emerald-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                          {event.allDay ? "Dia Todo" : (
+                             <div className="flex flex-col items-center leading-tight">
+                                <span>{new Date(event.startDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}</span>
+                                <span className="text-[9px] font-normal opacity-70">às</span>
+                                <span>{new Date(event.endDate).toLocaleTimeString("pt-BR", {hour: "2-digit", minute:"2-digit"})}</span>
+                             </div>
+                          )}
                         </span>
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <p className={`font-semibold text-sm ${completed ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-800 dark:text-white'}`}>
                           {event.title}
                         </p>
@@ -228,6 +234,26 @@ export const DetailsSidebar = ({
                           <p className={`text-xs mt-0.5 line-clamp-2 ${completed ? 'text-slate-400 dark:text-slate-500' : 'text-slate-500 dark:text-slate-400'}`}>
                             {event.description}
                           </p>
+                        )}
+                        {event.checklist && event.checklist.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {event.checklist.map((item: any, idx: number) => (
+                              <div key={item.id || idx} className="flex items-start gap-1.5">
+                                 <button
+                                    onClick={async () => {
+                                        if(!onUpdateAgendaEvent) return;
+                                        const newChecklist = [...event.checklist];
+                                        newChecklist[idx] = { ...item, isCompleted: !item.isCompleted };
+                                        await onUpdateAgendaEvent(event.id, { checklist: newChecklist });
+                                    }}
+                                    className={`mt-0.5 shrink-0 flex items-center justify-center w-3.5 h-3.5 rounded border transition-colors ${item.isCompleted ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 dark:border-slate-500 text-transparent hover:border-blue-400'}`}
+                                 >
+                                    <Check className="w-2.5 h-2.5" />
+                                 </button>
+                                 <span className={`text-xs ${item.isCompleted ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>{item.text}</span>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>

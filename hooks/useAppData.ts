@@ -22,6 +22,8 @@ import {
   Wallet,
   DailyRoutine,
   WorkGoal,
+  WorkoutProject,
+  WorkoutRoutine,
 } from "../types";
 import {
   addTransactionFire,
@@ -73,6 +75,12 @@ import {
   addWorkGoalFire,
   updateWorkGoalFire,
   deleteWorkGoalFire,
+  addWorkoutProjectFire,
+  updateWorkoutProjectFire,
+  deleteWorkoutProjectFire,
+  addWorkoutRoutineFire,
+  updateWorkoutRoutineFire,
+  deleteWorkoutRoutineFire,
   addWalletFire,
   updateWalletFire,
   deleteWalletFire,
@@ -1364,6 +1372,84 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     }
   };
 
+  const addWorkoutProject = async (project: Omit<WorkoutProject, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newProject: WorkoutProject = {
+      ...project,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    if (user && !isGuest) {
+      await addWorkoutProjectFire(user.uid, newProject);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutProjects: [...(prev.workoutProjects || []), newProject],
+      }));
+    }
+  };
+
+  const updateWorkoutProject = async (id: string, updates: Partial<WorkoutProject>) => {
+    if (user && !isGuest) {
+      await updateWorkoutProjectFire(user.uid, id, updates);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutProjects: (prev.workoutProjects || []).map((p) => (p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)),
+      }));
+    }
+  };
+
+  const deleteWorkoutProject = async (id: string) => {
+    if (user && !isGuest) {
+      await deleteWorkoutProjectFire(user.uid, id);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutProjects: (prev.workoutProjects || []).filter((p) => p.id !== id),
+      }));
+    }
+  };
+
+  const addWorkoutRoutine = async (routine: Omit<WorkoutRoutine, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newRoutine: WorkoutRoutine = {
+      ...routine,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    if (user && !isGuest) {
+      await addWorkoutRoutineFire(user.uid, newRoutine);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutRoutines: [...(prev.workoutRoutines || []), newRoutine],
+      }));
+    }
+  };
+
+  const updateWorkoutRoutine = async (id: string, updates: Partial<WorkoutRoutine>) => {
+    if (user && !isGuest) {
+      await updateWorkoutRoutineFire(user.uid, id, updates);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutRoutines: (prev.workoutRoutines || []).map((p) => (p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p)),
+      }));
+    }
+  };
+
+  const deleteWorkoutRoutine = async (id: string) => {
+    if (user && !isGuest) {
+      await deleteWorkoutRoutineFire(user.uid, id);
+    } else {
+      setData((prev) => ({
+        ...prev,
+        workoutRoutines: (prev.workoutRoutines || []).filter((p) => p.id !== id),
+      }));
+    }
+  };
+
   const unlockBadge = (badgeId: string) => {
     if (!data.unlockedBadges.includes(badgeId)) {
       if (user) unlockBadgeFire(user.uid, badgeId, data.unlockedBadges);
@@ -1452,6 +1538,12 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       addWorkGoal,
       updateWorkGoal,
       deleteWorkGoal,
+      addWorkoutProject,
+      updateWorkoutProject,
+      deleteWorkoutProject,
+      addWorkoutRoutine,
+      updateWorkoutRoutine,
+      deleteWorkoutRoutine,
       unlockBadge,
       saveWealthProfile,
       setDriveLink,

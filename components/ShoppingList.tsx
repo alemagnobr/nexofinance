@@ -454,16 +454,16 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({
                     <ShoppingCart className="w-7 h-7 text-indigo-600" />
                     Lista de Compras
                 </h2>
-                <div className="flex items-center gap-4 mt-1">
+                <div className="flex items-center gap-2 mt-3 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl w-fit">
                     <button 
                         onClick={() => setActiveTab('list')}
-                        className={`text-sm font-bold flex items-center gap-1.5 transition-colors ${activeTab === 'list' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`text-sm font-bold flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all ${activeTab === 'list' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                     >
                         <List className="w-4 h-4" /> Lista
                     </button>
                     <button 
                         onClick={() => setActiveTab('timeline')}
-                        className={`text-sm font-bold flex items-center gap-1.5 transition-colors ${activeTab === 'timeline' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`text-sm font-bold flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all ${activeTab === 'timeline' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                     >
                         <History className="w-4 h-4" /> Linha do Tempo
                     </button>

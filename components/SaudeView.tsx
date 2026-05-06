@@ -102,7 +102,7 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
         )}
 
         {currentView === View.TREINO && (
-          <TreinoView />
+          <TreinoView data={data} actions={actions} />
         )}
 
         {currentView === View.DIETA && (

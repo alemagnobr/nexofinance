@@ -58,6 +58,35 @@ export const AddAgendaEventModal = ({
           </div>
 
           <div>
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">
+              Cor do Evento
+            </label>
+            <div className="flex items-center gap-3">
+              {[
+                { hex: "#3b82f6", name: "Azul" },
+                { hex: "#ef4444", name: "Vermelho" },
+                { hex: "#22c55e", name: "Verde" },
+                { hex: "#eab308", name: "Amarelo" },
+                { hex: "#a855f7", name: "Roxo" },
+                { hex: "#ec4899", name: "Rosa" },
+                { hex: "#f97316", name: "Laranja" },
+                { hex: "#64748b", name: "Cinza" }
+              ].map(color => (
+                <button
+                  key={color.hex}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color: color.hex })}
+                  style={{ backgroundColor: color.hex }}
+                  className={`w-8 h-8 rounded-full transition-transform hover:scale-110 flex items-center justify-center ${formData.color === color.hex ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-slate-800' : ''}`}
+                  title={color.name}
+                >
+                  {formData.color === color.hex && <Check className="w-4 h-4 text-white" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -268,6 +297,66 @@ export const AddAgendaEventModal = ({
               }
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px] resize-none"
             />
+          </div>
+
+          <div className="mt-4">
+            <label className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center justify-between">
+              <span>Checklist Personalizado</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const newChecklist = [...(formData.checklist || []), { id: Date.now().toString(), text: '', isCompleted: false }];
+                  setFormData({ ...formData, checklist: newChecklist });
+                }}
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-[10px]"
+              >
+                <Plus className="w-3 h-3" /> Adicionar Item
+              </button>
+            </label>
+            
+            <div className="space-y-2">
+               {(formData.checklist || []).map((item: any, index: number) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                     <input
+                        type="checkbox"
+                        checked={item.isCompleted}
+                        onChange={(e) => {
+                           const newChecklist = [...formData.checklist];
+                           newChecklist[index] = { ...newChecklist[index], isCompleted: e.target.checked };
+                           setFormData({ ...formData, checklist: newChecklist });
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                     />
+                     <input
+                        type="text"
+                        value={item.text}
+                        onChange={(e) => {
+                           const newChecklist = [...formData.checklist];
+                           newChecklist[index] = { ...newChecklist[index], text: e.target.value };
+                           setFormData({ ...formData, checklist: newChecklist });
+                        }}
+                        placeholder="Item..."
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 py-2 text-sm"
+                     />
+                     <button
+                        type="button"
+                        onClick={() => {
+                           const newChecklist = formData.checklist.filter((_: any, i: number) => i !== index);
+                           setFormData({ ...formData, checklist: newChecklist });
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400"
+                     >
+                        <X className="w-4 h-4" />
+                     </button>
+                  </div>
+               ))}
+               {(!formData.checklist || formData.checklist.length === 0) && (
+                   <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-2 italic border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                       Nenhum item adicionado.
+                   </p>
+               )}
+            </div>
           </div>
 
           <button

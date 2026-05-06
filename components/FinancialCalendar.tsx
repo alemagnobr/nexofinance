@@ -128,6 +128,56 @@ const exportToICS = (events: any[]) => {
   document.body.removeChild(link);
 };
 
+const calculateEventLayout = (events: AgendaEvent[]) => {
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  );
+  
+  const layout = sorted.map((e) => ({
+    e,
+    start: new Date(e.startDate).getTime(),
+    end: new Date(e.endDate).getTime(),
+    colIndex: 0,
+    clusterSize: 1,
+  }));
+
+  let columns: (typeof layout[0])[][] = [];
+  let lastEventEnding: number | null = null;
+  let activeCluster: typeof layout = [];
+
+  for (const ev of layout) {
+    if (lastEventEnding !== null && ev.start >= lastEventEnding) {
+      activeCluster.forEach((c) => (c.clusterSize = columns.length || 1));
+      columns = [];
+      lastEventEnding = null;
+      activeCluster = [];
+    }
+
+    let placed = false;
+    for (let i = 0; i < columns.length; i++) {
+        const col = columns[i];
+        if (col[col.length - 1].end <= ev.start) {
+            col.push(ev);
+            ev.colIndex = i;
+            placed = true;
+            break;
+        }
+    }
+    if (!placed) {
+        ev.colIndex = columns.length;
+        columns.push([ev]);
+    }
+
+    if (lastEventEnding === null || ev.end > lastEventEnding) {
+      lastEventEnding = ev.end;
+    }
+    activeCluster.push(ev);
+  }
+
+  activeCluster.forEach((c) => (c.clusterSize = columns.length || 1));
+  return layout;
+};
+
 export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
   transactions,
   budgets,
@@ -154,7 +204,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     new Date().getDate(),
   );
   const [filterType, setFilterType] = useState<ViewFilter>("all");
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("week");
   const [collapseEarlyHours, setCollapseEarlyHours] = useState(true);
   
   const hourOffset = collapseEarlyHours ? 6 : 0;
@@ -174,6 +224,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     id: "",
     title: "",
     description: "",
+    color: "#3b82f6", // default blue
+    checklist: [] as { id: string; text: string; isCompleted: boolean }[],
     startTime: "",
     endTime: "",
     allDay: true,
@@ -593,6 +645,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       id: "",
       title: "",
       description: "",
+      color: "#3b82f6",
+      checklist: [],
       startTime: "09:00",
       endTime: "10:00",
       allDay: true,
@@ -612,6 +666,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       id: event.id,
       title: event.title,
       description: event.description || "",
+      color: event.color || "#3b82f6",
+      checklist: event.checklist || [],
       startTime: start.toLocaleTimeString("pt-BR", {
         hour: "2-digit",
         minute: "2-digit",
@@ -662,6 +718,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       await onUpdateAgendaEvent(agendaFormData.id, {
         title: agendaFormData.title,
         description: agendaFormData.description,
+        color: agendaFormData.color,
+        checklist: agendaFormData.checklist,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         allDay: agendaFormData.allDay,
@@ -675,6 +733,8 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
       await onAddAgendaEvent({
         title: agendaFormData.title,
         description: agendaFormData.description,
+        color: agendaFormData.color,
+        checklist: agendaFormData.checklist,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         allDay: agendaFormData.allDay,
@@ -918,6 +978,37 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
     );
   }
 
+  const handleDragStart = (e: React.DragEvent, eventId: string) => {
+    e.dataTransfer.setData("eventId", eventId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDropEvent = async (e: React.DragEvent, targetDate: Date, targetHour: number) => {
+    e.preventDefault();
+    const eventId = e.dataTransfer.getData("eventId");
+    if (!eventId || !onUpdateAgendaEvent) return;
+
+    const eventToMove = displayedAgendaEvents.find((evt) => evt.id === eventId);
+    if (!eventToMove) return;
+
+    const currentStart = new Date(eventToMove.startDate);
+    const currentEnd = new Date(eventToMove.endDate);
+    const durationMs = currentEnd.getTime() - currentStart.getTime();
+
+    const newStart = new Date(targetDate);
+    newStart.setHours(targetHour, currentStart.getMinutes(), 0, 0);
+
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    await onUpdateAgendaEvent(eventId, {
+      startDate: newStart.toISOString(),
+      endDate: newEnd.toISOString(),
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-20 md:pb-0 relative">
       <AIAgendaAssistant
@@ -1148,7 +1239,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
             <div className="grid grid-cols-7">{calendarCells}</div>
           </div>
         ) : viewMode === "week" ? (
-          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[800px]">
             {/* Week Header */}
             <div className="grid grid-cols-8 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
               <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
@@ -1238,7 +1329,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       <div
                         key={e.id}
                         onClick={() => handleEditAgendaEvent(e)}
-                        className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate"
+                        style={{
+                          backgroundColor: e.color ? `${e.color}33` : `var(--tw-colors-blue-100, #dbeafe)`,
+                          color: e.color || `var(--tw-colors-blue-700, #1d4ed8)`
+                        }}
                       >
                         {e.title}
                       </div>
@@ -1288,12 +1383,14 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       {hoursToRender.map((hour) => (
                         <div
                           key={hour}
+                          onDragOver={handleDragOver}
+                          onDrop={(ev) => handleDropEvent(ev, d, hour)}
                           className="h-12 border-b border-slate-100 dark:border-slate-700/50"
                         ></div>
                       ))}
 
                       {/* Render Events */}
-                      {dayAgendaEvents.map((e) => {
+                      {calculateEventLayout(dayAgendaEvents).map(({ e, colIndex, clusterSize }) => {
                         const start = new Date(e.startDate);
                         const end = new Date(e.endDate);
                         const startHour =
@@ -1307,14 +1404,22 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                         const top = adjustedStartHour * 48; // 48px per hour (h-12)
                         const height = Math.max((adjustedEndHour - adjustedStartHour) * 48, 20); // Min height 20px
 
+                        const width = `calc(${100 / clusterSize}% - 4px)`;
+                        const left = `calc(${(100 / clusterSize) * colIndex}% + 2px)`;
+
                         return (
                           <div
                             key={e.id}
+                            draggable
+                            onDragStart={(ev) => handleDragStart(ev, e.id)}
                             onClick={() => handleEditAgendaEvent(e)}
-                            className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
+                            className="absolute rounded-md text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-opacity hover:opacity-90 z-10"
                             style={{
+                              backgroundColor: e.color ? `${e.color}E6` : `rgba(59, 130, 246, 0.9)`,
                               top: `${top}px`,
                               height: `${height}px`,
+                              width,
+                              left,
                             }}
                           >
                             <div className="text-[10px] font-bold leading-tight truncate">
@@ -1343,7 +1448,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
             </div>
           </div>
         ) : (
-          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[600px]">
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[800px]">
             {/* Day Header */}
             <div className="grid grid-cols-[60px_1fr] bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
               <div className="py-3 border-r border-slate-200 dark:border-slate-600"></div>
@@ -1427,9 +1532,35 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                         <div
                           key={e.id}
                           onClick={() => handleEditAgendaEvent(e)}
-                          className="cursor-pointer text-[9px] font-bold px-1 py-0.5 rounded mb-0.5 truncate bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          className="cursor-pointer text-[9px] font-bold px-1.5 py-1 rounded mb-0.5"
+                          style={{
+                            backgroundColor: e.color ? `${e.color}33` : `var(--tw-colors-blue-100, #dbeafe)`,
+                            color: e.color || `var(--tw-colors-blue-700, #1d4ed8)`
+                          }}
                         >
-                          {e.title}
+                          <div className="truncate">{e.title}</div>
+                          {e.checklist && e.checklist.length > 0 && (
+                            <div className="mt-1 space-y-1">
+                              {e.checklist.map((item, idx) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-start gap-1"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    if (!onUpdateAgendaEvent) return;
+                                    const newChecklist = [...e.checklist!];
+                                    newChecklist[idx] = { ...item, isCompleted: !item.isCompleted };
+                                    onUpdateAgendaEvent(e.id, { checklist: newChecklist });
+                                  }}
+                                >
+                                  <div className={`mt-0.5 shrink-0 w-2.5 h-2.5 flex items-center justify-center rounded border transition-colors ${item.isCompleted ? 'bg-blue-500 border-blue-500 text-white' : 'border-blue-400 text-transparent hover:border-blue-500'}`}>
+                                    <Check className="w-2 h-2" />
+                                  </div>
+                                  <span className={`flex-1 leading-tight ${item.isCompleted ? 'line-through opacity-60' : ''}`}>{item.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </>
@@ -1458,6 +1589,11 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                   {hoursToRender.map((hour) => (
                     <div
                       key={hour}
+                      onDragOver={handleDragOver}
+                      onDrop={(ev) => {
+                        const d = new Date(year, month, selectedDay || 1);
+                        handleDropEvent(ev, d, hour);
+                      }}
                       className="h-12 border-b border-slate-100 dark:border-slate-700/50"
                     ></div>
                   ))}
@@ -1482,7 +1618,7 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       },
                     );
 
-                    return dayAgendaEvents.map((e) => {
+                    return calculateEventLayout(dayAgendaEvents).map(({ e, colIndex, clusterSize }) => {
                       const start = new Date(e.startDate);
                       const end = new Date(e.endDate);
                       const startHour =
@@ -1496,29 +1632,64 @@ export const FinancialCalendar: React.FC<FinancialCalendarProps> = ({
                       const top = adjustedStartHour * 48; // 48px per hour (h-12)
                       const height = Math.max((adjustedEndHour - adjustedStartHour) * 48, 20); // Min height 20px
 
+                      const width = `calc(${100 / clusterSize}% - 4px)`;
+                      const left = `calc(${(100 / clusterSize) * colIndex}% + 2px)`;
+
                       return (
                         <div
                           key={e.id}
+                          draggable
+                          onDragStart={(ev) => handleDragStart(ev, e.id)}
                           onClick={() => handleEditAgendaEvent(e)}
-                          className="absolute left-1 right-1 rounded-md bg-blue-500/90 hover:bg-blue-600 text-white p-1 overflow-hidden cursor-pointer shadow-sm transition-colors z-10"
-                          style={{ top: `${top}px`, height: `${height}px` }}
+                          className="absolute rounded-md text-white p-1 overflow-x-hidden overflow-y-auto cursor-pointer shadow-sm transition-opacity hover:opacity-90 z-10 custom-scrollbar"
+                          style={{
+                            backgroundColor: e.color ? `${e.color}E6` : `rgba(59, 130, 246, 0.9)`,
+                            top: `${top}px`,
+                            height: `${height}px`,
+                            width,
+                            left,
+                          }}
                         >
-                          <div className="text-[10px] font-bold leading-tight truncate">
-                            {e.title}
-                          </div>
-                          {height >= 40 && (
-                            <div className="text-[9px] opacity-80 leading-tight truncate">
-                              {start.toLocaleTimeString("pt-BR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}{" "}
-                              -{" "}
-                              {end.toLocaleTimeString("pt-BR", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                          <div className="flex flex-col h-full">
+                            <div className="text-[10px] font-bold leading-tight truncate shrink-0">
+                              {e.title}
                             </div>
-                          )}
+                            {height >= 40 && (
+                              <div className="text-[9px] opacity-80 leading-tight truncate shrink-0 mb-1">
+                                {start.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                                {" - "}
+                                {end.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </div>
+                            )}
+                            {e.checklist && e.checklist.length > 0 && (
+                              <div className="mt-1 space-y-1">
+                                {e.checklist.map((item, idx) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-start gap-1 text-[9px]"
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      if (!onUpdateAgendaEvent) return;
+                                      const newChecklist = [...e.checklist!];
+                                      newChecklist[idx] = { ...item, isCompleted: !item.isCompleted };
+                                      onUpdateAgendaEvent(e.id, { checklist: newChecklist });
+                                    }}
+                                  >
+                                    <div className={`mt-0.5 shrink-0 w-2.5 h-2.5 flex items-center justify-center rounded border transition-colors ${item.isCompleted ? 'bg-white text-blue-500' : 'border-white/50 text-transparent hover:border-white'}`}>
+                                      <Check className="w-2 h-2" />
+                                    </div>
+                                    <span className={`flex-1 leading-tight ${item.isCompleted ? 'line-through opacity-70' : 'opacity-90'}`}>{item.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     });

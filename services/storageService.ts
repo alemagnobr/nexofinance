@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine, WorkGoal } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine, WorkGoal, WorkoutProject, WorkoutRoutine } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -287,6 +287,20 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     handleFirestoreError(error, "Erro ao assinar metas de trabalho");
   });
 
+  const unsubWorkoutProjects = onSnapshot(collection(db, 'users', uid, 'workoutProjects'), (snapshot) => {
+    const workoutProjects = snapshot.docs.map(doc => doc.data() as WorkoutProject);
+    onUpdate({ workoutProjects });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar projetos de treino");
+  });
+
+  const unsubWorkoutRoutines = onSnapshot(collection(db, 'users', uid, 'workoutRoutines'), (snapshot) => {
+    const workoutRoutines = snapshot.docs.map(doc => doc.data() as WorkoutRoutine);
+    onUpdate({ workoutRoutines });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar fichas de treino");
+  });
+
   const unsubCategories = onSnapshot(collection(db, 'users', uid, 'categories'), (snapshot) => {
       const categories = snapshot.docs.map(doc => doc.data() as Category);
       // Se não houver categorias no banco, o hook useAppData deve lidar com o default
@@ -339,6 +353,8 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubDailyRoutines();
     unsubWallets();
     unsubWorkGoals();
+    unsubWorkoutProjects();
+    unsubWorkoutRoutines();
     unsubCategories();
     unsubUserDoc();
   };
@@ -782,6 +798,60 @@ export const deleteDailyRoutineFire = async (uid: string, id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'dailyRoutines', id));
   } catch (error) {
     handleFirestoreError(error, "Erro ao excluir rotina diária");
+  }
+};
+
+export const addWorkoutProjectFire = async (uid: string, project: WorkoutProject) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'workoutProjects', project.id), project);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar projeto de treino");
+  }
+};
+
+export const updateWorkoutProjectFire = async (uid: string, id: string, updates: Partial<WorkoutProject>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'workoutProjects', id), {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar projeto de treino");
+  }
+};
+
+export const deleteWorkoutProjectFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'workoutProjects', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao excluir projeto de treino");
+  }
+};
+
+export const addWorkoutRoutineFire = async (uid: string, routine: WorkoutRoutine) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'workoutRoutines', routine.id), routine);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar ficha de treino");
+  }
+};
+
+export const updateWorkoutRoutineFire = async (uid: string, id: string, updates: Partial<WorkoutRoutine>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'workoutRoutines', id), {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar ficha de treino");
+  }
+};
+
+export const deleteWorkoutRoutineFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'workoutRoutines', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao excluir ficha de treino");
   }
 };
 

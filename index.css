@@ -71,6 +71,21 @@ body {
 }
 
 /* Custom Scrollbar for Desktop */
+/* Custom Scrollbar for small containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
 @media (min-width: 768px) {
   ::-webkit-scrollbar {
     width: 8px;

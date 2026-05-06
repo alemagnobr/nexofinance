@@ -217,6 +217,7 @@ export interface AgendaEvent {
   id: string;
   title: string;
   description?: string;
+  color?: string;
   startDate: string; // ISO datetime or YYYY-MM-DD
   endDate: string; // ISO datetime or YYYY-MM-DD
   allDay: boolean;
@@ -226,6 +227,7 @@ export interface AgendaEvent {
   recurrenceEndDate?: string;
   isRoutine?: boolean; // Se é uma rotina
   completedDates?: string[]; // Datas (YYYY-MM-DD) em que foi concluído
+  checklist?: { id: string; text: string; isCompleted: boolean }[];
   isGhost?: boolean;
   updatedAt?: string;
 }
@@ -308,6 +310,11 @@ export interface AppData {
   scoreSerasa?: number;
   scoreSerasaUpdatedAt?: string;
   scoreSerasaHistory?: { score: number, date: string }[];
+  workoutProjects?: WorkoutProject[];
+  workoutProjectPhases?: WorkoutProjectPhase[];
+  workoutSteps?: WorkoutStep[];
+  workoutCheckins?: WorkoutCheckin[];
+  workoutRoutines?: WorkoutRoutine[];
 }
 
 export enum View {
@@ -346,6 +353,84 @@ export interface DailyRoutine {
   order?: number;
   time?: string; // HH:mm
   eventId?: string; // Links to agenda event
+}
+
+export interface WorkoutProject {
+  id: string;
+  name: string; // Ex: Bulk Base 2026
+  objective: string; // Ex: Ganho de massa com mínimo acúmulo de gordura
+  description: string;
+  startDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  status: 'Planejado' | 'Em andamento' | 'Pausado' | 'Finalizado';
+  priority: 'Alta' | 'Média' | 'Baixa';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkoutProjectPhase {
+  id: string;
+  projectId: string;
+  name: string; // Ex: Adaptação
+  period: string; // Ex: Semana 1 a 2
+  objective: string; // Ex: Voltar ritmo, controlar dores
+  order: number;
+}
+
+export interface WorkoutStep {
+  id: string;
+  projectId: string;
+  name: string; // Ex: Etapa 1: Retorno
+  duration: string; // Ex: 2 semanas
+  intensity: string; // Ex: leve/moderada
+  focus: string; // Ex: técnica, mobilidade
+  strategy?: string; 
+  techniques?: string;
+  volume?: string;
+  order: number;
+}
+
+export interface WorkoutCheckin {
+  id: string;
+  projectId: string;
+  date: string; // YYYY-MM-DD
+  weight?: number;
+  measurements?: string; // Observações sobre medidas
+  photos?: string[]; // URLs das fotos
+  loads?: string; // Carga dos principais
+  energyLevel?: number; // 1-5
+  sleepQuality?: number; // 1-5
+  dietAdherence?: number; // 0-100%
+  notes?: string;
+  adjustments?: string;
+  createdAt: string;
+}
+
+export interface RoutineExercise {
+  id: string;
+  name: string;
+  sets: string;
+  reps: string;
+  rest: string;
+  technique?: string;
+  notes?: string;
+}
+
+export interface RoutineDay {
+  id: string;
+  name: string; // Ex: Treino A - Peito, Segunda-feira
+  dayOfWeek?: number; // 0 (Sun) to 6 (Sat)
+  exercises: RoutineExercise[];
+}
+
+export interface WorkoutRoutine {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  days: RoutineDay[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkGoal {

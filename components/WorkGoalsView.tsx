@@ -136,9 +136,47 @@ export const WorkGoalsView: React.FC<WorkGoalsViewProps> = ({
                   />
                 </div>
                 {goal.deadline && (
-                  <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <CalendarDays className="w-3.5 h-3.5" /> Prazo: {new Date(goal.deadline + "T12:00:00").toLocaleDateString('pt-BR')}
-                  </p>
+                  <div className="mt-4 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-2">
+                      <CalendarDays className="w-4 h-4 text-emerald-500" /> 
+                      Prazo: {new Date(goal.deadline + "T12:00:00").toLocaleDateString('pt-BR')}
+                    </p>
+                    {(() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const dl = new Date(goal.deadline + "T12:00:00");
+                      dl.setHours(0, 0, 0, 0);
+                      const diffMs = dl.getTime() - today.getTime();
+                      const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+                      const remainingHours = Math.max(0, goal.targetHours - goal.completedHours);
+                      
+                      const hoursPerDay = daysRemaining > 0 ? (remainingHours / daysRemaining) : remainingHours;
+                      const hoursPerWeek = daysRemaining >= 7 ? hoursPerDay * 7 : remainingHours;
+                      
+                      return (
+                        <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                           <div className="flex flex-col items-center p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Faltam</span>
+                              <span className={`text-sm font-black ${daysRemaining <= 3 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {daysRemaining}d
+                              </span>
+                           </div>
+                           <div className="flex flex-col items-center p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Por Dia</span>
+                              <span className="text-sm font-black text-blue-600 dark:text-blue-400">
+                                {hoursPerDay.toFixed(1)}h
+                              </span>
+                           </div>
+                           <div className="flex flex-col items-center p-1.5 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Por Sem.</span>
+                              <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                                {hoursPerWeek.toFixed(1)}h
+                              </span>
+                           </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
 
