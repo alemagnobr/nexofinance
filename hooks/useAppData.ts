@@ -285,15 +285,16 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
 
     const newBalance = wallet.balance + adjustment;
 
+    // Optimistic Update
+    setData((prev) => ({
+      ...prev,
+      wallets: (prev.wallets || []).map((w) =>
+        w.id === walletId ? { ...w, balance: newBalance } : w,
+      ),
+    }));
+
     if (user) {
       await updateWalletFire(user.uid, walletId, { balance: newBalance });
-    } else {
-      setData((prev) => ({
-        ...prev,
-        wallets: (prev.wallets || []).map((w) =>
-          w.id === walletId ? { ...w, balance: newBalance } : w,
-        ),
-      }));
     }
   };
 
@@ -322,16 +323,7 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
     const oldTransaction = data.transactions.find((t) => t.id === id);
     if (!oldTransaction) return;
 
-    if (user) await updateTransactionFire(user.uid, id, updates);
-    else
-      setData((prev) => ({
-        ...prev,
-        transactions: prev.transactions.map((t) =>
-          t.id === id ? { ...t, ...updates } : t,
-        ),
-      }));
-
-    // Handle wallet balance changes if it was paid or is becoming paid
+    // Handle wallet balance changes logic
     const isNowPaid = updates.status
       ? updates.status === "paid"
       : oldTransaction.status === "paid";
@@ -365,21 +357,40 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       walletChanges[newWalletId] = (walletChanges[newWalletId] || 0) + applyAdj;
     }
 
-    // Apply changes
-    for (const [wId, change] of Object.entries(walletChanges)) {
-      if (change !== 0) {
-        const wallet = data.wallets?.find((w) => w.id === wId);
-        if (wallet) {
-          const newBalance = wallet.balance + change;
-          if (user) {
+    // --- OPTIMISTIC UPDATES ---
+    setData((prev) => {
+      // 1. Update Transaction
+      const updatedTransactions = prev.transactions.map((t) =>
+        t.id === id ? { ...t, ...updates } : t,
+      );
+
+      // 2. Update Wallets
+      let updatedWallets = prev.wallets || [];
+      for (const [wId, change] of Object.entries(walletChanges)) {
+        if (change !== 0) {
+          updatedWallets = updatedWallets.map((w) =>
+            w.id === wId ? { ...w, balance: w.balance + change } : w,
+          );
+        }
+      }
+
+      return {
+        ...prev,
+        transactions: updatedTransactions,
+        wallets: updatedWallets,
+      };
+    });
+
+    // --- FIREBASE UPDATES (if logged in) ---
+    if (user) {
+      await updateTransactionFire(user.uid, id, updates);
+
+      for (const [wId, change] of Object.entries(walletChanges)) {
+        if (change !== 0) {
+          const wallet = data.wallets?.find((w) => w.id === wId);
+          if (wallet) {
+            const newBalance = wallet.balance + change;
             await updateWalletFire(user.uid, wId, { balance: newBalance });
-          } else {
-            setData((prev) => ({
-              ...prev,
-              wallets: (prev.wallets || []).map((w) =>
-                w.id === wId ? { ...w, balance: newBalance } : w,
-              ),
-            }));
           }
         }
       }
@@ -504,30 +515,58 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       targetTransaction.status === "paid" ? "pending" : "paid";
     const finalWalletId = walletId || targetTransaction.walletId;
 
+    // --- OPTIMISTIC UPDATES ---
+    setData((prev) => {
+      const updatedTransactions = prev.transactions.map((t) =>
+        t.id === id ? { ...t, status: newStatus, walletId: finalWalletId } : t,
+      );
+
+      let updatedDebts = prev.debts;
+      if (targetTransaction.debtId) {
+        const relatedTransactions = updatedTransactions.filter(
+          (t) => t.debtId === targetTransaction.debtId,
+        );
+        const allPaid = relatedTransactions.every((t) => t.status === "paid");
+        const newDebtStatus = allPaid ? "paid" : "agreement";
+
+        updatedDebts = prev.debts.map((d) => {
+          if (d.id === targetTransaction.debtId) {
+            return { ...d, status: newDebtStatus };
+          }
+          return d;
+        });
+      }
+      return {
+        ...prev,
+        transactions: updatedTransactions,
+        debts: updatedDebts,
+      };
+    });
+
+    if (finalWalletId) {
+      if (newStatus === "paid") {
+        await adjustWalletBalance(
+          finalWalletId,
+          targetTransaction.amount,
+          targetTransaction.type,
+        );
+      } else {
+        await adjustWalletBalance(
+          finalWalletId,
+          targetTransaction.amount,
+          targetTransaction.type,
+          true,
+        );
+      }
+    }
+
+    // --- FIREBASE UPDATES (if logged in) ---
     if (user) {
       await updateTransactionFire(user.uid, id, {
         status: newStatus,
         walletId: finalWalletId,
       });
 
-      if (finalWalletId) {
-        if (newStatus === "paid") {
-          await adjustWalletBalance(
-            finalWalletId,
-            targetTransaction.amount,
-            targetTransaction.type,
-          );
-        } else {
-          await adjustWalletBalance(
-            finalWalletId,
-            targetTransaction.amount,
-            targetTransaction.type,
-            true,
-          );
-        }
-      }
-
-      // Debt Sync Logic
       if (targetTransaction.debtId) {
         const debt = data.debts.find((d) => d.id === targetTransaction.debtId);
         if (debt) {
@@ -538,59 +577,12 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
             if (t.id === id) return newStatus === "paid";
             return t.status === "paid";
           });
-
           const newDebtStatus = allPaid ? "paid" : "agreement";
-
           if (debt.status !== newDebtStatus) {
             await updateDebtFire(user.uid, debt.id, { status: newDebtStatus });
           }
         }
       }
-    } else {
-      if (finalWalletId) {
-        if (newStatus === "paid") {
-          adjustWalletBalance(
-            finalWalletId,
-            targetTransaction.amount,
-            targetTransaction.type,
-          );
-        } else {
-          adjustWalletBalance(
-            finalWalletId,
-            targetTransaction.amount,
-            targetTransaction.type,
-            true,
-          );
-        }
-      }
-      setData((prev) => {
-        const updatedTransactions = prev.transactions.map((t) =>
-          t.id === id
-            ? { ...t, status: newStatus, walletId: finalWalletId }
-            : t,
-        );
-
-        let updatedDebts = prev.debts;
-        if (targetTransaction.debtId) {
-          const relatedTransactions = updatedTransactions.filter(
-            (t) => t.debtId === targetTransaction.debtId,
-          );
-          const allPaid = relatedTransactions.every((t) => t.status === "paid");
-          const newDebtStatus = allPaid ? "paid" : "agreement";
-
-          updatedDebts = prev.debts.map((d) => {
-            if (d.id === targetTransaction.debtId) {
-              return { ...d, status: newDebtStatus };
-            }
-            return d;
-          });
-        }
-        return {
-          ...prev,
-          transactions: updatedTransactions,
-          debts: updatedDebts,
-        };
-      });
     }
   };
 
