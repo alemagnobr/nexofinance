@@ -3,6 +3,7 @@ import { ChevronLeft, Target, Calendar as CalendarIcon, Activity, Plus, Edit2, T
 import { WorkoutProject, WorkoutRoutine, RoutineDay, RoutineExercise } from '../types';
 import { WorkoutRoutineEditor } from './WorkoutRoutineEditor';
 import { WorkoutRoutineViewer } from './WorkoutRoutineViewer';
+import { WorkoutPlayer } from './WorkoutPlayer';
 
 interface WorkoutProjectDetailsProps {
   project: WorkoutProject;
@@ -15,6 +16,8 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
   const [activeTab, setActiveTab] = useState<'info' | 'routines' | 'dietas'>('info');
   const [editingRoutine, setEditingRoutine] = useState<WorkoutRoutine | null | 'new'>(null);
   const [viewingRoutine, setViewingRoutine] = useState<WorkoutRoutine | null>(null);
+  const [playingRoutineDay, setPlayingRoutineDay] = useState<{ routineId: string; dayIndex: number } | null>(null);
+  const [editingExercisePointer, setEditingExercisePointer] = useState<{ dayIndex: number, exIndex: number } | null>(null);
 
   const [isEditingObjective, setIsEditingObjective] = useState(false);
   const [objectiveInput, setObjectiveInput] = useState(project.objective);
@@ -41,21 +44,75 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
     if (editingRoutine === 'new') {
       actions.addWorkoutRoutine?.(routineData);
     } else if (editingRoutine) {
-      actions.updateWorkoutRoutine?.(editingRoutine.id, routineData);
+      actions.updateWorkoutRoutine?.(editingRoutine.id || routineData.id, routineData);
     }
     setEditingRoutine(null);
+    setEditingExercisePointer(null);
   };
 
   if (viewingRoutine) {
     // If the routine was updated, we want to view the updated version next render
     const upToDateRoutine = projectRoutines.find((r: WorkoutRoutine) => r.id === viewingRoutine.id) || viewingRoutine;
+    if (playingRoutineDay) {
+      return (
+        <>
+          <WorkoutPlayer 
+            routine={upToDateRoutine}
+            dayIndex={playingRoutineDay.dayIndex}
+            onBack={() => setPlayingRoutineDay(null)}
+            onUpdateRoutine={(r: WorkoutRoutine) => {
+              actions.updateWorkoutRoutine?.(r.id, r);
+            }}
+            onEditExercise={(dayIndex, exIndex) => {
+              setEditingExercisePointer({ dayIndex, exIndex });
+              setEditingRoutine(upToDateRoutine);
+            }}
+          />
+          {editingRoutine && editingExercisePointer && (
+            <div className="fixed inset-0 z-[60]">
+              <WorkoutRoutineEditor 
+                routine={upToDateRoutine} 
+                projectId={project.id} 
+                onSave={handleSaveRoutine} 
+                onCancel={() => {
+                  setEditingRoutine(null);
+                  setEditingExercisePointer(null);
+                }} 
+                initialEditingEx={editingExercisePointer}
+                isQuickEdit={!!editingExercisePointer}
+              />
+            </div>
+          )}
+        </>
+      );
+    }
+    if (editingRoutine && editingExercisePointer) {
+      return (
+        <WorkoutRoutineEditor 
+          routine={upToDateRoutine} 
+          projectId={project.id} 
+          onSave={handleSaveRoutine} 
+          onCancel={() => {
+            setEditingRoutine(null);
+            setEditingExercisePointer(null);
+          }} 
+          initialEditingEx={editingExercisePointer}
+          isQuickEdit={!!editingExercisePointer}
+        />
+      );
+    }
     if (editingRoutine) {
       return (
         <WorkoutRoutineEditor 
           routine={upToDateRoutine} 
           projectId={project.id} 
           onSave={handleSaveRoutine} 
-          onCancel={() => setEditingRoutine(null)} 
+          onCancel={() => {
+            setEditingRoutine(null);
+            setEditingExercisePointer(null);
+          }} 
+          initialEditingEx={editingExercisePointer}
+          isQuickEdit={!!editingExercisePointer}
         />
       );
     }
@@ -67,6 +124,11 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
         onUpdateRoutine={(r: WorkoutRoutine) => {
           actions.updateWorkoutRoutine?.(r.id, r);
         }}
+        onEditExercise={(dayIndex, exIndex) => {
+          setEditingExercisePointer({ dayIndex, exIndex });
+          setEditingRoutine(upToDateRoutine);
+        }}
+        onPlayDay={(dayIndex) => setPlayingRoutineDay({ routineId: upToDateRoutine.id, dayIndex })}
       />
     );
   }
@@ -77,7 +139,10 @@ export const WorkoutProjectDetails: React.FC<WorkoutProjectDetailsProps> = ({ pr
         routine={null} 
         projectId={project.id} 
         onSave={handleSaveRoutine} 
-        onCancel={() => setEditingRoutine(null)} 
+        onCancel={() => {
+          setEditingRoutine(null);
+          setEditingExercisePointer(null);
+        }} 
       />
     );
   }

@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { WorkoutRoutine, RoutineExercise } from '../types';
-import { ChevronLeft, Calendar as CalendarIcon, List, LayoutGrid, Edit2, TrendingUp, Plus, X } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, List, LayoutGrid, Edit2, TrendingUp, Plus, X, Play } from 'lucide-react';
 
 interface WorkoutRoutineViewerProps {
   routine: WorkoutRoutine;
   onBack: () => void;
   onEdit: () => void;
   onUpdateRoutine?: (routine: WorkoutRoutine) => void;
+  onEditExercise?: (dayIndex: number, exIndex: number) => void;
+  onPlayDay?: (dayIndex: number) => void;
 }
 
-export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ routine, onBack, onEdit, onUpdateRoutine }) => {
+export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ routine, onBack, onEdit, onUpdateRoutine, onEditExercise, onPlayDay }) => {
   const [viewMode, setViewMode] = useState<'lista' | 'semanal'>('lista');
-  const [selectedExercise, setSelectedExercise] = useState<{ dayId: string; ex: RoutineExercise } | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<{ dayId: string; ex: RoutineExercise; setIndex: number } | null>(null);
   const [newLoad, setNewLoad] = useState('');
   const [newReps, setNewReps] = useState('');
   const [newNotes, setNewNotes] = useState('');
@@ -34,16 +36,24 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
     const exIndex = newRoutine.days[dayIndex].exercises.findIndex(e => e.id === selectedExercise.ex.id);
     if (exIndex === -1) return;
 
-    const currentHistory = newRoutine.days[dayIndex].exercises[exIndex].loadHistory || [];
+    const setIndex = selectedExercise.setIndex;
+    if (!newRoutine.days[dayIndex].exercises[exIndex].setsData || !newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex]) return;
+
+    const currentHistory = newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex].loadHistory || [];
     
-    newRoutine.days[dayIndex].exercises[exIndex] = {
-      ...newRoutine.days[dayIndex].exercises[exIndex],
-      currentLoad: newLoad,
+    newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex] = {
+      ...newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex],
+      load: newLoad,
       loadHistory: [newEntry, ...currentHistory]
     };
+    
+    // Fallback: also update the global load if it's the first set just for backwards compat display in some places
+    if (setIndex === 0) {
+      newRoutine.days[dayIndex].exercises[exIndex].currentLoad = newLoad;
+    }
 
     onUpdateRoutine(newRoutine);
-    setSelectedExercise({ dayId: selectedExercise.dayId, ex: newRoutine.days[dayIndex].exercises[exIndex] });
+    setSelectedExercise({ dayId: selectedExercise.dayId, ex: newRoutine.days[dayIndex].exercises[exIndex], setIndex });
     setNewLoad('');
     setNewReps('');
     setNewNotes('');
@@ -59,17 +69,20 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
     const exIndex = newRoutine.days[dayIndex].exercises.findIndex(e => e.id === selectedExercise.ex.id);
     if (exIndex === -1) return;
 
-    const currentHistory = newRoutine.days[dayIndex].exercises[exIndex].loadHistory || [];
+    const setIndex = selectedExercise.setIndex;
+    if (!newRoutine.days[dayIndex].exercises[exIndex].setsData || !newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex]) return;
+
+    const currentHistory = newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex].loadHistory || [];
     const updatedHistory = currentHistory.filter(h => h.id !== histId);
     
-    newRoutine.days[dayIndex].exercises[exIndex] = {
-      ...newRoutine.days[dayIndex].exercises[exIndex],
-      currentLoad: updatedHistory.length > 0 ? updatedHistory[0].load : '',
+    newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex] = {
+      ...newRoutine.days[dayIndex].exercises[exIndex].setsData[setIndex],
+      load: updatedHistory.length > 0 ? updatedHistory[0].load : '',
       loadHistory: updatedHistory,
     };
 
     onUpdateRoutine(newRoutine);
-    setSelectedExercise({ dayId: selectedExercise.dayId, ex: newRoutine.days[dayIndex].exercises[exIndex] });
+    setSelectedExercise({ dayId: selectedExercise.dayId, ex: newRoutine.days[dayIndex].exercises[exIndex], setIndex });
   };
 
   return (
@@ -119,64 +132,110 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
 
       {viewMode === 'lista' ? (
         <div className="space-y-8">
-          {routine.days.map((day) => (
+          {routine.days.map((day, dayIndex) => (
             <div key={day.id} className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                 <h3 className="font-black text-lg text-slate-800 dark:text-white">{day.name}</h3>
+                {onPlayDay && day.exercises.length > 0 && (
+                  <button 
+                    onClick={() => onPlayDay(dayIndex)}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm"
+                  >
+                    <Play className="w-4 h-4 fill-current" /> Começar
+                  </button>
+                )}
               </div>
               <div className="p-0">
                 {day.exercises.length === 0 ? (
                   <p className="p-6 text-center text-slate-400">Nenhum exercício neste dia.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800 text-slate-500 border-b border-slate-200 dark:border-slate-700">
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider">Exercício</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider text-center">Séries</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider text-center">Reps</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider text-center">Descanso</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider">Técnica</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider text-center">Carga Alvo</th>
-                          <th className="py-3 px-6 font-bold uppercase text-[10px] tracking-wider text-center">Ação</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                        {day.exercises.map((ex) => (
-                          <tr key={ex.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
-                            <td className="py-4 px-6 font-bold text-slate-800 dark:text-slate-200">
-                              {ex.name}
+                      <div className="flex flex-col">
+                        {day.exercises.map((ex, exIndex) => (
+                          <div 
+                            key={ex.id} 
+                            className={`flex flex-col lg:flex-row items-stretch lg:items-center p-5 lg:p-6 gap-4 lg:gap-8 ${
+                              exIndex !== day.exercises.length - 1 ? 'border-b border-slate-100 dark:border-slate-700/50' : ''
+                            } hover:bg-slate-50/50 dark:hover:bg-slate-700/10 transition-colors`}
+                          >
+                            <div className="flex-[0_0_200px] min-w-0">
+                              <h4 className="font-bold text-base text-slate-800 dark:text-slate-100">{ex.name}</h4>
+                              {ex.setsData?.some(s => s.bisetExerciseName) && (
+                                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-500 font-bold bg-amber-50 dark:bg-amber-900/20 inline-block px-2 py-0.5 rounded border border-amber-100 dark:border-amber-800/30 whitespace-nowrap">
+                                  + Bi-sets: {Array.from(new Set(ex.setsData.map(s => s.bisetExerciseName).filter(Boolean))).join(', ')}
+                                </div>
+                              )}
                               {ex.progressionMethod && (
-                                <span className="block text-[10px] text-indigo-500 font-medium mt-1">{ex.progressionMethod}</span>
+                                <span className="block text-[11px] text-indigo-500 font-bold mt-1.5 uppercase tracking-wide">{ex.progressionMethod}</span>
                               )}
-                            </td>
-                            <td className="py-4 px-6 text-center font-medium text-slate-600 dark:text-slate-300">{ex.sets}</td>
-                            <td className="py-4 px-6 text-center text-indigo-600 dark:text-indigo-400 font-bold">{ex.reps}</td>
-                            <td className="py-4 px-6 text-center text-slate-500">{ex.rest}</td>
-                            <td className="py-4 px-6 text-slate-500 text-xs text-center">
-                              {ex.technique && (
-                                <span className="bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-1 rounded font-bold uppercase inline-block whitespace-nowrap">
-                                  {ex.technique}
-                                </span>
+                            </div>
+
+                            <div className="flex-1 flex gap-2 lg:gap-3 overflow-x-auto pb-2 lg:pb-0 items-start lg:items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                              {ex.setsData ? ex.setsData.map((s, i) => (
+                                <div key={i} className="group relative flex flex-col gap-1.5 items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-2xl p-3 min-w-[5rem] lg:min-w-[6rem] shrink-0">
+                                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded w-full text-center">S{i+1}</div>
+                                  <span className="font-black text-slate-700 dark:text-slate-200 text-lg sm:text-xl whitespace-nowrap">{s.reps || '-'}</span>
+                                  {s.rest && <span className="text-[10px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-700 px-1.5 py-0.5 rounded">{s.rest}</span>}
+                                  
+                                  {s.load && <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-full mt-0.5 border border-indigo-100 dark:border-indigo-800/30 w-full text-center whitespace-nowrap truncate">{s.load}</span>}
+                                  
+                                  <button 
+                                    onClick={() => setSelectedExercise({ dayId: day.id, ex, setIndex: i })} 
+                                    className="absolute -top-2 -right-2 bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 active:scale-95" 
+                                    title="Progresso da Série"
+                                  >
+                                    <TrendingUp className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {s.technique && (
+                                    <div className="flex flex-col items-center gap-0.5 mt-0.5 w-full">
+                                      <span className="text-[9px] font-bold bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded border border-rose-100 dark:border-rose-800/30 uppercase w-full text-center truncate" title={s.technique}>
+                                        {s.technique}
+                                      </span>
+                                      {s.technique.includes('Drop Set') && s.dropLoads && s.dropLoads.length > 0 && (
+                                        <div className="flex flex-wrap items-center justify-center gap-0.5 mt-1">
+                                          {s.dropLoads.filter(d => d).map((d, dI) => (
+                                            <span key={dI} className="text-[9px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-1 rounded">
+                                              -{d}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {s.technique.includes('Bi-set') && s.bisetReps && (
+                                        <span className="text-[9px] font-bold text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 w-full text-center px-1 py-0.5 rounded mt-0.5 border border-amber-100 dark:border-amber-800/30">
+                                          +{s.bisetReps} {s.bisetLoad && `(${s.bisetLoad})`}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )) : (
+                                <div className="text-sm text-slate-500 bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-xl font-medium">
+                                  {ex.sets} séries x {ex.reps} reps ({ex.rest})
+                                </div>
                               )}
-                            </td>
-                            <td className="py-4 px-6 text-center font-bold text-slate-700 dark:text-slate-300">
-                              {ex.currentLoad || '-'}
-                            </td>
-                            <td className="py-4 px-6 text-center">
+                            </div>
+
+            <div className="flex-none flex items-center justify-end pl-2 gap-2">
+                              {onEditExercise && (
+                                <button 
+                                  onClick={() => onEditExercise(dayIndex, exIndex)}
+                                  className="p-3 text-slate-400 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/50 dark:text-slate-500 dark:hover:bg-slate-700/70 rounded-2xl transition-colors inline-flex items-center justify-center hover:scale-105 active:scale-95"
+                                  title="Editar Exercício"
+                                >
+                                  <Edit2 className="w-5 h-5" />
+                                </button>
+                              )}
                               <button 
-                                onClick={() => setSelectedExercise({ dayId: day.id, ex })}
-                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-lg transition-colors inline-flex items-center justify-center"
-                                title="Histórico de Progressão"
+                                onClick={() => setSelectedExercise({ dayId: day.id, ex, setIndex: 0 })}
+                                className="p-3 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-2xl transition-colors inline-flex items-center justify-center hover:scale-105 active:scale-95"
+                                title="Histórico de Progressão (Visão Geral)"
                               >
-                                <TrendingUp className="w-4 h-4" />
+                                <TrendingUp className="w-5 h-5" />
                               </button>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
                 )}
               </div>
             </div>
@@ -191,13 +250,18 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
           </p>
         </div>
       )}
-      {selectedExercise && (
+      {selectedExercise && (() => {
+        const setIndex = selectedExercise.setIndex;
+        const setData = selectedExercise.ex.setsData?.[setIndex];
+        const loadHistory = setData?.loadHistory || selectedExercise.ex.loadHistory || []; // Fallback para history na raiz 
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col md:max-h-[85vh] max-h-screen animate-scale-in">
             <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/80 sticky top-0 z-10">
               <div>
                 <h3 className="font-bold text-lg text-slate-800 dark:text-white leading-tight">Histórico de Progressão</h3>
-                <p className="text-xs text-slate-500 font-medium">{selectedExercise.ex.name}</p>
+                <p className="text-xs text-slate-500 font-medium">{selectedExercise.ex.name} - Série {setIndex + 1}</p>
               </div>
               <button 
                 onClick={() => setSelectedExercise(null)} 
@@ -253,16 +317,16 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
               <div>
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-indigo-500" />
-                  Histórico ({selectedExercise.ex.loadHistory?.length || 0})
+                  Histórico ({loadHistory.length})
                 </h4>
                 
                 <div className="space-y-3">
-                  {(!selectedExercise.ex.loadHistory || selectedExercise.ex.loadHistory.length === 0) ? (
+                  {loadHistory.length === 0 ? (
                     <p className="text-center text-sm text-slate-400 py-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                       Nenhum registro ainda.
                     </p>
                   ) : (
-                    selectedExercise.ex.loadHistory.map((h, i) => (
+                    loadHistory.map((h, i) => (
                       <div key={h.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl flex items-center justify-between group">
                         <div>
                           <div className="flex items-center gap-2">
@@ -294,7 +358,8 @@ export const WorkoutRoutineViewer: React.FC<WorkoutRoutineViewerProps> = ({ rout
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -31,8 +31,8 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
   return (
     <div className="flex flex-col w-full min-h-screen">
       {/* Sub-navigation Header */}
-      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-top-bar z-30">
-        <div className="p-4 md:p-6 pb-2">
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 -mt-4 mx-[-1rem] md:-mt-8 md:mx-[-2rem] px-4 md:px-8 pt-4 md:pt-8">
+        <div className="pb-2">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl">
               <Activity className="w-6 h-6" />

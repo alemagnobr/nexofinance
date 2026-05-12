@@ -405,13 +405,30 @@ export interface WorkoutCheckin {
   createdAt: string;
 }
 
-export interface RoutineExercise {
+export interface RoutineExerciseSet {
   id: string;
-  name: string;
-  sets: string;
   reps: string;
   rest: string;
   technique?: string;
+  load?: string;
+  dropLoads?: string[];
+  dropReps?: string[];
+  bisetExerciseName?: string;
+  bisetReps?: string;
+  bisetLoad?: string;
+  loadHistory?: { date: string; load: string; reps?: string; notes?: string; id: string }[];
+}
+
+export interface RoutineExercise {
+  id: string;
+  name: string;
+  // Maintained for backwards compatibility, but optional now if setsData is used
+  sets?: string;
+  reps?: string;
+  rest?: string;
+  technique?: string;
+  
+  setsData?: RoutineExerciseSet[]; // Nova abordagem para séries individuais
   notes?: string;
   currentLoad?: string;
   progressionMethod?: string;

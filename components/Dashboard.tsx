@@ -259,6 +259,76 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const totalInvested = data.investments.reduce((acc, curr) => acc + curr.amount, 0);
 
+  // --- RESUMO DO DIA LOGIC ---
+  const dailySummary = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today.getTime() + 86400000);
+
+    // 1. Contas de Hoje
+    const pendingToday = data.transactions.filter(t => {
+      if (t.type !== 'expense' || t.status !== 'pending') return false;
+      const tDate = new Date(t.date);
+      tDate.setHours(0, 0, 0, 0);
+      return tDate.getTime() === today.getTime();
+    });
+    
+    // 2. Contas de Amanhã
+    const pendingTomorrow = data.transactions.filter(t => {
+      if (t.type !== 'expense' || t.status !== 'pending') return false;
+      const tDate = new Date(t.date);
+      tDate.setHours(0, 0, 0, 0);
+      return tDate.getTime() === tomorrow.getTime();
+    });
+
+    // 3. Hábitos Pendentes Hoje
+    let pendingHabitsCount = 0;
+    if (data.habits) {
+        data.habits.forEach(h => {
+             if (!h.startDate) return;
+             const start = new Date(h.startDate);
+             start.setHours(0,0,0,0);
+             const diffTime = today.getTime() - start.getTime();
+             const dayIndex = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+             if (dayIndex >= 0 && dayIndex < h.targetDays) {
+                 const entry = h.entries ? h.entries[dayIndex] : undefined;
+                 if (!entry || entry.status !== 'done') {
+                     pendingHabitsCount++;
+                 }
+             }
+        });
+    }
+
+    // 4. Workflow / Kanban
+    let delayedTasks = 0;
+    let dueTodayTasks = 0;
+    if (data.kanbanBoards) {
+        data.kanbanBoards.forEach(board => {
+            board.columns.forEach(col => {
+                if (!col.isConclusion) {
+                    col.cards.forEach(card => {
+                        if (card.dueDate) {
+                            const due = new Date(card.dueDate);
+                            due.setHours(0,0,0,0);
+                            if (due.getTime() < today.getTime()) delayedTasks++;
+                            else if (due.getTime() === today.getTime()) dueTodayTasks++;
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    return {
+       pendingToday,
+       totalPendingToday: pendingToday.reduce((acc, t) => acc + t.amount, 0),
+       pendingTomorrow,
+       pendingHabitsCount,
+       delayedTasks,
+       dueTodayTasks
+    };
+  }, [data.transactions, data.habits, data.kanbanBoards]);
+
   // --- NEW: Detailed Metrics for Cards ---
 
   // 1. Upcoming Bills (Next 3)
@@ -451,8 +521,128 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* --- RESUMO DE HOJE --- */}
+      <div className="mb-3 mt-4">
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <CalendarClock className="w-5 h-5 text-indigo-500" /> Resumo de Hoje
+        </h2>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Contas de Hoje */}
+          <div 
+             onClick={() => onNavigate(View.TRANSACTIONS)}
+             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingToday.length > 0 ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/30 hover:border-rose-300 dark:hover:border-rose-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700'}`}
+          >
+             <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2">
+                     <AlertCircle className={`w-4 h-4 ${dailySummary.pendingToday.length > 0 ? 'text-rose-500' : 'text-emerald-500'}`} />
+                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingToday.length > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Contas de Hoje</h3>
+                 </div>
+                 {dailySummary.pendingToday.length > 0 && (
+                     <span className="bg-rose-200 text-rose-800 dark:bg-rose-800 dark:text-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full">{dailySummary.pendingToday.length} pendentes</span>
+                 )}
+             </div>
+             
+             {dailySummary.pendingToday.length > 0 ? (
+                 <>
+                    <p className="text-xl font-bold text-rose-600 dark:text-rose-400 truncate" title={formatValue(dailySummary.totalPendingToday)}>{formatValue(dailySummary.totalPendingToday)}</p>
+                    <p className="text-[10px] text-rose-500/80 dark:text-rose-400/80 mt-1 truncate">
+                       Ex: {dailySummary.pendingToday[0].description} {dailySummary.pendingToday.length > 1 ? `e +${dailySummary.pendingToday.length - 1}` : ''}
+                    </p>
+                 </>
+             ) : (
+                 <>
+                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">Tudo limpo!</p>
+                    <p className="text-[10px] text-emerald-500/80 dark:text-emerald-400/80 mt-1">Nenhuma conta com vencimento para hoje.</p>
+                 </>
+             )}
+          </div>
+          
+          {/* Faltando Hábitos */}
+          <div 
+             onClick={() => onNavigate(View.SAUDE_DASHBOARD)}
+             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingHabitsCount > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30 hover:border-amber-300 dark:hover:border-amber-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700'}`}
+          >
+              <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2">
+                     <Target className={`w-4 h-4 ${dailySummary.pendingHabitsCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
+                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingHabitsCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Hábitos de Hoje</h3>
+                 </div>
+             </div>
+             
+             {dailySummary.pendingHabitsCount > 0 ? (
+                 <>
+                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{dailySummary.pendingHabitsCount} restando</p>
+                    <p className="text-[10px] text-amber-500/80 dark:text-amber-400/80 mt-1">Não quebre sua sequência diária.</p>
+                 </>
+             ) : (
+                 <>
+                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">100% Concluído</p>
+                    <p className="text-[10px] text-emerald-500/80 dark:text-emerald-400/80 mt-1">Você bateu todas as metas de hoje!</p>
+                 </>
+             )}
+          </div>
+
+          {/* Amanhã e Vencimentos (Recurring / Tomorrow) */}
+          <div
+             onClick={() => onNavigate(View.TRANSACTIONS)}
+             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingTomorrow.length > 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'}`}
+          >
+              <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2">
+                     <Clock className={`w-4 h-4 ${dailySummary.pendingTomorrow.length > 0 ? 'text-blue-500' : 'text-slate-500'}`} />
+                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingTomorrow.length > 0 ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-400'}`}>Amanhã</h3>
+                 </div>
+              </div>
+
+              {dailySummary.pendingTomorrow.length > 0 ? (
+                 <>
+                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{dailySummary.pendingTomorrow.length} Contas</p>
+                    <p className="text-[10px] text-blue-500/80 dark:text-blue-400/80 mt-1 truncate">
+                       Ex: {dailySummary.pendingTomorrow[0].description}
+                    </p>
+                 </>
+              ) : (
+                 <>
+                    <p className="text-xl font-bold text-slate-600 dark:text-slate-400">Sem Vencimentos</p>
+                    <p className="text-[10px] text-slate-500/80 dark:text-slate-400/80 mt-1">O dia de amanhã está tranquilo.</p>
+                 </>
+              )}
+          </div>
+
+          {/* Tarefas Atrasadas / Hoje */}
+          <div
+             onClick={() => onNavigate(View.KANBAN)}
+             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30 hover:border-purple-300 dark:hover:border-purple-700' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'}`}
+          >
+              <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2">
+                     <CheckSquare className={`w-4 h-4 ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'text-purple-500' : 'text-slate-500'}`} />
+                     <h3 className={`text-xs font-bold uppercase tracking-wider ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'text-purple-700 dark:text-purple-400' : 'text-slate-700 dark:text-slate-400'}`}>Tarefas</h3>
+                 </div>
+              </div>
+
+              {dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0 ? (
+                 <>
+                    <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                      {dailySummary.delayedTasks > 0 ? `${dailySummary.delayedTasks} Atrasadas` : `${dailySummary.dueTodayTasks} Hoje`}
+                    </p>
+                    <p className="text-[10px] text-purple-500/80 dark:text-purple-400/80 mt-1 truncate">
+                       {dailySummary.delayedTasks > 0 ? 'Corrija seus quadros.' : 'Entregue o que focou hoje.'}
+                    </p>
+                 </>
+              ) : (
+                 <>
+                    <p className="text-xl font-bold text-slate-600 dark:text-slate-400">Tudo em Dia</p>
+                    <p className="text-[10px] text-slate-500/80 dark:text-slate-400/80 mt-1">Nenhuma tarefa atrasada.</p>
+                 </>
+              )}
+          </div>
+      </div>
+
       {/* --- VISÃO GERAL --- */}
-      <div className="mb-3 mt-6">
+      <div className="mb-3 mt-8">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
           <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral
         </h2>
