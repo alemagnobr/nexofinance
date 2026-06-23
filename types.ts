@@ -18,6 +18,8 @@ export interface Wallet {
   color?: string;
   icon?: string;
   observation?: string; // Observação opcional para a carteira
+  creditCardDueDate?: number; // Dia do vencimento
+  creditLimit?: number; // Limite total
 }
 
 export interface Category {
@@ -457,6 +459,7 @@ export interface WorkGoal {
   title: string;
   targetHours: number;
   completedHours: number;
+  startDate?: string;
   deadline?: string;
   history?: { id: string; date: string; hours: number; notes?: string }[];
   createdAt: string;

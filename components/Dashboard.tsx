@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AppData, Badge, Budget, View, WalletType } from '../types';
-import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play, Dumbbell, Apple, Key, ShoppingCart, KeyRound, QrCode, FileText, CheckSquare } from 'lucide-react';
+import { Wallet, TrendingUp, AlertCircle, Target, Download, Trophy, CheckCheck, Layers, Crown, TrendingDown, Calendar, BarChart3, ShieldAlert, BadgeAlert, Scale, ArrowRight, ArrowLeft, Settings2, CalendarClock, DollarSign, PieChart as PieChartIcon, ChevronDown, Bell, X, Activity, Clock, ArrowDownCircle, StickyNote, CheckCircle2, Circle, Grid, Edit2, Timer, Play, Dumbbell, Apple, Key, ShoppingCart, KeyRound, QrCode, FileText, CheckSquare, CreditCard } from 'lucide-react';
 
 interface DashboardProps {
   data: AppData;
@@ -429,6 +429,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
     document.body.removeChild(link);
   };
 
+  // --- CREDIT CARD LOGIC ---
+  const creditCards = useMemo(() => {
+    return (data.wallets || []).filter(w => w.type === WalletType.CREDIT_CARD);
+  }, [data.wallets]);
+
+  const creditCardSummaries = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    return creditCards.map(card => {
+       const currentInvoiceSum = data.transactions
+         .filter(t => t.walletId === card.id && t.type === 'expense' &&
+                      new Date(t.date).getMonth() === currentMonth &&
+                      new Date(t.date).getFullYear() === currentYear)
+         .reduce((acc, t) => acc + t.amount, 0);
+
+       return {
+         ...card,
+         currentInvoice: currentInvoiceSum
+       };
+    });
+  }, [creditCards, data.transactions]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* NUDGES / ALERTS AREA */}
@@ -520,6 +544,61 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* --- CARTÕES DE CRÉDITO --- */}
+      {creditCardSummaries.length > 0 && (
+         <div className="mb-6">
+            <div className="mb-3 mt-4">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-indigo-500" /> Cartões de Crédito
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+               {creditCardSummaries.map(card => (
+                  <div key={card.id} className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-3 rounded-xl shadow-md relative overflow-hidden group hover:shadow-lg transition-all flex flex-col justify-between cursor-pointer" onClick={() => onNavigate(View.TRANSACTIONS)}>
+                     <div className={`absolute -right-10 -top-10 w-32 h-32 bg-${card.color || 'indigo'}-500/20 rounded-full blur-3xl`} />
+                     
+                     <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-1.5 relative z-10">
+                           <div className={`p-1.5 rounded-lg bg-slate-700 text-${card.color || 'indigo'}-400`}>
+                             <CreditCard className="w-3.5 h-3.5" />
+                           </div>
+                           <h3 className="font-bold text-white text-xs truncate" title={card.name}>{card.name}</h3>
+                        </div>
+                     </div>
+
+                     <div className="relative z-10">
+                        <div className="flex justify-between items-end mb-2">
+                            <div>
+                               <p className="text-[9px] text-slate-400 font-medium uppercase tracking-widest mb-0.5">Fatura</p>
+                               <p className="text-sm font-black text-white">{formatValue(card.currentInvoice)}</p>
+                            </div>
+                            {card.creditCardDueDate && (
+                               <span className="text-[8px] font-bold bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 mb-0.5">
+                                   Venc. {card.creditCardDueDate}
+                               </span>
+                            )}
+                        </div>
+
+                        {card.creditLimit ? (
+                             <div className="pt-2 border-t border-slate-700/50 mt-1">
+                                <div className="flex justify-between text-[9px] font-medium text-slate-400 mb-1.5">
+                                   <span>Lim: {formatValue(card.creditLimit)}</span>
+                                   <span className="text-white">Disp: {formatValue(Math.max(0, card.creditLimit - card.currentInvoice))}</span>
+                                </div>
+                                <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                                   <div className={`h-full rounded-full transition-all bg-${card.color || 'indigo'}-500`} style={{ width: `${Math.min(100, (card.currentInvoice / card.creditLimit) * 100)}%` }} />
+                                </div>
+                             </div>
+                         ) : (
+                             <div className="text-[9px] text-slate-500 italic mt-2">Sem limite.</div>
+                         )}
+                     </div>
+                  </div>
+               ))}
+            </div>
+         </div>
+      )}
 
       {/* --- RESUMO DE HOJE --- */}
       <div className="mb-3 mt-4">
@@ -644,7 +723,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* --- VISÃO GERAL --- */}
       <div className="mb-3 mt-8">
         <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral
+          <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral Financeiro
         </h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

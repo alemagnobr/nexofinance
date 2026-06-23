@@ -40,6 +40,28 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
     );
   }, [wallets]);
 
+  const creditCardsSummaries = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const allCreditCards = wallets.filter(w => w.type === WalletType.CREDIT_CARD);
+    
+    return allCreditCards.map(card => {
+       const currentInvoiceSum = (transactions || [])
+         .filter(t => t.walletId === card.id && t.type === 'expense' &&
+                      new Date(t.date).getMonth() === currentMonth &&
+                      new Date(t.date).getFullYear() === currentYear)
+         .reduce((acc, t) => acc + t.amount, 0);
+
+       return {
+         ...card,
+         currentInvoice: currentInvoiceSum
+       };
+    });
+  }, [wallets, transactions]);
+
+  const otherWallets = useMemo(() => wallets.filter(w => w.type !== WalletType.CREDIT_CARD), [wallets]);
+
   // Transfer Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferSourceId, setTransferSourceId] = useState<string>('');
@@ -58,7 +80,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
   });
 
   const resetForm = () => {
-    setFormData({ name: '', type: WalletType.BANK, balance: 0, color: 'indigo', observation: '' });
+    setFormData({ name: '', type: WalletType.BANK, balance: 0, color: 'indigo', observation: '', creditCardDueDate: undefined, creditLimit: undefined });
     setEditingId(null);
     setIsFormOpen(false);
     setWalletError('');
@@ -71,7 +93,9 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
       balance: wallet.balance,
       color: wallet.color || 'indigo',
       icon: wallet.icon,
-      observation: wallet.observation || ''
+      observation: wallet.observation || '',
+      creditCardDueDate: wallet.creditCardDueDate,
+      creditLimit: wallet.creditLimit
     });
     setEditingId(wallet.id);
     setIsFormOpen(true);
@@ -213,6 +237,31 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                         />
                       </div>
 
+                      {formData.type === WalletType.CREDIT_CARD && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Limite Total</label>
+                            <CurrencyInput
+                              value={formData.creditLimit || 0}
+                              onChangeValue={val => setFormData({ ...formData, creditLimit: parseFloat(val) || 0 })}
+                              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Dia do Vencimento</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="31"
+                              value={formData.creditCardDueDate || ''}
+                              onChange={e => setFormData({ ...formData, creditCardDueDate: parseInt(e.target.value) || undefined })}
+                              placeholder="Ex: 10"
+                              className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                          </div>
+                        </>
+                      )}
+
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
                         <textarea
@@ -323,17 +372,87 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {wallets.map(wallet => {
+      <div className="mb-6">
+         <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase flex items-center gap-2 mb-3">
+            <Landmark className="w-4 h-4 text-slate-500" /> Contas e Cartões
+         </h3>
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {creditCardsSummaries.map(card => (
+               <div key={card.id} className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-3 rounded-xl shadow-md relative overflow-hidden group hover:shadow-lg transition-all flex flex-col justify-between">
+                  <div className={`absolute -right-10 -top-10 w-32 h-32 bg-${card.color || 'indigo'}-500/20 rounded-full blur-3xl`} />
+                  
+                  <div className="flex justify-between items-start mb-3">
+                     <div className="flex items-center gap-1.5 relative z-10">
+                        <div className={`p-1.5 rounded-lg bg-slate-700 text-${card.color || 'indigo'}-400`}>
+                          <CreditCard className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[8px] text-slate-400 uppercase font-bold">Cartão de Crédito</span>
+                           <h3 className="font-bold text-white text-xs truncate" title={card.name}>{card.name}</h3>
+                        </div>
+                     </div>
+                     <div className="flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEdit(card as Wallet)} className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Editar">
+                           <Pencil className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => handleDelete(card.id)} className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded transition-colors" title="Excluir">
+                           <Trash2 className="w-3 h-3" />
+                        </button>
+                     </div>
+                  </div>
+
+                  <div className="relative z-10">
+                     <div className="flex justify-between items-end mb-2">
+                         <div>
+                            <p className="text-[9px] text-slate-400 font-medium uppercase tracking-widest mb-0.5">Fatura Atual</p>
+                            <p className="text-sm font-black text-white">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.currentInvoice)}</p>
+                         </div>
+                         {card.creditCardDueDate && (
+                            <span className="text-[8px] font-bold bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 mb-0.5">
+                                Venc. {card.creditCardDueDate}
+                            </span>
+                         )}
+                     </div>
+
+                     {card.creditLimit ? (
+                          <div className="pt-2 border-t border-slate-700/50 mt-1">
+                             <div className="flex justify-between text-[9px] font-medium text-slate-400 mb-1.5">
+                                <span>Lim: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(card.creditLimit)}</span>
+                                <span className="text-white">Disp: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.max(0, card.creditLimit - card.currentInvoice))}</span>
+                             </div>
+                             <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full transition-all bg-${card.color || 'indigo'}-500`} style={{ width: `${Math.min(100, (card.currentInvoice / card.creditLimit) * 100)}%` }} />
+                             </div>
+                          </div>
+                      ) : (
+                          <div className="text-[9px] text-slate-500 italic mt-2">Sem limite.</div>
+                      )}
+                      {card.observation && (
+                         <p className="text-[9px] text-slate-500 mt-2 line-clamp-1 italic">
+                            {card.observation}
+                         </p>
+                      )}
+                  </div>
+               </div>
+            ))}
+
+            {otherWallets.map(wallet => {
               const TypeIcon = WALLET_TYPES.find(t => t.value === wallet.type)?.icon || MoreHorizontal;
+              const typeLabel = WALLET_TYPES.find(t => t.value === wallet.type)?.label || 'Conta';
               const colorClass = wallet.color ? `bg-${wallet.color}-100 text-${wallet.color}-600 dark:bg-${wallet.color}-900/30 dark:text-${wallet.color}-400` : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
               const borderClass = wallet.color ? `border-${wallet.color}-200 dark:border-${wallet.color}-800/50` : 'border-slate-200 dark:border-slate-700';
 
               return (
-                <div key={wallet.id} className={`bg-white dark:bg-slate-800 rounded-xl p-3 border shadow-sm hover:shadow-md transition-all group ${borderClass}`}>
+                <div key={wallet.id} className={`bg-white dark:bg-slate-800 rounded-xl p-3 border shadow-sm hover:shadow-md transition-all group ${borderClass} flex flex-col justify-between`}>
                   <div className="flex justify-between items-start mb-2">
-                    <div className={`p-2 rounded-lg ${colorClass}`}>
-                      <TypeIcon className="w-4 h-4" />
+                    <div className="flex items-center gap-2">
+                       <div className={`p-1.5 rounded-lg ${colorClass}`}>
+                         <TypeIcon className="w-3.5 h-3.5" />
+                       </div>
+                       <div className="flex flex-col">
+                           <span className="text-[8px] text-slate-400 uppercase font-bold">{typeLabel}</span>
+                           <h3 className="font-bold text-slate-800 dark:text-white text-xs truncate" title={wallet.name}>{wallet.name}</h3>
+                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {onTransfer && (
@@ -359,15 +478,14 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                   </div>
                   
                   <div>
-                    <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate" title={wallet.name}>{wallet.name}</h3>
-                    
                     <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700/50">
+                      <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-widest mb-0.5">Saldo Atual</p>
                       <p className={`text-sm font-bold ${wallet.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                        {formatCurrency(wallet.balance)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(wallet.balance)}
                       </p>
                     </div>
                     {wallet.observation && (
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5 line-clamp-2 italic leading-tight">
+                      <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1.5 line-clamp-1 italic leading-tight">
                         {wallet.observation}
                       </p>
                     )}
@@ -375,20 +493,21 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                 </div>
               );
             })}
-            
-            {wallets.length === 0 && !isFormOpen && (
-              <div className="col-span-full bg-slate-50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-4 text-center">
-                <Landmark className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nenhuma conta</h3>
-                <button
-                  onClick={() => setIsFormOpen(true)}
-                  className="inline-flex items-center gap-1 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-bold text-xs shadow-sm mt-2"
-                >
-                  <Plus className="w-3 h-3" /> Adicionar
-                </button>
-              </div>
-            )}
-          </div>
+         </div>
+      </div>
+      
+      {wallets.length === 0 && !isFormOpen && (
+        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 p-4 text-center">
+          <Landmark className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nenhuma conta</h3>
+          <button
+            onClick={() => setIsFormOpen(true)}
+            className="inline-flex items-center gap-1 bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors font-bold text-xs shadow-sm mt-2"
+          >
+            <Plus className="w-3 h-3" /> Adicionar
+          </button>
+        </div>
+      )}
         </>
       )}
 
