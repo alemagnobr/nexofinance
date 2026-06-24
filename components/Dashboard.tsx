@@ -429,29 +429,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     document.body.removeChild(link);
   };
 
-  // --- CREDIT CARD LOGIC ---
-  const creditCards = useMemo(() => {
-    return (data.wallets || []).filter(w => w.type === WalletType.CREDIT_CARD);
-  }, [data.wallets]);
-
-  const creditCardSummaries = useMemo(() => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    
-    return creditCards.map(card => {
-       const currentInvoiceSum = data.transactions
-         .filter(t => t.walletId === card.id && t.type === 'expense' &&
-                      new Date(t.date).getMonth() === currentMonth &&
-                      new Date(t.date).getFullYear() === currentYear)
-         .reduce((acc, t) => acc + t.amount, 0);
-
-       return {
-         ...card,
-         currentInvoice: currentInvoiceSum
-       };
-    });
-  }, [creditCards, data.transactions]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -545,842 +522,108 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* --- CARTÕES DE CRÉDITO --- */}
-      {creditCardSummaries.length > 0 && (
-         <div className="mb-6">
-            <div className="mb-3 mt-4">
-              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-indigo-500" /> Cartões de Crédito
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-               {creditCardSummaries.map(card => (
-                  <div key={card.id} className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-3 rounded-xl shadow-md relative overflow-hidden group hover:shadow-lg transition-all flex flex-col justify-between cursor-pointer" onClick={() => onNavigate(View.TRANSACTIONS)}>
-                     <div className={`absolute -right-10 -top-10 w-32 h-32 bg-${card.color || 'indigo'}-500/20 rounded-full blur-3xl`} />
-                     
-                     <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center gap-1.5 relative z-10">
-                           <div className={`p-1.5 rounded-lg bg-slate-700 text-${card.color || 'indigo'}-400`}>
-                             <CreditCard className="w-3.5 h-3.5" />
-                           </div>
-                           <h3 className="font-bold text-white text-xs truncate" title={card.name}>{card.name}</h3>
-                        </div>
-                     </div>
-
-                     <div className="relative z-10">
-                        <div className="flex justify-between items-end mb-2">
-                            <div>
-                               <p className="text-[9px] text-slate-400 font-medium uppercase tracking-widest mb-0.5">Fatura</p>
-                               <p className="text-sm font-black text-white">{formatValue(card.currentInvoice)}</p>
-                            </div>
-                            {card.creditCardDueDate && (
-                               <span className="text-[8px] font-bold bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 mb-0.5">
-                                   Venc. {card.creditCardDueDate}
-                               </span>
-                            )}
-                        </div>
-
-                        {card.creditLimit ? (
-                             <div className="pt-2 border-t border-slate-700/50 mt-1">
-                                <div className="flex justify-between text-[9px] font-medium text-slate-400 mb-1.5">
-                                   <span>Lim: {formatValue(card.creditLimit)}</span>
-                                   <span className="text-white">Disp: {formatValue(Math.max(0, card.creditLimit - card.currentInvoice))}</span>
-                                </div>
-                                <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
-                                   <div className={`h-full rounded-full transition-all bg-${card.color || 'indigo'}-500`} style={{ width: `${Math.min(100, (card.currentInvoice / card.creditLimit) * 100)}%` }} />
-                                </div>
-                             </div>
-                         ) : (
-                             <div className="text-[9px] text-slate-500 italic mt-2">Sem limite.</div>
-                         )}
-                     </div>
-                  </div>
-               ))}
-            </div>
-         </div>
-      )}
+      {/* --- Credit Cards removed for space --- */}
 
       {/* --- RESUMO DE HOJE --- */}
-      <div className="mb-3 mt-4">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <CalendarClock className="w-5 h-5 text-indigo-500" /> Resumo de Hoje
-        </h2>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
           {/* Contas de Hoje */}
           <div 
              onClick={() => onNavigate(View.TRANSACTIONS)}
-             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingToday.length > 0 ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800/30 hover:border-rose-300 dark:hover:border-rose-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700'}`}
+             className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all flex items-center gap-3"
           >
-             <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2">
-                     <AlertCircle className={`w-4 h-4 ${dailySummary.pendingToday.length > 0 ? 'text-rose-500' : 'text-emerald-500'}`} />
-                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingToday.length > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Contas de Hoje</h3>
-                 </div>
-                 {dailySummary.pendingToday.length > 0 && (
-                     <span className="bg-rose-200 text-rose-800 dark:bg-rose-800 dark:text-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full">{dailySummary.pendingToday.length} pendentes</span>
-                 )}
+             <div className={`p-2 rounded-lg ${dailySummary.pendingToday.length > 0 ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                <AlertCircle className="w-5 h-5" />
              </div>
-             
-             {dailySummary.pendingToday.length > 0 ? (
-                 <>
-                    <p className="text-xl font-bold text-rose-600 dark:text-rose-400 truncate" title={formatValue(dailySummary.totalPendingToday)}>{formatValue(dailySummary.totalPendingToday)}</p>
-                    <p className="text-[10px] text-rose-500/80 dark:text-rose-400/80 mt-1 truncate">
-                       Ex: {dailySummary.pendingToday[0].description} {dailySummary.pendingToday.length > 1 ? `e +${dailySummary.pendingToday.length - 1}` : ''}
-                    </p>
-                 </>
-             ) : (
-                 <>
-                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">Tudo limpo!</p>
-                    <p className="text-[10px] text-emerald-500/80 dark:text-emerald-400/80 mt-1">Nenhuma conta com vencimento para hoje.</p>
-                 </>
-             )}
+             <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Contas Hoje</p>
+                <p className="text-lg font-black text-slate-800 dark:text-white truncate">
+                   {dailySummary.pendingToday.length > 0 ? formatValue(dailySummary.totalPendingToday) : 'Em dia'}
+                </p>
+             </div>
           </div>
           
           {/* Faltando Hábitos */}
           <div 
              onClick={() => onNavigate(View.SAUDE_DASHBOARD)}
-             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingHabitsCount > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30 hover:border-amber-300 dark:hover:border-amber-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700'}`}
+             className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all flex items-center gap-3"
           >
-              <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2">
-                     <Target className={`w-4 h-4 ${dailySummary.pendingHabitsCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`} />
-                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingHabitsCount > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>Hábitos de Hoje</h3>
-                 </div>
+             <div className={`p-2 rounded-lg ${dailySummary.pendingHabitsCount > 0 ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                <Target className="w-5 h-5" />
              </div>
-             
-             {dailySummary.pendingHabitsCount > 0 ? (
-                 <>
-                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{dailySummary.pendingHabitsCount} restando</p>
-                    <p className="text-[10px] text-amber-500/80 dark:text-amber-400/80 mt-1">Não quebre sua sequência diária.</p>
-                 </>
-             ) : (
-                 <>
-                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">100% Concluído</p>
-                    <p className="text-[10px] text-emerald-500/80 dark:text-emerald-400/80 mt-1">Você bateu todas as metas de hoje!</p>
-                 </>
-             )}
+             <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Hábitos</p>
+                <p className="text-lg font-black text-slate-800 dark:text-white truncate">
+                   {dailySummary.pendingHabitsCount > 0 ? `${dailySummary.pendingHabitsCount} pendentes` : 'Concluído'}
+                </p>
+             </div>
           </div>
 
-          {/* Amanhã e Vencimentos (Recurring / Tomorrow) */}
+          {/* Amanhã */}
           <div
              onClick={() => onNavigate(View.TRANSACTIONS)}
-             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${dailySummary.pendingTomorrow.length > 0 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'}`}
+             className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all flex items-center gap-3"
           >
-              <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2">
-                     <Clock className={`w-4 h-4 ${dailySummary.pendingTomorrow.length > 0 ? 'text-blue-500' : 'text-slate-500'}`} />
-                     <h3 className={`text-xs font-bold uppercase tracking-wider ${dailySummary.pendingTomorrow.length > 0 ? 'text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-400'}`}>Amanhã</h3>
-                 </div>
-              </div>
-
-              {dailySummary.pendingTomorrow.length > 0 ? (
-                 <>
-                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{dailySummary.pendingTomorrow.length} Contas</p>
-                    <p className="text-[10px] text-blue-500/80 dark:text-blue-400/80 mt-1 truncate">
-                       Ex: {dailySummary.pendingTomorrow[0].description}
-                    </p>
-                 </>
-              ) : (
-                 <>
-                    <p className="text-xl font-bold text-slate-600 dark:text-slate-400">Sem Vencimentos</p>
-                    <p className="text-[10px] text-slate-500/80 dark:text-slate-400/80 mt-1">O dia de amanhã está tranquilo.</p>
-                 </>
-              )}
+             <div className={`p-2 rounded-lg ${dailySummary.pendingTomorrow.length > 0 ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
+                <Clock className="w-5 h-5" />
+             </div>
+             <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Amanhã</p>
+                <p className="text-lg font-black text-slate-800 dark:text-white truncate">
+                   {dailySummary.pendingTomorrow.length > 0 ? `${dailySummary.pendingTomorrow.length} contas` : 'Livre'}
+                </p>
+             </div>
           </div>
 
-          {/* Tarefas Atrasadas / Hoje */}
+          {/* Tarefas */}
           <div
              onClick={() => onNavigate(View.KANBAN)}
-             className={`p-4 rounded-xl shadow-sm border relative overflow-hidden group cursor-pointer transition-all ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800/30 hover:border-purple-300 dark:hover:border-purple-700' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'}`}
+             className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md transition-all flex items-center gap-3"
           >
-              <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2">
-                     <CheckSquare className={`w-4 h-4 ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'text-purple-500' : 'text-slate-500'}`} />
-                     <h3 className={`text-xs font-bold uppercase tracking-wider ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'text-purple-700 dark:text-purple-400' : 'text-slate-700 dark:text-slate-400'}`}>Tarefas</h3>
-                 </div>
-              </div>
-
-              {dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0 ? (
-                 <>
-                    <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                      {dailySummary.delayedTasks > 0 ? `${dailySummary.delayedTasks} Atrasadas` : `${dailySummary.dueTodayTasks} Hoje`}
-                    </p>
-                    <p className="text-[10px] text-purple-500/80 dark:text-purple-400/80 mt-1 truncate">
-                       {dailySummary.delayedTasks > 0 ? 'Corrija seus quadros.' : 'Entregue o que focou hoje.'}
-                    </p>
-                 </>
-              ) : (
-                 <>
-                    <p className="text-xl font-bold text-slate-600 dark:text-slate-400">Tudo em Dia</p>
-                    <p className="text-[10px] text-slate-500/80 dark:text-slate-400/80 mt-1">Nenhuma tarefa atrasada.</p>
-                 </>
-              )}
-          </div>
-      </div>
-
-      {/* --- VISÃO GERAL --- */}
-      <div className="mb-3 mt-8">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Activity className="w-5 h-5 text-indigo-500" /> Visão Geral Financeiro
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {['score', 'balance', 'expenses', 'investments'].map((cardId) => {
-          if (cardId === 'score') return (
-        <div key="score" onClick={() => onNavigate(View.DEBTS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden group flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
-          {/* Card 1: Health Score */}
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-            <Scale className="w-20 h-20 text-slate-400" />
-          </div>
-          <div className="flex flex-col gap-4">
-            {/* Score Financeiro Pessoal */}
-            <div>
-                 <div className="flex items-center justify-between mb-2">
-                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Score Financeiro Pessoal</h3>
-                   <BadgeAlert className={`w-4 h-4 ${scoreColor}`} />
-                 </div>
-                 <div className="flex items-baseline gap-2 mb-1">
-                    <span className={`text-3xl font-black ${scoreColor} tracking-tighter`}>{healthScore}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">/ 1000</span>
-                 </div>
-                 <p className={`text-xs font-bold uppercase tracking-wide ${scoreColor}`}>{scoreLabel}</p>
-                 
-                 {/* Health Score Progress Bar */}
-                 <div className="mt-2 w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
-                    <div 
-                      className={`h-full transition-all duration-1000 ease-out ${
-                          healthScore >= 700 ? 'bg-emerald-500' : 
-                          healthScore >= 500 ? 'bg-amber-400' : 
-                          healthScore >= 300 ? 'bg-orange-500' : 'bg-rose-500'
-                      }`}
-                      style={{ width: `${(healthScore / 1000) * 100}%` }}
-                    />
-                 </div>
-            </div>
-
-            {/* Read-only Score Serasa summary */}
-            {(data.scoreSerasa !== undefined) && (
-                 <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
-                     <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                           <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">Score Serasa</h3>
-                           <ShieldAlert className="w-3 h-3 text-pink-500" />
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                           {data.scoreSerasaUpdatedAt 
-                            ? `Atualizado: ${new Date(data.scoreSerasaUpdatedAt).toLocaleDateString('pt-BR')}` 
-                            : 'Nenhuma atualização'}
-                        </span>
-                     </div>
-                     <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-black text-slate-800 dark:text-white tracking-tighter">
-                          {data.scoreSerasa}
-                        </span>
-                     </div>
-                 </div>
-            )}
-
-            {/* Priority Debts */}
-            {priorityDebts.length > 0 && (
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                    <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Dívidas em Destaque</h3>
-                    <div className="flex flex-col gap-1.5">
-                        {priorityDebts.map(debt => (
-                            <div key={debt.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 p-1.5 rounded-lg border border-slate-100 dark:border-slate-700/50">
-                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${debt.status === 'agreement' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                    <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 truncate">{debt.creditor}</span>
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-800 dark:text-white shrink-0">{formatValue(debt.status === 'agreement' ? (debt.agreedAmount || debt.currentAmount) : debt.currentAmount)}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-          </div>
-        </div>
-          );
-
-          if (cardId === 'balance') return (
-        <div key="balance" onClick={() => onNavigate(View.TRANSACTIONS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
-          {/* Card 2: Current Balance & Pending Income */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-               <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saldo em Caixa</h3>
-               <Wallet className="w-4 h-4 text-emerald-500" />
-            </div>
-            <p className="text-2xl font-bold text-slate-800 dark:text-white truncate">{formatValue(currentBalance)}</p>
-            
-            {/* NEW: Only Pending Income (A Receber) */}
-            {pendingIncome > 0 && (
-                <div className="mt-4 flex flex-col bg-emerald-50/80 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800/30 overflow-hidden w-full">
-                    <div className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-emerald-500" />
-                            <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 uppercase font-bold tracking-wider">Total a Receber</span>
-                        </div>
-                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-                            +{formatValue(pendingIncome)}
-                        </span>
-                    </div>
-                    {currentMonthPendingIncome > 0 && (
-                        <div className="flex items-center justify-between px-3 py-2 bg-emerald-100/30 dark:bg-emerald-800/20 border-t border-emerald-100 dark:border-emerald-800/30">
-                            <div className="flex items-center gap-1.5">
-                                <CalendarClock className="w-3.5 h-3.5 text-emerald-500/80 dark:text-emerald-400/80" />
-                                <span className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 uppercase font-bold tracking-wider">Neste mês</span>
-                            </div>
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400/90 whitespace-nowrap">
-                                +{formatValue(currentMonthPendingIncome)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
-          </div>
-          
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
-             {lateBillsCount > 0 && (
-                 <div className="flex items-center justify-between mb-3 bg-rose-50 dark:bg-rose-900/20 p-2 rounded-lg border border-rose-100 dark:border-rose-800/30">
-                     <div className="flex items-center gap-1.5">
-                         <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
-                         <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider">Contas Atrasadas</span>
-                     </div>
-                     <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
-                         {lateBillsCount} {lateBillsCount === 1 ? 'conta' : 'contas'}
-                     </span>
-                 </div>
-             )}
-             <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase">Sobrevivência</span>
-                <span className={`text-xs font-bold ${financialRunway < 1 ? 'text-rose-500' : financialRunway < 3 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                   {financialRunway < 0.1 ? 'Crítico' : `${financialRunway.toFixed(1)} Meses`}
-                </span>
+             <div className={`p-2 rounded-lg ${(dailySummary.delayedTasks > 0 || dailySummary.dueTodayTasks > 0) ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
+                <CheckSquare className="w-5 h-5" />
              </div>
-             <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full mt-1.5 overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${financialRunway < 1 ? 'bg-rose-500' : financialRunway < 3 ? 'bg-amber-400' : 'bg-emerald-500'}`} 
-                  style={{ width: `${Math.min(100, (financialRunway / 6) * 100)}%` }}
-                ></div>
+             <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tarefas</p>
+                <p className="text-lg font-black text-slate-800 dark:text-white truncate">
+                   {dailySummary.delayedTasks > 0 ? `${dailySummary.delayedTasks} atrasadas` : dailySummary.dueTodayTasks > 0 ? `${dailySummary.dueTodayTasks} hoje` : 'Em dia'}
+                </p>
              </div>
           </div>
-        </div>
-          );
+      </div>
 
-          if (cardId === 'expenses') return (
-        <div key="expenses" onClick={() => onNavigate(View.TRANSACTIONS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
-          {/* Card 3: Saídas (Paid vs Pending) - REDESIGNED */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-               <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Saídas (Mês)</h3>
-               <ArrowDownCircle className="w-4 h-4 text-rose-500" />
-            </div>
-            
-            {/* Main Value: Realized (Paid) Expenses */}
-            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 truncate">
-               -{formatValue(totalPaidExpenses)}
-            </p>
-            
-            {/* Secondary Value: Pending Expenses */}
-            {totalPending > 0 ? (
-                <div className="mt-4 flex flex-col bg-amber-50/80 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-800/30 overflow-hidden w-full">
-                    <div className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 uppercase font-bold tracking-wider">Total a Pagar</span>
-                        </div>
-                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                            -{formatValue(totalPending)}
-                        </span>
-                    </div>
-                    {currentMonthPendingExpense > 0 && (
-                        <div className="flex items-center justify-between px-3 py-2 bg-amber-100/30 dark:bg-amber-800/20 border-t border-amber-100 dark:border-amber-800/30">
-                            <div className="flex items-center gap-1.5">
-                                <CalendarClock className="w-3.5 h-3.5 text-amber-500/80 dark:text-amber-400/80" />
-                                <span className="text-[10px] text-amber-600/70 dark:text-amber-400/70 uppercase font-bold tracking-wider">Neste mês</span>
-                            </div>
-                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400/90 whitespace-nowrap">
-                                -{formatValue(currentMonthPendingExpense)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="flex items-center gap-1 mt-1 px-2 py-1">
-                    <CheckCheck className="w-3 h-3 text-emerald-500" />
-                    <span className="text-[10px] text-emerald-500 font-bold uppercase">Tudo Pago</span>
-                </div>
-            )}
-          </div>
+      {/* --- MEUS APLICATIVOS --- */}
+      <div className="space-y-4">
+          <h2 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-2">Meus Aplicativos</h2>
           
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex-1 flex flex-col justify-end space-y-2">
-            <p className="text-[10px] text-slate-400 font-semibold uppercase pb-1">
-               Próximos Vencimentos
-            </p>
-            {upcomingBills.length === 0 ? (
-               <div className="text-xs text-slate-400 italic">Nada pendente.</div>
-            ) : (
-               upcomingBills.map(bill => {
-                 const isLate = new Date(bill.date) < new Date(new Date().setHours(0,0,0,0));
-                 return (
-                   <div key={bill.id} className="flex justify-between items-center text-xs">
-                      <div className="flex items-center gap-1.5 overflow-hidden">
-                         <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isLate ? 'bg-rose-500' : 'bg-amber-400'}`}></div>
-                         <span className="truncate text-slate-600 dark:text-slate-300 max-w-[80px]">{bill.description}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {[
+                  { id: View.CALENDAR, icon: CalendarClock, label: 'Calendário', color: 'indigo', desc: 'Eventos' },
+                  { id: View.KANBAN, icon: Layers, label: 'Kanban', color: 'purple', desc: 'Projetos' },
+                  { id: View.BUDGETS, icon: Target, label: 'Orçamentos', color: 'rose', desc: 'Limites' },
+                  { id: View.DAILY_ROUTINES, icon: CheckSquare, label: 'Rotina', color: 'blue', desc: 'Checklists' },
+                  { id: View.PRODUCTIVITY, icon: Target, label: 'Hábitos', color: 'emerald', desc: 'Rastreio' },
+                  { id: View.WORK_GOALS, icon: TrendingUp, label: 'Metas', color: 'emerald', desc: 'Trabalho' },
+                  { id: View.NOTES, icon: StickyNote, label: 'Notas', color: 'amber', desc: 'Anotações' },
+                  { id: View.SHOPPING_LIST, icon: ShoppingCart, label: 'Compras', color: 'sky', desc: 'Mercado' },
+                  { id: View.PASSWORDS, icon: KeyRound, label: 'Senhas', color: 'slate', desc: 'Cofre' },
+                  { id: View.PIX_KEYS, icon: QrCode, label: 'Chaves Pix', color: 'teal', desc: 'Gerenciar' },
+                  { id: View.TREINO, icon: Dumbbell, label: 'Treino', color: 'orange', desc: 'Atividades' },
+              ].map(app => (
+                  <div 
+                      key={app.id} 
+                      onClick={() => onNavigate(app.id as View)}
+                      className="bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all flex items-center gap-3 group"
+                  >
+                      <div className={`p-2 rounded-lg bg-${app.color}-100 text-${app.color}-600 dark:bg-${app.color}-900/30 dark:text-${app.color}-400 group-hover:scale-110 transition-transform`}>
+                          <app.icon className="w-4 h-4" />
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                         <span className="text-slate-400 text-[10px]">{new Date(bill.date).toLocaleDateString('pt-BR', {day: '2-digit', month:'2-digit'})}</span>
-                         <span className={`font-semibold ${isLate ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'}`}>
-                           {formatValue(bill.amount).replace('R$', '')}
-                         </span>
-                      </div>
-                   </div>
-                 );
-               })
-            )}
-          </div>
-        </div>
-          );
-
-          if (cardId === 'investments') return (
-        <div key="investments" onClick={() => onNavigate(View.INVESTMENTS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer">
-          {/* Card 4: Investments (Top Assets) */}
-          <div>
-              <div className="flex items-center justify-between mb-3">
-                 <div>
-                   <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Total Investido</h3>
-                   <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatValue(totalInvested)}</p>
-                 </div>
-                 <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-indigo-500" />
-                 </div>
-              </div>
-
-              {/* NEW: Investment Ratio Insight */}
-              {totalInvested > 0 && currentBalance > 0 && (
-                  <div className="mt-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">Ativos para Aposentadoria</span>
-                          <span className="text-xs font-black text-indigo-700 dark:text-indigo-400">
-                              {((totalInvested / (totalInvested + currentBalance)) * 100).toFixed(0)}%
-                          </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-indigo-100 dark:bg-indigo-900/40 rounded-full overflow-hidden">
-                          <div 
-                              className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full"
-                              style={{ width: `${(totalInvested / (totalInvested + currentBalance)) * 100}%` }}
-                          />
+                      <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 dark:text-white truncate">{app.label}</p>
+                          <p className="text-[9px] font-medium text-slate-400 uppercase tracking-wider truncate">{app.desc}</p>
                       </div>
                   </div>
-              )}
+              ))}
           </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 flex-1 flex flex-col justify-end space-y-2">
-             <p className="text-[10px] text-slate-400 font-semibold uppercase pb-1 flex justify-between">
-                <span>Maiores Posições</span>
-                <PieChartIcon className="w-3 h-3" />
-             </p>
-             {topInvestments.length === 0 ? (
-                <div className="text-xs text-slate-400 italic">Carteira vazia.</div>
-             ) : (
-                topInvestments.map((inv, idx) => (
-                   <div key={inv.id} className="flex justify-between items-center text-xs">
-                      <div className="flex items-center gap-1.5 overflow-hidden">
-                         <span className="text-slate-400 font-mono text-[10px]">{idx + 1}.</span>
-                         <span className="truncate text-slate-600 dark:text-slate-300 max-w-[90px]" title={inv.name}>{inv.name}</span>
-                      </div>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                         {formatValue(inv.amount).replace('R$', '')}
-                      </span>
-                   </div>
-                ))
-             )}
-          </div>
-        </div>
-          );
-
-          return null;
-        })}
-      </div>
-
-      {/* --- PLANEJAMENTO --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-indigo-500" /> Planejamento
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Calendário Preview */}
-        <div onClick={() => onNavigate(View.CALENDAR)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-sm font-bold uppercase">
-                    <CalendarClock className="w-4 h-4" /> Calendário
-                </div>
-                <ArrowRight className="w-4 h-4 text-indigo-400" />
-            </div>
-            {data.agendaEvents?.filter(e => new Date(e.startDate) >= new Date()).slice(0, 3).length > 0 ? (
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
-                    {data.agendaEvents.filter(e => new Date(e.startDate) >= new Date()).sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 3).map(event => (
-                        <div key={event.id} className="text-xs flex items-center gap-2 bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0 bg-indigo-500" />
-                            <div className="flex-1 truncate">
-                                <span className="font-semibold text-slate-700 dark:text-slate-200">{event.title}</span>
-                                <span className="block text-slate-500 text-[10px]">{new Date(event.startDate).toLocaleDateString('pt-BR')}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-xs text-slate-500 mt-2">Acompanhe vencimentos e fluxo de caixa diário.</p>
-            )}
-        </div>
-
-        {/* Kanban Preview */}
-        <div onClick={() => onNavigate(View.KANBAN)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 text-sm font-bold uppercase">
-                    <Layers className="w-4 h-4" /> Kanban
-                </div>
-                <ArrowRight className="w-4 h-4 text-purple-400" />
-            </div>
-            {data.kanbanBoards && data.kanbanBoards.length > 0 ? (
-                <div className="flex-1 flex flex-col gap-2">
-                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        {data.kanbanBoards.length} quadro(s) de tarefas.
-                     </span>
-                     <div className="flex items-center gap-2 mt-2">
-                        <div className="flex-1 bg-slate-100 dark:bg-slate-700/50 h-10 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500">
-                            {data.kanbanBoards.reduce((acc, b) => acc + Object.values(b.columns).reduce((acc2, col) => acc2 + col.cards.length, 0), 0)} tarefas
-                        </div>
-                     </div>
-                </div>
-            ) : (
-                <p className="text-xs text-slate-500 mt-2">Organize tarefas em quadros visuais.</p>
-            )}
-        </div>
-
-        {/* Orçamentos Preview */}
-        <div onClick={() => onNavigate(View.BUDGETS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-sm font-bold uppercase">
-                    <Target className="w-4 h-4" /> Orçamentos
-                </div>
-                <ArrowRight className="w-4 h-4 text-rose-400" />
-            </div>
-            {data.budgets && data.budgets.length > 0 ? (
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
-                    {data.budgets.slice(0, 2).map((budget: any) => {
-                        const totalSpent = data.transactions.filter(t => t.type === 'expense' && t.category === budget.category && new Date(t.date).getMonth() === new Date().getMonth()).reduce((acc, t) => acc + t.amount, 0);
-                        const progress = Math.min((totalSpent / budget.limit) * 100, 100);
-                        return (
-                            <div key={budget.id} className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate">{budget.category}</span>
-                                    <span className="text-[10px] font-bold text-rose-500">{progress.toFixed(0)}%</span>
-                                </div>
-                                <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-1 overflow-hidden">
-                                    <div className={`h-full rounded-full ${progress >= 100 ? 'bg-rose-500' : progress >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${progress}%` }} />
-                                </div>
-                            </div>
-                        );
-                    })}
-                    {data.budgets.length > 2 && <span className="text-[10px] text-center text-slate-500">+ {data.budgets.length - 2} orçamentos</span>}
-                </div>
-            ) : (
-                <p className="text-xs text-slate-500 mt-2">Defina tetos de gastos por categoria.</p>
-            )}
-        </div>
-
-        {/* Rotina Diária Preview */}
-        <div onClick={() => onNavigate(View.DAILY_ROUTINES)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[160px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm font-bold uppercase">
-                    <CheckSquare className="w-4 h-4" /> Rotina Diária
-                </div>
-                <ArrowRight className="w-4 h-4 text-blue-400" />
-            </div>
-            {data.dailyRoutines && data.dailyRoutines.length > 0 ? (
-                <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar">
-                    {data.dailyRoutines.slice(0, 3).map((r: any) => (
-                        <div key={r.id} className="flex items-center gap-2">
-                             {r.completed ? <CheckSquare className="w-3 h-3 text-emerald-500" /> : <div className="w-3 h-3 border-2 border-slate-300 dark:border-slate-500 rounded-sm" />}
-                             <span className={`text-xs truncate ${r.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{r.time} - {r.title}</span>
-                        </div>
-                    ))}
-                    {data.dailyRoutines.length > 3 && <span className="text-[10px] text-center text-slate-500">+ {data.dailyRoutines.length - 3} rotinas</span>}
-                </div>
-            ) : (
-                <p className="text-xs text-slate-500 mt-2">Planeje seu dia com checklists organizados.</p>
-            )}
-        </div>
-      </div>
-
-      {/* --- PRODUTIVIDADE & UTILIDADES --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Target className="w-5 h-5 text-purple-500" /> Produtividade & Utilidades
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {['habits', 'notes', 'workgoals'].map((cardId) => {
-          if (cardId === 'habits') {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const activeHabits = data.habits || [];
-            
-            // Find if a habit has an entry for today
-            const hasEntryToday = (habit: any) => {
-                return Object.values(habit.entries || {}).some((e: any) => e.date === todayStr && e.status === 'done');
-            };
-
-            const completedToday = activeHabits.filter(hasEntryToday).length;
-            const totalHabits = activeHabits.length;
-            const progress = totalHabits > 0 ? (completedToday / totalHabits) * 100 : 0;
-
-            const handleQuickToggle = (habit: any) => {
-                // If already done today, maybe we don't untoggle from dashboard, or we find the entry and remove it?
-                // For simplicity, let's just navigate to productivity view if they click it, or we can find the first empty slot.
-                const entries = habit.entries || {};
-                const todayEntryEntry = Object.entries(entries).find(([_, e]: [string, any]) => e.date === todayStr) as [string, any] | undefined;
-                
-                if (todayEntryEntry) {
-                    // Toggle existing today entry
-                    const dayIndex = parseInt(todayEntryEntry[0]);
-                    const currentStatus = todayEntryEntry[1].status;
-                    onToggleHabitEntry(habit.id, dayIndex, currentStatus === 'done' ? 'missed' : 'done', todayStr);
-                } else {
-                    // Find first empty slot
-                    const targetDays = habit.targetDays || 21;
-                    let firstEmpty = -1;
-                    for (let i = 0; i < targetDays; i++) {
-                        if (!entries[i]) {
-                            firstEmpty = i;
-                            break;
-                        }
-                    }
-                    if (firstEmpty !== -1) {
-                        onToggleHabitEntry(habit.id, firstEmpty, 'done', todayStr);
-                    }
-                }
-            };
-
-            return (
-              <div key="habits" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; onNavigate(View.PRODUCTIVITY); }} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                          <Target className="w-4 h-4" /> Hábitos de Hoje
-                      </h3>
-                      <button 
-                          onClick={() => onNavigate(View.PRODUCTIVITY)} 
-                          className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
-                          title="Ver todos"
-                      >
-                          <ArrowRight className="w-4 h-4" />
-                      </button>
-                  </div>
-                  
-                  {totalHabits === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                          <Target className="w-6 h-6 opacity-30" />
-                          <p className="text-xs italic text-center">Nenhum hábito criado.</p>
-                      </div>
-                  ) : (
-                      <div className="flex-1 flex flex-col">
-                          <div className="flex items-end justify-between mb-2">
-                              <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
-                                  {completedToday}<span className="text-sm text-slate-400 font-medium">/{totalHabits}</span>
-                              </span>
-                              <span className="text-[10px] font-bold uppercase text-indigo-600/80 dark:text-indigo-400/80">
-                                  {progress.toFixed(0)}% Concluído
-                              </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
-                              <div 
-                                  className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full transition-all duration-500"
-                                  style={{ width: `${progress}%` }}
-                              />
-                          </div>
-                          
-                          <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5">
-                              {activeHabits.slice(0, 4).map(habit => {
-                                  const isCompleted = hasEntryToday(habit);
-                                  return (
-                                      <div 
-                                          key={habit.id}
-                                          onClick={() => handleQuickToggle(habit)}
-                                          className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
-                                              isCompleted 
-                                              ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30' 
-                                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                          }`}
-                                      >
-                                          <div className="flex items-center gap-2 truncate">
-                                              <span className="text-sm">{habit.icon}</span>
-                                              <span title={habit.name} className={`text-xs truncate font-medium ${isCompleted ? 'text-emerald-700 dark:text-emerald-400 line-through opacity-70' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                  {habit.name}
-                                              </span>
-                                          </div>
-                                          {isCompleted ? (
-                                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                                          ) : (
-                                              <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
-                                          )}
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                      </div>
-                  )}
-              </div>
-            );
-          }
-
-          if (cardId === 'workgoals') {
-            const goals = data.workGoals || [];
-            
-            return (
-              <div key="workgoals" onClick={() => onNavigate(View.WORK_GOALS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-emerald-500" /> Metas de Trab.
-                      </h3>
-                      <button 
-                          onClick={(e) => { e.stopPropagation(); onNavigate(View.WORK_GOALS); }}
-                          className="text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 p-1 rounded transition-colors"
-                          title="Ver todas"
-                      >
-                          <ArrowRight className="w-4 h-4" />
-                      </button>
-                  </div>
-                  
-                  {goals.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                          <TrendingUp className="w-6 h-6 opacity-30" />
-                          <p className="text-xs italic text-center">Nenhuma meta cadastrada.</p>
-                      </div>
-                  ) : (
-                      <div className="flex-1 flex flex-col gap-2 overflow-y-auto no-scrollbar max-h-[120px]">
-                          {goals.slice(0, 3).map(goal => {
-                              const progress = Math.min((goal.completedHours / goal.targetHours) * 100, 100);
-                              return (
-                                  <div key={goal.id} className="bg-slate-50 dark:bg-slate-700/50 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
-                                      <div className="flex justify-between items-center mb-1">
-                                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{goal.title}</span>
-                                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{progress.toFixed(0)}%</span>
-                                      </div>
-                                      <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-1 overflow-hidden">
-                                          <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${progress}%` }} />
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  )}
-              </div>
-            );
-          }
-
-          if (cardId === 'notes') return (
-        <div key="notes" onClick={() => onNavigate(View.NOTES)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow h-full min-h-[180px] cursor-pointer">
-            {/* Card 5: Notes Widget */}
-            <div className="flex items-center justify-between mb-3">
-                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                    <StickyNote className="w-4 h-4" /> Notas Fixadas
-                </h3>
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onNavigate(View.NOTES); }}
-                    className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 p-1 rounded transition-colors"
-                    title="Ver todas"
-                >
-                    <ArrowRight className="w-4 h-4" />
-                </button>
-            </div>
-            <div className="flex-1 space-y-2 overflow-y-auto max-h-[220px] no-scrollbar">
-                {pinnedNotes.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                        <StickyNote className="w-6 h-6 opacity-30" />
-                        <p className="text-xs italic text-center">Nenhuma nota fixada.</p>
-                    </div>
-                ) : (
-                    pinnedNotes.map(note => {
-                        const borderColor = note.color === 'slate' ? 'border-slate-200 dark:border-slate-600' : `border-${note.color}-200 dark:border-${note.color}-800`;
-                        const bgColor = note.color === 'slate' ? 'bg-slate-50 dark:bg-slate-700/50' : `bg-${note.color}-50 dark:bg-${note.color}-900/20`;
-                        
-                        return (
-                            <div 
-                                key={note.id} 
-                                onClick={() => onNavigate(View.NOTES)}
-                                className={`text-xs p-3 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${borderColor} ${bgColor}`}
-                            >
-                                <span className="font-bold mr-1 block truncate mb-1 text-slate-800 dark:text-slate-200">{note.title || 'Sem título'}</span>
-                                <span className="text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{note.content}</span>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-        </div>
-          );
-
-          return null;
-        })}
-
-        <div onClick={() => onNavigate(View.SHOPPING_LIST)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 text-xs font-bold uppercase">
-                    <ShoppingCart className="w-4 h-4" /> Compras
-                </div>
-                <ArrowRight className="w-4 h-4 text-sky-400" />
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                <ShoppingCart className="w-6 h-6 opacity-30" />
-                <p className="text-xs italic text-center">Lista inteligente de supermercado.</p>
-            </div>
-        </div>
-
-        <div onClick={() => onNavigate(View.PASSWORDS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-xs font-bold uppercase">
-                    <KeyRound className="w-4 h-4" /> Senhas
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                <KeyRound className="w-6 h-6 opacity-30" />
-                <p className="text-xs italic text-center">Cofre seguro para senhas.</p>
-            </div>
-        </div>
-
-        <div onClick={() => onNavigate(View.PIX_KEYS)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer min-h-[180px]">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 text-xs font-bold uppercase">
-                    <QrCode className="w-4 h-4" /> Chaves Pix
-                </div>
-                <ArrowRight className="w-4 h-4 text-teal-400" />
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-70">
-                <QrCode className="w-6 h-6 opacity-30" />
-                <p className="text-xs italic text-center">Gerencie todas suas chaves Pix.</p>
-            </div>
-        </div>
-      </div>
-
-      {/* --- SAÚDE --- */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-          <Activity className="w-5 h-5 text-rose-500" /> Saúde & Bem-estar
-        </h2>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div onClick={() => onNavigate(View.TREINO)} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative flex flex-col hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 text-sm font-bold uppercase">
-                    <Dumbbell className="w-4 h-4" /> Treinos
-                </div>
-                <ArrowRight className="w-4 h-4 text-orange-400" />
-            </div>
-            <p className="text-xs text-slate-500">Registre treinos, cronogramas e rotina diária.</p>
-        </div>
       </div>
     </div>
   );

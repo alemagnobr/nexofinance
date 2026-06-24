@@ -281,21 +281,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <NavItem
           active={isFinanceiroActive}
-          onClick={() => handleNavClick(View.FINANCEIRO_DASHBOARD)}
+          onClick={() => handleNavClick(View.TRANSACTIONS)}
           icon={Landmark}
           label="Financeiro"
         />
 
         <NavItem
           active={isProductivityActive}
-          onClick={() => handleNavClick(View.PLANEJAMENTO_DASHBOARD)}
+          onClick={() => handleNavClick(View.PRODUCTIVITY)}
           icon={Target}
           label="Planejamento"
         />
 
         <NavItem
           active={isSaudeActive}
-          onClick={() => handleNavClick(View.SAUDE_DASHBOARD)}
+          onClick={() => handleNavClick(View.TREINO)}
           icon={Activity}
           label="Saúde"
         />

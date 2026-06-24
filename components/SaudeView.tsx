@@ -13,25 +13,17 @@ interface SaudeViewProps {
 export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, data, actions }) => {
   const tabs = [
     { 
-      id: View.SAUDE_DASHBOARD, 
-      label: 'Painel Geral', 
-      icon: LayoutDashboard,
-      activeClass: 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30',
-      inactiveClass: 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/30 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-200'
-    },
-    { 
       id: View.TREINO, 
       label: 'Gestão de Treinos', 
       icon: Dumbbell,
-      activeClass: 'bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-500/30',
-      inactiveClass: 'bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-900/30 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-200'
+      activeColor: 'text-orange-600 dark:text-orange-400'
     }
   ];
 
   return (
     <div className="flex flex-col w-full min-h-screen">
       {/* Sub-navigation Header */}
-      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 -mt-4 mx-[-1rem] md:-mt-8 md:mx-[-2rem] px-4 md:px-8 pt-4 md:pt-8">
+      <div className="mb-6">
         <div className="pb-2">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl">
@@ -43,25 +35,30 @@ export const SaudeView: React.FC<SaudeViewProps> = ({ currentView, onNavigate, d
             </div>
           </div>
           
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = currentView === tab.id;
-              
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onNavigate(tab.id as View)}
-                  className={`
-                    flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all duration-300 border
-                    ${isActive ? tab.activeClass : tab.inactiveClass}
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
+          {/* Internal Tabs Navigation - Integrated Segmented Control */}
+          <div className="w-full overflow-x-auto scrollbar-hide pb-2 md:pb-0">
+            <div className="flex items-stretch justify-center w-max min-w-full p-1.5 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl mx-auto border border-slate-200/50 dark:border-slate-700/50">
+              {tabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = currentView === tab.id;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => onNavigate(tab.id as View)}
+                    className={`
+                      flex-1 shrink-0 relative flex flex-row items-center justify-center gap-1.5 md:gap-2 py-2 md:py-2.5 px-3 md:px-2 rounded-xl font-bold transition-all duration-300
+                      ${isActive 
+                        ? `bg-white dark:bg-slate-700 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600 ${tab.activeColor}` 
+                        : `text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50`}
+                    `}
+                  >
+                    <Icon className={`w-4 h-4 md:w-4 md:h-4 ${isActive ? 'scale-110' : ''} transition-transform`} />
+                    <span className="text-xs md:text-sm whitespace-nowrap truncate">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

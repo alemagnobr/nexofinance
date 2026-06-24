@@ -12,7 +12,8 @@ import {
   AppWindow,
   Landmark,
   CheckSquare,
-  Activity
+  Activity,
+  LayoutDashboard
 } from "lucide-react";
 import {
   View,
@@ -521,77 +522,45 @@ const App: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto animate-fade-in">
-          {/* Quick Actions Bar - Only visible on Dashboard usually, but keeping global for now as user likes it */}
-
-          {currentView === View.DASHBOARD && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-              <button
-                onClick={() => triggerQuickAction(View.FINANCEIRO_DASHBOARD)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-blue-100 dark:border-blue-900/30 hover:border-blue-300 transition-all group"
-              >
-                <div className="bg-blue-100 dark:bg-blue-900/40 p-2.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors text-blue-600 dark:text-blue-400">
-                  <Landmark className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Acessar
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
-                    Financeiro
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => triggerQuickAction(View.PLANEJAMENTO_DASHBOARD)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-emerald-100 dark:border-emerald-900/30 hover:border-emerald-300 transition-all group"
-              >
-                <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2.5 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors text-emerald-600 dark:text-emerald-400">
-                  <Target className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Acessar
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
-                    Planejamento
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => triggerQuickAction(View.SAUDE_DASHBOARD)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-rose-100 dark:border-rose-900/30 hover:border-rose-300 transition-all group"
-              >
-                <div className="bg-rose-100 dark:bg-rose-900/40 p-2.5 rounded-lg group-hover:bg-rose-600 group-hover:text-white transition-colors text-rose-600 dark:text-rose-400">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Acessar
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
-                    Saúde
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => triggerQuickAction(View.CALENDAR)}
-                className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md border border-purple-100 dark:border-purple-900/30 hover:border-purple-300 transition-all group"
-              >
-                <div className="bg-purple-100 dark:bg-purple-900/40 p-2.5 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors text-purple-600 dark:text-purple-400">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                    Acessar
-                  </p>
-                  <p className="font-bold text-slate-700 dark:text-white leading-tight">
-                    Agenda
-                  </p>
-                </div>
-              </button>
+          {/* Quick Actions Bar - Replacing with Segmented Control for Main Navigation */}
+          {[
+            View.DASHBOARD,
+            View.CALENDAR,
+            View.FINANCEIRO_DASHBOARD, View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS, View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER, View.PIX_KEYS,
+            View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS,
+            View.SAUDE_DASHBOARD, View.TREINO
+          ].includes(currentView) && (
+            <div className="w-full overflow-x-auto scrollbar-hide pb-2 mb-6 px-1">
+              <div className="flex items-stretch justify-center w-max min-w-full p-1.5 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl mx-auto border border-slate-200/50 dark:border-slate-700/50">
+                {[
+                  { id: View.DASHBOARD, label: 'Visão Geral', icon: LayoutDashboard, color: 'text-indigo-600 dark:text-indigo-400', 
+                    isActive: currentView === View.DASHBOARD },
+                  { id: View.CALENDAR, label: 'Agenda', icon: Calendar, color: 'text-purple-600 dark:text-purple-400',
+                    isActive: currentView === View.CALENDAR },
+                  { id: View.TRANSACTIONS, label: 'Financeiro', icon: Landmark, color: 'text-blue-600 dark:text-blue-400',
+                    isActive: [View.FINANCEIRO_DASHBOARD, View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS, View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER, View.PIX_KEYS].includes(currentView) },
+                  { id: View.PRODUCTIVITY, label: 'Planejamento', icon: Target, color: 'text-emerald-600 dark:text-emerald-400',
+                    isActive: [View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView) },
+                  { id: View.TREINO, label: 'Saúde', icon: Activity, color: 'text-rose-600 dark:text-rose-400',
+                    isActive: [View.SAUDE_DASHBOARD, View.TREINO].includes(currentView) }
+                ].map(tab => {
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => triggerQuickAction(tab.id)}
+                      className={`
+                        flex-1 shrink-0 relative flex flex-row items-center justify-center gap-1.5 md:gap-2 py-2 md:py-2.5 px-4 md:px-6 rounded-xl font-bold transition-all duration-300
+                        ${tab.isActive 
+                          ? `bg-white dark:bg-slate-700 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600 ${tab.color}` 
+                          : `text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50`}
+                      `}
+                    >
+                      <tab.icon className={`w-4 h-4 md:w-4 md:h-4 ${tab.isActive ? 'scale-110' : ''} transition-transform`} />
+                      <span className="text-xs md:text-sm whitespace-nowrap truncate">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
