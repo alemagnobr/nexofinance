@@ -114,6 +114,36 @@ export interface ShoppingItem {
   purchaseDate?: string; // Data da compra (YYYY-MM-DD)
 }
 
+export interface RegisteredProduct {
+  id: string;
+  name: string;
+  category: ShoppingCategory;
+  unit: string;
+  defaultPrice?: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  category: string;
+  minQuantity?: number; // Quantidade ideal ou mínima para reposição
+  updatedAt?: string;
+  firstAddedAt?: string;
+  persistedMonthsCount?: number; // Quantidade de meses que persistiu no estoque
+}
+
+export interface ReplenishmentLog {
+  id: string;
+  itemName: string;
+  quantityAdded: number;
+  unit: string;
+  category: string;
+  date: string; // ISO format
+  type: 'purchase' | 'manual';
+}
+
 // --- KANBAN TYPES ---
 export interface KanbanTag {
   id: string;
@@ -293,6 +323,9 @@ export interface AppData {
   budgets: Budget[];
   debts: Debt[];
   shoppingList: ShoppingItem[];
+  registeredProducts?: RegisteredProduct[];
+  inventoryList?: InventoryItem[];
+  replenishmentHistory?: ReplenishmentLog[];
   shoppingBudget?: number; // Novo campo: Teto de gastos da ida ao mercado
   kanbanColumns: KanbanColumn[]; // Legacy: Mantido para migração se necessário
   kanbanBoards: KanbanBoard[]; // Novo campo: Múltiplos Quadros
@@ -343,7 +376,8 @@ export enum View {
   WORK_GOALS = 'WORK_GOALS',
   TREINO = 'TREINO',
   WALLETS = 'WALLETS', // Gerenciamento de Carteiras
-  SETTINGS = 'SETTINGS'
+  SETTINGS = 'SETTINGS',
+  INVENTORY = 'INVENTORY'
 }
 
 export interface DailyRoutine {

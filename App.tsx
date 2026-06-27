@@ -351,7 +351,7 @@ const App: React.FC = () => {
     }
 
     // 4. Group: Productivity (Kanban, Notes, Habits, Eisenhower, Utilities)
-    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView)) {
+    if ([View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS, View.INVENTORY].includes(currentView)) {
       return (
         <PlanejamentoView
           currentView={currentView}
@@ -527,7 +527,7 @@ const App: React.FC = () => {
             View.DASHBOARD,
             View.CALENDAR,
             View.FINANCEIRO_DASHBOARD, View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS, View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER, View.PIX_KEYS,
-            View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS,
+            View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS, View.INVENTORY,
             View.SAUDE_DASHBOARD, View.TREINO
           ].includes(currentView) && (
             <div className="w-full overflow-x-auto scrollbar-hide pb-2 mb-6 px-1">
@@ -540,7 +540,7 @@ const App: React.FC = () => {
                   { id: View.TRANSACTIONS, label: 'Financeiro', icon: Landmark, color: 'text-blue-600 dark:text-blue-400',
                     isActive: [View.FINANCEIRO_DASHBOARD, View.TRANSACTIONS, View.SUBSCRIPTIONS, View.DEBTS, View.INVESTMENTS, View.BUDGETS, View.WEALTH_PLANNER, View.PIX_KEYS].includes(currentView) },
                   { id: View.PRODUCTIVITY, label: 'Planejamento', icon: Target, color: 'text-emerald-600 dark:text-emerald-400',
-                    isActive: [View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS].includes(currentView) },
+                    isActive: [View.PLANEJAMENTO_DASHBOARD, View.KANBAN, View.NOTES, View.PRODUCTIVITY, View.WORK_GOALS, View.SHOPPING_LIST, View.PASSWORDS, View.INVENTORY].includes(currentView) },
                   { id: View.TREINO, label: 'Saúde', icon: Activity, color: 'text-rose-600 dark:text-rose-400',
                     isActive: [View.SAUDE_DASHBOARD, View.TREINO].includes(currentView) }
                 ].map(tab => {
