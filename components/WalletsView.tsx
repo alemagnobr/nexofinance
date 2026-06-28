@@ -10,6 +10,7 @@ interface WalletsViewProps {
   onUpdate: (id: string, updates: Partial<Wallet>) => void;
   onDelete: (id: string) => void;
   onTransfer?: (sourceWalletId: string, targetWalletId: string, amount: number, date: string, observation?: string) => void;
+  onUpdateTransaction?: (id: string, updates: Partial<Transaction>) => void;
 }
 
 const WALLET_TYPES: { value: WalletType; label: string; icon: any }[] = [
@@ -21,11 +22,13 @@ const WALLET_TYPES: { value: WalletType; label: string; icon: any }[] = [
 
 const COLORS = ['slate', 'red', 'orange', 'amber', 'emerald', 'teal', 'cyan', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
 
-export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions = [], onAdd, onUpdate, onDelete, onTransfer }) => {
+export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions = [], onAdd, onUpdate, onDelete, onTransfer, onUpdateTransaction }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string>('');
+  const [walletToDelete, setWalletToDelete] = useState<string | null>(null);
+  const [migrateTargetWalletId, setMigrateTargetWalletId] = useState<string>('');
   
   const totals = useMemo(() => {
     return wallets.reduce(
@@ -105,13 +108,35 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
   const handleDelete = (id: string) => {
     const hasLinkedTransactions = transactions.some(t => t.walletId === id);
     if (hasLinkedTransactions) {
-      setWalletError('Não é possível excluir esta conta pois existem transações vinculadas a ela. Exclua as transações primeiro ou edite-as para outra conta.');
-      // Auto clear error after 5s
-      setTimeout(() => setWalletError(''), 5000);
+      const otherAvailableWallets = wallets.filter(w => w.id !== id);
+      if (otherAvailableWallets.length === 0) {
+        setWalletError('Não é possível excluir esta conta pois existem transações vinculadas a ela e não há outra conta para transferi-las. Por favor, crie outra conta primeiro.');
+        setTimeout(() => setWalletError(''), 7000);
+        return;
+      }
+      
+      setWalletToDelete(id);
+      setMigrateTargetWalletId(otherAvailableWallets[0].id);
+      setWalletError('');
       return;
     }
     setWalletError('');
     onDelete(id);
+  };
+
+  const handleConfirmDeleteWithMigration = async () => {
+    if (!walletToDelete || !migrateTargetWalletId) return;
+    
+    const linkedTransactions = transactions.filter(t => t.walletId === walletToDelete);
+    if (onUpdateTransaction) {
+      for (const t of linkedTransactions) {
+        await onUpdateTransaction(t.id, { walletId: migrateTargetWalletId });
+      }
+    }
+    
+    onDelete(walletToDelete);
+    setWalletToDelete(null);
+    setMigrateTargetWalletId('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -613,6 +638,74 @@ export const WalletsView: React.FC<WalletsViewProps> = ({ wallets, transactions 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Wallet Deletion & Transaction Migration Modal */}
+      {walletToDelete && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in border border-slate-200 dark:border-slate-700">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-rose-50/50 dark:bg-rose-950/10">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 rounded-lg">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Migrar Transações e Excluir</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setWalletToDelete(null);
+                  setMigrateTargetWalletId('');
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                A conta <strong className="text-slate-800 dark:text-white">"{wallets.find(w => w.id === walletToDelete)?.name}"</strong> possui <strong className="text-rose-600 dark:text-rose-400">{transactions.filter(t => t.walletId === walletToDelete).length} transações</strong> vinculadas a ela.
+              </p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Para prosseguir com a exclusão, selecione para qual conta deseja transferir estas transações:
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Conta de Destino</label>
+                <select
+                  required
+                  value={migrateTargetWalletId}
+                  onChange={e => setMigrateTargetWalletId(e.target.value)}
+                  className="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-xl p-3 focus:ring-2 focus:ring-rose-500 outline-none font-medium"
+                >
+                  {wallets.filter(w => w.id !== walletToDelete).map(w => (
+                    <option key={w.id} value={w.id}>{w.name} (Saldo: {formatCurrency(w.balance)})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWalletToDelete(null);
+                    setMigrateTargetWalletId('');
+                  }}
+                  className="flex-1 px-4 py-3 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmDeleteWithMigration}
+                  disabled={!migrateTargetWalletId}
+                  className="flex-1 px-4 py-3 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20"
+                >
+                  Transferir e Excluir
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

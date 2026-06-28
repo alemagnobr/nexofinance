@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { View, Category, TransactionType, AppData } from '../types';
-import { Settings, Key, Database, Palette, Shield, Download, Upload, Trash2, Plus, X, Monitor, Moon, Sun, Lock } from 'lucide-react';
+import { View, Category, TransactionType, AppData, RegisteredProduct, ShoppingCategory } from '../types';
+import { Settings, Key, Database, Palette, Shield, Download, Upload, Trash2, Plus, X, Monitor, Moon, Sun, Lock, ShoppingCart, Search, Edit2 } from 'lucide-react';
 
 interface SettingsViewProps {
   data: AppData;
@@ -35,10 +35,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   data, actions, privacyMode, setPrivacyMode, darkMode, setDarkMode, hasApiKey,
   onOpenKeyModal, onExportBackup, onImportBackup, onFactoryReset
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'categories' | 'data' | 'catalog'>('general');
   const [newCatName, setNewCatName] = useState('');
   const [newCatType, setNewCatType] = useState<TransactionType>('expense');
   const [newCatColor, setNewCatColor] = useState('slate');
+
+  // Registered Product State
+  const [newProdName, setNewProdName] = useState('');
+  const [newProdCategory, setNewProdCategory] = useState<ShoppingCategory>('Hortifruti');
+  const [newProdDefaultUnit, setNewProdDefaultUnit] = useState('un');
+  const [newProdDefaultPrice, setNewProdDefaultPrice] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // CSV Import State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +65,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       
       actions.addCategory(newCat);
       setNewCatName('');
+  };
+
+  const formatCurrencyInput = (value: string) => {
+      const numericValue = value.replace(/\D/g, '');
+      if (!numericValue) return '';
+      const floatValue = parseFloat(numericValue) / 100;
+      return floatValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleAddProduct = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newProdName.trim()) return;
+
+      const numericValue = newProdDefaultPrice.replace(/\D/g, '');
+      const defaultPrice = numericValue ? parseFloat(numericValue) / 100 : undefined;
+
+      actions.addRegisteredProduct({
+          name: newProdName.trim(),
+          category: newProdCategory,
+          unit: newProdDefaultUnit,
+          defaultPrice: defaultPrice,
+      });
+
+      setNewProdName('');
+      setNewProdDefaultPrice('');
   };
 
   const handleCsvImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,6 +178,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                ${activeTab === 'data' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
           >
              <Database className="w-4 h-4" /> Dados & Backup
+          </button>
+          <button 
+             onClick={() => setActiveTab('catalog')}
+             className={`flex-1 py-2 px-4 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap
+               ${activeTab === 'catalog' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+          >
+             <ShoppingCart className="w-4 h-4" /> Catálogo de Produtos
           </button>
       </div>
 
@@ -414,6 +453,144 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                               Resetar App
                           </button>
                       </div>
+                  </div>
+              </div>
+          )}
+
+          {/* 5. CATALOG TAB */}
+          {activeTab === 'catalog' && (
+              <div className="space-y-6 animate-fade-in">
+                  <div className="bg-slate-50 dark:bg-slate-700/30 p-5 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <h4 className="font-bold text-slate-800 dark:text-white mb-4">Cadastrar Novo Produto</h4>
+                      <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                          <div className="md:col-span-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome do Produto</label>
+                              <input 
+                                  type="text" 
+                                  placeholder="Ex: Arroz Tio João 5kg" 
+                                  value={newProdName}
+                                  onChange={(e) => setNewProdName(e.target.value)}
+                                  className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                  required
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Categoria</label>
+                              <select 
+                                  value={newProdCategory}
+                                  onChange={(e) => setNewProdCategory(e.target.value as ShoppingCategory)}
+                                  className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none font-medium"
+                              >
+                                  <option value="Hortifruti">Hortifruti</option>
+                                  <option value="Carnes">Carnes</option>
+                                  <option value="Laticínios">Laticínios</option>
+                                  <option value="Mercearia">Mercearia</option>
+                                  <option value="Padaria">Padaria</option>
+                                  <option value="Bebidas">Bebidas</option>
+                                  <option value="Limpeza">Limpeza</option>
+                                  <option value="Higiene">Higiene</option>
+                                  <option value="Outros">Outros</option>
+                              </select>
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Unidade Padrão</label>
+                              <select 
+                                  value={newProdDefaultUnit}
+                                  onChange={(e) => setNewProdDefaultUnit(e.target.value)}
+                                  className="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none font-medium"
+                              >
+                                  <option value="un">UN</option>
+                                  <option value="kg">KG</option>
+                                  <option value="g">g</option>
+                                  <option value="L">L</option>
+                                  <option value="ml">ml</option>
+                                  <option value="cx">CX</option>
+                                  <option value="pct">PCT</option>
+                                  <option value="pc">PÇ</option>
+                                  <option value="bdj">BDJ</option>
+                              </select>
+                          </div>
+                          <div className="md:col-span-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Preço Ref. Padrão (Opcional)</label>
+                              <div className="relative">
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                                  <input 
+                                      type="text" 
+                                      placeholder="0,00"
+                                      value={newProdDefaultPrice}
+                                      onChange={(e) => setNewProdDefaultPrice(formatCurrencyInput(e.target.value))}
+                                      className="w-full pl-8 pr-3 py-2.5 font-bold text-right rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                  />
+                              </div>
+                          </div>
+                          <div className="md:col-span-2 flex justify-end">
+                              <button 
+                                  type="submit"
+                                  className="w-full md:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
+                              >
+                                  <Plus className="w-5 h-5" /> Cadastrar Produto
+                              </button>
+                          </div>
+                      </form>
+                  </div>
+
+                  <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                          <div>
+                              <h4 className="font-bold text-slate-800 dark:text-white">Produtos Cadastrados</h4>
+                              <p className="text-slate-500 dark:text-slate-400 text-xs">Total: {data.registeredProducts?.length || 0} produtos no catálogo</p>
+                          </div>
+                          <div className="relative w-full sm:w-64">
+                              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                              <input 
+                                  type="text" 
+                                  placeholder="Buscar produto..."
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                              />
+                          </div>
+                      </div>
+
+                      {(!data.registeredProducts || data.registeredProducts.length === 0) ? (
+                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                              <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Nenhum produto cadastrado no catálogo.</p>
+                              <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">Os produtos cadastrados aqui ficarão disponíveis na lista de compras.</p>
+                          </div>
+                      ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {(data.registeredProducts || [])
+                                  .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                  .map(p => (
+                                      <div key={p.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700/70 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-colors">
+                                          <div>
+                                              <p className="font-bold text-slate-800 dark:text-white text-sm">{p.name}</p>
+                                              <div className="flex items-center gap-2 mt-1">
+                                                  <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 rounded text-[10px] font-bold">
+                                                      {p.category}
+                                                  </span>
+                                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase">
+                                                      unidade: {p.unit}
+                                                  </span>
+                                                  {p.defaultPrice !== undefined && p.defaultPrice > 0 && (
+                                                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                                                          R$ {p.defaultPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                      </span>
+                                                  )}
+                                              </div>
+                                          </div>
+                                          <button 
+                                              onClick={() => { if(confirm(`Excluir produto "${p.name}" do catálogo?`)) actions.deleteRegisteredProduct(p.id); }}
+                                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                                          >
+                                              <Trash2 className="w-4 h-4" />
+                                          </button>
+                                      </div>
+                                  ))
+                              }
+                          </div>
+                      )}
                   </div>
               </div>
           )}

@@ -6,7 +6,8 @@ import { HabitTracker } from './HabitTracker';
 import { WorkGoalsView } from './WorkGoalsView';
 import { ShoppingList } from './ShoppingList';
 import { PasswordManager } from './PasswordManager';
-import { Wallet, StickyNote, Target, LayoutDashboard, TrendingUp, ShoppingCart, Key } from 'lucide-react';
+import { Inventory } from './Inventory';
+import { Wallet, StickyNote, Target, LayoutDashboard, TrendingUp, ShoppingCart, Key, Package } from 'lucide-react';
 
 interface PlanejamentoViewProps {
   currentView: View;
@@ -21,7 +22,7 @@ interface PlanejamentoViewProps {
 export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({ 
   currentView, onNavigate, data, actions, privacyMode, hasApiKey, quickActionSignal 
 }) => {
-  // Logic to finish shopping (Convert cart to expense)
+  // Logic to finish shopping (Convert cart to expense and update inventory)
   const finishShopping = async (total: number, paymentMethod: string, category: string) => {
      const transaction = {
          description: `Compra de Mercado (${new Date().toLocaleDateString()})`,
@@ -33,10 +34,51 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
          paymentMethod: paymentMethod,
          isRecurring: false
      };
+
+     // Process items to Inventory
+     const shoppingList = data.shoppingList || [];
+     const purchasedItems = shoppingList.filter((item: any) => item.isChecked);
+     const itemsToProcess = purchasedItems.length > 0 ? purchasedItems : shoppingList;
+     const currentInventory = data.inventoryList || [];
+
+     for (const sItem of itemsToProcess) {
+         // Find existing inventory item by name (case-insensitive)
+         const existing = currentInventory.find(
+             (inv: any) => inv.name.trim().toLowerCase() === sItem.name.trim().toLowerCase()
+         );
+
+         if (existing) {
+             const newQty = (existing.quantity || 0) + (sItem.quantity || 1);
+             await actions.updateInventoryItem(existing.id, {
+                 quantity: newQty,
+                 category: sItem.category || existing.category || 'Outros',
+                 unit: sItem.unit || existing.unit || 'un'
+             });
+         } else {
+             await actions.addInventoryItem({
+                 name: sItem.name.trim(),
+                 quantity: sItem.quantity || 1,
+                 unit: sItem.unit || 'un',
+                 category: sItem.category || 'Outros',
+                 minQuantity: 1
+             });
+         }
+
+         // Register replenishment log
+         await actions.addReplenishmentLog({
+             itemName: sItem.name.trim(),
+             quantityAdded: sItem.quantity || 1,
+             unit: sItem.unit || 'un',
+             category: sItem.category || 'Outros',
+             date: new Date().toISOString(),
+             type: 'purchase'
+         });
+     }
+
      await actions.addTransaction(transaction);
      await actions.clearShoppingList();
-     alert("Compra finalizada! Despesa registrada com sucesso.");
-     onNavigate(View.TRANSACTIONS);
+     alert("Compra finalizada! Despesa registrada e itens enviados ao estoque.");
+     onNavigate(View.INVENTORY);
   };
 
   const tabs = [
@@ -69,6 +111,12 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
       label: 'Compras', 
       icon: ShoppingCart,
       activeColor: 'text-rose-600 dark:text-rose-400'
+    },
+    { 
+      id: View.INVENTORY, 
+      label: 'Estoque', 
+      icon: Package,
+      activeColor: 'text-indigo-600 dark:text-indigo-400'
     },
     { 
       id: View.PASSWORDS, 
@@ -151,6 +199,14 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
                 <p className="text-slate-500 dark:text-slate-400 text-sm">Organize suas idas ao mercado focando nas categorias.</p>
               </div>
 
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => onNavigate(View.INVENTORY)}>
+                <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">
+                  <Package className="w-8 h-8" />
+                  <h3 className="text-lg font-bold">Estoque & Reposição</h3>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Controle de estoque, avisos de reposição e itens de consumo.</p>
+              </div>
+
               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-sky-300 transition-colors" onClick={() => onNavigate(View.PASSWORDS)}>
                 <div className="flex items-center gap-3 text-sky-600 dark:text-sky-400">
                   <Key className="w-8 h-8" />
@@ -205,6 +261,8 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
         {currentView === View.SHOPPING_LIST && (
           <ShoppingList 
              items={data.shoppingList || []}
+             registeredProducts={data.registeredProducts || []}
+             inventoryList={data.inventoryList || []}
              onAdd={actions.addShoppingItem}
              onUpdate={actions.updateShoppingItem}
              onDelete={actions.deleteShoppingItem}
@@ -223,6 +281,30 @@ export const PlanejamentoView: React.FC<PlanejamentoViewProps> = ({
              onAdd={actions.addPassword}
              onUpdate={actions.updatePassword}
              onDelete={actions.deletePassword}
+             privacyMode={privacyMode}
+          />
+        )}
+        {currentView === View.INVENTORY && (
+          <Inventory
+             items={data.inventoryList || []}
+             replenishmentLogs={data.replenishmentHistory || []}
+             onAdd={actions.addInventoryItem}
+             onUpdate={actions.updateInventoryItem}
+             onDelete={actions.deleteInventoryItem}
+             onAddReplenishmentLog={actions.addReplenishmentLog}
+             onClearReplenishmentHistory={actions.clearReplenishmentHistory}
+             onAddToShoppingList={(item) => {
+                 actions.addShoppingItem({
+                     name: item.name,
+                     quantity: item.quantity,
+                     unit: item.unit,
+                     category: item.category,
+                     actualPrice: 0,
+                     isChecked: false,
+                     observation: 'Auto-gerado para reposição de estoque'
+                 });
+                 alert(`"${item.name}" foi adicionado de volta à lista de compras!`);
+             }}
              privacyMode={privacyMode}
           />
         )}

@@ -975,6 +975,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             onUpdate={onUpdateWallet}
             onDelete={onDeleteWallet}
             onTransfer={handleTransfer}
+            onUpdateTransaction={onUpdate}
           />
         </div>
       )}

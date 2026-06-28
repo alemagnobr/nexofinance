@@ -185,7 +185,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     View.PRODUCTIVITY,
     View.WORK_GOALS,
     View.SHOPPING_LIST,
-    View.PASSWORDS
+    View.PASSWORDS,
+    View.INVENTORY
   ].includes(currentView);
   const isSaudeActive = [
     View.SAUDE_DASHBOARD,
