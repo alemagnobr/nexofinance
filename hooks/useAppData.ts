@@ -7,6 +7,9 @@ import {
   Budget,
   Debt,
   ShoppingItem,
+  RegisteredProduct,
+  InventoryItem,
+  ReplenishmentLog,
   TransactionStatus,
   WealthProfile,
   KanbanColumn,
@@ -42,6 +45,14 @@ import {
   updateShoppingItemFire,
   deleteShoppingItemFire,
   clearShoppingListFire,
+  addRegisteredProductFire,
+  deleteRegisteredProductFire,
+  updateRegisteredProductFire,
+  addInventoryItemFire,
+  updateInventoryItemFire,
+  deleteInventoryItemFire,
+  addReplenishmentLogFire,
+  clearReplenishmentHistoryFire,
   updateShoppingBudgetFire,
   updateScoreSerasaFire,
   saveKanbanColumnFire,
@@ -100,6 +111,9 @@ const DEFAULT_DATA: AppData = {
   budgets: [],
   debts: [],
   shoppingList: [],
+  registeredProducts: [],
+  inventoryList: [],
+  replenishmentHistory: [],
   shoppingBudget: 0,
   kanbanColumns: [],
   kanbanBoards: [],
@@ -705,6 +719,102 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       setData((prev) => ({
         ...prev,
         shoppingList: prev.shoppingList.filter((item) => item.id !== id),
+      }));
+  };
+
+  const addRegisteredProduct = async (product: Omit<RegisteredProduct, "id">) => {
+    const newProduct: RegisteredProduct = {
+      ...product,
+      id: crypto.randomUUID(),
+    };
+    if (user) await addRegisteredProductFire(user.uid, newProduct);
+    else
+      setData((prev) => ({
+        ...prev,
+        registeredProducts: [...(prev.registeredProducts || []), newProduct],
+      }));
+  };
+
+  const updateRegisteredProduct = async (
+    id: string,
+    updates: Partial<RegisteredProduct>,
+  ) => {
+    if (user) await updateRegisteredProductFire(user.uid, id, updates);
+    else
+      setData((prev) => ({
+        ...prev,
+        registeredProducts: (prev.registeredProducts || []).map((prod) =>
+          prod.id === id ? { ...prod, ...updates } : prod,
+        ),
+      }));
+  };
+
+  const deleteRegisteredProduct = async (id: string) => {
+    if (user) await deleteRegisteredProductFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        registeredProducts: (prev.registeredProducts || []).filter((prod) => prod.id !== id),
+      }));
+  };
+
+  const addInventoryItem = async (item: Omit<InventoryItem, "id">) => {
+    const newItem: InventoryItem = {
+      ...item,
+      id: crypto.randomUUID(),
+      updatedAt: new Date().toISOString()
+    };
+    if (user) await addInventoryItemFire(user.uid, newItem);
+    else
+      setData((prev) => ({
+        ...prev,
+        inventoryList: [...(prev.inventoryList || []), newItem],
+      }));
+  };
+
+  const updateInventoryItem = async (
+    id: string,
+    updates: Partial<InventoryItem>,
+  ) => {
+    const finalUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    if (user) await updateInventoryItemFire(user.uid, id, finalUpdates);
+    else
+      setData((prev) => ({
+        ...prev,
+        inventoryList: (prev.inventoryList || []).map((item) =>
+          item.id === id ? { ...item, ...finalUpdates } : item,
+        ),
+      }));
+  };
+
+  const deleteInventoryItem = async (id: string) => {
+    if (user) await deleteInventoryItemFire(user.uid, id);
+    else
+      setData((prev) => ({
+        ...prev,
+        inventoryList: (prev.inventoryList || []).filter((item) => item.id !== id),
+      }));
+  };
+
+  const addReplenishmentLog = async (log: Omit<ReplenishmentLog, "id">) => {
+    const newLog: ReplenishmentLog = {
+      ...log,
+      id: crypto.randomUUID(),
+    };
+    if (user) await addReplenishmentLogFire(user.uid, newLog);
+    else
+      setData((prev) => ({
+        ...prev,
+        replenishmentHistory: [newLog, ...(prev.replenishmentHistory || [])],
+      }));
+  };
+
+  const clearReplenishmentHistory = async () => {
+    if (user) await clearReplenishmentHistoryFire(user.uid);
+    else
+      setData((prev) => ({
+        ...prev,
+        replenishmentHistory: [],
       }));
   };
 
@@ -1488,6 +1598,14 @@ export const useAppData = (user: User | null, isGuest: boolean) => {
       addShoppingItem,
       updateShoppingItem,
       deleteShoppingItem,
+      addRegisteredProduct,
+      updateRegisteredProduct,
+      deleteRegisteredProduct,
+      addInventoryItem,
+      updateInventoryItem,
+      deleteInventoryItem,
+      addReplenishmentLog,
+      clearReplenishmentHistory,
       clearShoppingList,
       setShoppingBudget,
       updateScoreSerasa,
