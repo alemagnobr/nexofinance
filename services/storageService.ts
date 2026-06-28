@@ -1,5 +1,5 @@
 
-import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine, WorkGoal, WorkoutProject, WorkoutRoutine } from '../types';
+import { AppData, Transaction, Investment, Budget, Debt, ShoppingItem, RegisteredProduct, InventoryItem, ReplenishmentLog, WealthProfile, KanbanColumn, KanbanBoard, Note, Category, PasswordEntry, AgendaEvent, TaskList, Task, PixKey, Habit, Wallet, DailyRoutine, WorkGoal, WorkoutProject, WorkoutRoutine } from '../types';
 import { db } from './firebase';
 import { toast } from 'sonner';
 import { 
@@ -44,6 +44,7 @@ const DEFAULT_DATA: AppData = {
   budgets: [],
   debts: [],
   shoppingList: [],
+  registeredProducts: [],
   shoppingBudget: 0,
   kanbanColumns: [],
   kanbanBoards: [],
@@ -79,6 +80,7 @@ export const loadData = (userId?: string): AppData => {
     if (!data.unlockedBadges) data.unlockedBadges = [];
     if (!data.debts) data.debts = [];
     if (!data.shoppingList) data.shoppingList = [];
+    if (!data.registeredProducts) data.registeredProducts = [];
     if (!data.kanbanColumns) data.kanbanColumns = [];
     if (!data.kanbanBoards) data.kanbanBoards = [];
     if (!data.notes) data.notes = [];
@@ -201,6 +203,27 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     onUpdate({ shoppingList });
   }, (error) => {
     handleFirestoreError(error, "Erro ao assinar lista de compras");
+  });
+
+  const unsubRegisteredProducts = onSnapshot(collection(db, 'users', uid, 'registered_products'), (snapshot) => {
+    const registeredProducts = snapshot.docs.map(doc => doc.data() as RegisteredProduct);
+    onUpdate({ registeredProducts });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar produtos registrados");
+  });
+
+  const unsubInventory = onSnapshot(collection(db, 'users', uid, 'inventory'), (snapshot) => {
+    const inventoryList = snapshot.docs.map(doc => doc.data() as InventoryItem);
+    onUpdate({ inventoryList });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar estoque");
+  });
+
+  const unsubReplenishment = onSnapshot(collection(db, 'users', uid, 'replenishment_history'), (snapshot) => {
+    const replenishmentHistory = snapshot.docs.map(doc => doc.data() as ReplenishmentLog);
+    onUpdate({ replenishmentHistory });
+  }, (error) => {
+    handleFirestoreError(error, "Erro ao assinar histórico de reposição");
   });
 
   const unsubKanban = onSnapshot(query(collection(db, 'users', uid, 'kanban_columns'), orderBy('order')), (snapshot) => {
@@ -341,6 +364,9 @@ export const subscribeToData = (uid: string, onUpdate: (data: Partial<AppData>) 
     unsubBudgets();
     unsubDebts();
     unsubShopping();
+    unsubRegisteredProducts();
+    unsubInventory();
+    unsubReplenishment();
     unsubKanban();
     unsubKanbanBoards();
     unsubNotes();
@@ -544,6 +570,50 @@ export const deleteShoppingItemFire = async (uid: string, id: string) => {
     handleFirestoreError(error, "Erro ao excluir item da lista");
   }
 };
+
+// INVENTORY
+export const addInventoryItemFire = async (uid: string, item: InventoryItem) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'inventory', item.id), item);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar item ao estoque");
+  }
+};
+export const updateInventoryItemFire = async (uid: string, id: string, data: Partial<InventoryItem>) => {
+  try {
+    await updateDoc(doc(db, 'users', uid, 'inventory', id), data);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao atualizar item do estoque");
+  }
+};
+export const deleteInventoryItemFire = async (uid: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, 'users', uid, 'inventory', id));
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao excluir item do estoque");
+  }
+};
+
+export const addReplenishmentLogFire = async (uid: string, log: ReplenishmentLog) => {
+  try {
+    await setDoc(doc(db, 'users', uid, 'replenishment_history', log.id), log);
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao adicionar item ao histórico de reposição");
+  }
+};
+
+export const clearReplenishmentHistoryFire = async (uid: string) => {
+  try {
+    const snapshot = await getDocs(query(collection(db, 'users', uid, 'replenishment_history')));
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, "Erro ao limpar histórico de reposição");
+  }
+};
 export const clearShoppingListFire = async (uid: string, month?: string) => {
   try {
     let q = query(collection(db, 'users', uid, 'shopping_list'));
@@ -729,6 +799,29 @@ export const deleteTaskFire = async (uid: string, id: string) => {
       await deleteDoc(doc(db, 'users', uid, 'tasks', id));
     } catch (error) {
       handleFirestoreError(error, "Erro ao excluir tarefa");
+    }
+};
+
+// REGISTERED PRODUCTS
+export const addRegisteredProductFire = async (uid: string, item: RegisteredProduct) => {
+    try {
+      await setDoc(doc(db, 'users', uid, 'registered_products', item.id), item);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao adicionar produto registrado");
+    }
+};
+export const updateRegisteredProductFire = async (uid: string, id: string, data: Partial<RegisteredProduct>) => {
+    try {
+      await updateDoc(doc(db, 'users', uid, 'registered_products', id), data);
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao atualizar produto registrado");
+    }
+};
+export const deleteRegisteredProductFire = async (uid: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'registered_products', id));
+    } catch (error) {
+      handleFirestoreError(error, "Erro ao excluir produto registrado");
     }
 };
 
@@ -995,6 +1088,11 @@ export const migrateLocalToCloud = async (uid: string, localData: AppData) => {
       localData.shoppingList.forEach(s => {
         const ref = doc(db, 'users', uid, 'shopping_list', s.id);
         batch.set(ref, s);
+      });
+
+      localData.registeredProducts?.forEach(p => {
+        const ref = doc(db, 'users', uid, 'registered_products', p.id);
+        batch.set(ref, p);
       });
 
       localData.kanbanColumns.forEach(k => {
